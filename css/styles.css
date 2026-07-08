@@ -137,24 +137,45 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .totals .line { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; color: var(--ink-soft); }
 .totals .line.grand { border-top: 2px solid var(--ink); margin-top: 8px; padding-top: 12px; font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -.5px; }
 
-/* ---------- invoice (blue, brand logo) ---------- */
-.invoice { --inv: #1b22d6; --inv-name: #0f10f4; background: #fff; color: #1a1a1a; padding: 44px; max-width: 840px; margin: 0 auto; }
-.invoice .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid var(--inv); padding-bottom: 20px; margin-bottom: 24px; }
-.invoice .co { display: flex; align-items: flex-start; gap: 16px; }
-.invoice .logo { width: 92px; height: 92px; object-fit: contain; flex: none; }
-.invoice .co-name { font-size: 27px; font-weight: 800; color: var(--inv-name); letter-spacing: -.5px; }
-.invoice .co-meta { font-size: 12px; color: #555; margin-top: 4px; }
+/* ---------- invoice (modern, blue, brand logo) ---------- */
+.invoice-panel { padding: 0; overflow: hidden; }
+.invoice { --inv: #1f2ae0; --inv-dark: #1319b0; background: #fff; color: #23262e; padding: 0 52px 48px; max-width: 860px; margin: 0 auto; }
+.invoice .accent-strip { height: 6px; margin: 0 -52px 40px; background: linear-gradient(90deg, var(--inv), #4b56f0); }
+.invoice .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 34px; }
+.invoice .co { display: flex; align-items: center; gap: 18px; }
+.invoice .logo { width: 84px; height: 84px; object-fit: contain; flex: none; }
+.invoice .co-lines { display: flex; flex-direction: column; gap: 2px; }
+.invoice .co-meta { font-size: 12.5px; color: #6b7280; }
 .invoice .doc-title { text-align: right; }
-.invoice .doc-title .t { font-size: 32px; font-weight: 800; letter-spacing: 3px; color: var(--inv); }
-.invoice .parties { display: flex; gap: 44px; margin-bottom: 22px; }
-.invoice .parties h4 { margin: 0 0 5px; font-size: 10.5px; text-transform: uppercase; color: var(--muted); letter-spacing: .6px; font-weight: 700; }
-.invoice table.items { width: 100%; border-collapse: collapse; margin-top: 8px; }
-.invoice table.items th { background: var(--inv); color: #fff; padding: 10px 11px; font-size: 11.5px; text-align: left; text-transform: uppercase; letter-spacing: .4px; }
+.invoice .doc-title .t { font-size: 34px; font-weight: 800; letter-spacing: 4px; color: var(--inv); margin-bottom: 12px; }
+.invoice .doc-meta { display: inline-flex; flex-direction: column; gap: 5px; min-width: 190px; }
+.invoice .mrow { display: flex; justify-content: space-between; gap: 20px; font-size: 12.5px; }
+.invoice .mrow .ml { color: #9ca3af; font-weight: 600; }
+.invoice .mrow .mv { color: #23262e; font-weight: 700; font-variant-numeric: tabular-nums; }
+.invoice .mrow.status { justify-content: flex-end; margin-top: 2px; }
+.invoice .bill { background: #f6f7fe; border-left: 3px solid var(--inv); border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 30px; }
+.invoice .bill h4 { margin: 0 0 6px; font-size: 10.5px; text-transform: uppercase; color: var(--inv); letter-spacing: .8px; font-weight: 800; }
+.invoice .bill-name { font-size: 16px; font-weight: 700; color: #23262e; }
+.invoice .bill div { font-size: 13px; color: #4b5563; }
+.invoice table.items { width: 100%; border-collapse: collapse; }
+.invoice table.items th { background: var(--inv); color: #fff; padding: 12px 12px; font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+.invoice table.items th:first-child { border-radius: 8px 0 0 0; }
+.invoice table.items th:last-child { border-radius: 0 8px 0 0; }
 .invoice table.items th.num, .invoice table.items td.num { text-align: right; }
-.invoice table.items td { padding: 10px 11px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: top; }
-.invoice .totals .line.grand { border-top-color: var(--inv); color: var(--inv); }
-.invoice .terms { margin-top: 28px; font-size: 12px; color: #555; white-space: pre-line; border-top: 1px solid #e5e5e5; padding-top: 14px; }
-@media print { .invoice table.items th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+.invoice table.items td { padding: 13px 12px; border-bottom: 1px solid #eef0f2; font-size: 13px; vertical-align: top; color: #374151; }
+.invoice table.items tbody tr:nth-child(even) { background: #fafbff; }
+.invoice table.items td.strong { font-weight: 700; color: #23262e; }
+.invoice table.items td.desc { color: #6b7280; max-width: 260px; line-height: 1.5; }
+.invoice .sum { display: flex; justify-content: flex-end; margin-top: 22px; }
+.invoice .sum-box { width: 300px; }
+.invoice .sum-box .line { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; color: #4b5563; }
+.invoice .sum-box .line.grand { margin-top: 6px; padding: 14px 16px; background: var(--inv); color: #fff; border-radius: 10px; font-size: 20px; font-weight: 800; }
+.invoice .terms { margin-top: 38px; font-size: 12px; color: #6b7280; white-space: pre-line; border-top: 1px solid #eef0f2; padding-top: 16px; line-height: 1.7; }
+@media print {
+  .invoice { padding: 0 10px 10px; }
+  .invoice .accent-strip { margin: 0 -10px 30px; }
+  .invoice table.items th, .invoice .sum-box .line.grand, .invoice .accent-strip, .invoice .bill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 
 .toast {
   position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
@@ -168,7 +189,14 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .subtab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
 /* ---------- editable worksheet (Excel-style) ---------- */
-.sheet-wrap { border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.sheet-wrap { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow-x: auto; overflow-y: hidden; }
+/* subtle, thin horizontal scrollbar instead of the chunky native one */
+.sheet-wrap::-webkit-scrollbar { height: 8px; }
+.sheet-wrap::-webkit-scrollbar-track { background: transparent; }
+.sheet-wrap::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
+.sheet-wrap::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+.sheet-wrap { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.addbar { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 table.sheet { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; }
 table.sheet th {
   position: sticky; top: 0; z-index: 1;

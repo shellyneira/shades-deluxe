@@ -189,20 +189,20 @@ function sheet(q, rerender) {
     const cells = cols.map((col) => cell(col, item, onChange));
     cells.push(el('td', { class: 'r price' }, [priceNode]));
     if (draftRow) {
-      cells.push(el('td', {}, [el('button', {
-        class: 'btn accent small', onclick: () => {
-          if (!item.width || !item.height) return toast('Enter width and height');
-          q.items.push({ ...item });
-          q._draft = blankLine(s);
-          save();
-          rerender();
-        },
-      }, ['＋ Add'])]));
+      cells.push(el('td', {}, [])); // action cell kept empty; Add button lives below the scroll
       return el('tr', { class: 'draftrow' }, cells);
     }
     const idx = q.items.indexOf(item);
     cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Remove', onclick: () => { q.items.splice(idx, 1); save(); rerender(); } }, ['✕'])]));
     return el('tr', {}, cells);
+  };
+
+  const addLine = () => {
+    if (!draft.width || !draft.height) return toast('Enter width and height');
+    q.items.push({ ...draft });
+    q._draft = blankLine(s);
+    save();
+    rerender();
   };
 
   const head = el('tr', {}, [
@@ -213,6 +213,8 @@ function sheet(q, rerender) {
 
   const bodyRows = q.items.map((it) => makeRow(it));
   const draftRow = makeRow(draft, { draftRow: true });
+  // Enter anywhere in the draft row commits it.
+  draftRow.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addLine(); } });
 
   const table = el('table', { class: 'sheet' }, [
     el('thead', {}, [head]),
@@ -236,9 +238,13 @@ function sheet(q, rerender) {
   return el('div', { class: 'panel' }, [
     el('div', { class: 'section-head' }, [
       el('h3', { style: 'margin:0' }, ['Worksheet']),
-      el('span', { class: 'hint' }, ['Fill the bottom row and press ＋ Add. Scroll sideways for more columns. Every cell is editable.']),
+      el('span', { class: 'hint' }, ['Fill the highlighted row, then Add line. Every cell is editable · scroll sideways for more.']),
     ]),
-    el('div', { class: 'scroll sheet-wrap' }, [table]),
+    el('div', { class: 'sheet-wrap' }, [table]),
+    el('div', { class: 'addbar' }, [
+      el('button', { class: 'btn accent', onclick: addLine }, ['＋ Add line']),
+      el('span', { class: 'hint' }, ['or press Enter']),
+    ]),
     totals,
   ]);
 }
@@ -259,45 +265,57 @@ function invoice(q) {
     return el('tr', {}, [
       el('td', { class: 'num' }, ['1']),
       el('td', {}, [l.location]),
-      el('td', {}, [l.product]),
-      el('td', {}, [describeLine(l)]),
+      el('td', { class: 'strong' }, [l.product]),
+      el('td', { class: 'desc' }, [describeLine(l)]),
       el('td', {}, [l.color]),
       el('td', { class: 'num' }, [money(c.unit || 0)]),
-      el('td', { class: 'num' }, [money(c.unit || 0)]),
+      el('td', { class: 'num strong' }, [money(c.unit || 0)]),
     ]);
   });
 
-  const doc = el('div', { class: 'invoice blue' }, [
+  const meta = (label, val) => el('div', { class: 'mrow' }, [el('span', { class: 'ml' }, [label]), el('span', { class: 'mv' }, [val])]);
+
+  const doc = el('div', { class: 'invoice' }, [
+    el('div', { class: 'accent-strip' }, []),
     el('div', { class: 'head' }, [
       el('div', { class: 'co' }, [
         el('img', { class: 'logo', src: 'assets/logo.jpg', alt: co.name }),
-        el('div', {}, [
+        el('div', { class: 'co-lines' }, [
           el('div', { class: 'co-meta' }, [co.address]),
-          el('div', { class: 'co-meta' }, [co.phone + ' · ' + co.email]),
+          el('div', { class: 'co-meta' }, [co.phone]),
+          el('div', { class: 'co-meta' }, [co.email]),
         ]),
       ]),
       el('div', { class: 'doc-title' }, [
         el('div', { class: 't' }, ['QUOTE']),
-        el('div', { class: 'co-meta' }, ['#' + q.number]),
-        el('div', { class: 'co-meta' }, ['Date: ' + (q.date || '')]),
-        q.installDate ? el('div', { class: 'co-meta' }, ['Install: ' + q.installDate]) : null,
+        el('div', { class: 'doc-meta' }, [
+          meta('Quote #', String(q.number)),
+          meta('Date', q.date || '—'),
+          q.installDate ? meta('Install', q.installDate) : null,
+          el('div', { class: 'mrow status' }, [el('span', { class: 'badge ' + (q.status || 'draft') }, [q.status || 'draft'])]),
+        ]),
       ]),
     ]),
-    el('div', { class: 'parties' }, [
-      el('div', {}, [el('h4', {}, ['Sold To']), el('div', {}, [q.client.name || '—']), el('div', {}, [q.client.address || '']), el('div', {}, [q.client.phone || '']), el('div', {}, [q.client.email || ''])]),
+    el('div', { class: 'bill' }, [
+      el('h4', {}, ['Bill To']),
+      el('div', { class: 'bill-name' }, [q.client.name || '—']),
+      q.client.address ? el('div', {}, [q.client.address]) : null,
+      el('div', { class: 'co-meta' }, [[q.client.phone, q.client.email].filter(Boolean).join(' · ')]),
     ]),
     el('table', { class: 'items' }, [
       el('thead', {}, [el('tr', {}, ['Qty', 'Location', 'Product', 'Description', 'Color', 'Unit Price', 'Total'].map((h, i) =>
         el('th', { class: i >= 5 || i === 0 ? 'num' : '' }, [h])))]),
-      el('tbody', {}, items.length ? items : [el('tr', {}, [el('td', { colspan: 7, class: 'muted' }, ['No items'])])]),
+      el('tbody', {}, items.length ? items : [el('tr', {}, [el('td', { colspan: 7, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
     ]),
-    el('div', { class: 'totals' }, [
-      el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
-      t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
-      el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
+    el('div', { class: 'sum' }, [
+      el('div', { class: 'sum-box' }, [
+        el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
+        t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
+        el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
+      ]),
     ]),
     el('div', { class: 'terms' }, [co.terms]),
   ]);
 
-  return el('div', {}, [toolbar, el('div', { class: 'panel' }, [doc])]);
+  return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [doc])]);
 }
