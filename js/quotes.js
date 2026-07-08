@@ -1,7 +1,7 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
-import { el, select, input, mount, toast, FRACTION_LABEL } from './dom.js';
+import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote } from './store.js';
-import { computeLine, describeLine, quoteTotals, money } from './pricing.js';
+import { computeLine, describeLine, quoteTotals, money, round2 } from './pricing.js';
 
 let sub = { view: 'list', quoteId: null };
 
@@ -19,6 +19,8 @@ function open(id, view = 'edit') {
 
 /* ---------------- list ---------------- */
 const STATUSES = ['draft', 'sent', 'won', 'lost'];
+const PAYMENT_OPTS = ['Unpaid', '50% paid', 'Paid'];
+const paymentPct = (p) => (p === 'Paid' ? 1 : p === '50% paid' ? 0.5 : 0);
 let filter = 'all';
 
 function list() {
@@ -43,6 +45,7 @@ function list() {
           el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
           el('div', { class: 'muted' }, [q.items.length + ' item(s)']),
           el('div', { class: 'total' }, [money(t.total)]),
+          q.payment && q.payment !== 'Unpaid' ? el('span', { class: 'pay-tag ' + (q.payment === 'Paid' ? 'full' : 'half') }, [q.payment === 'Paid' ? '✓ Paid' : '◐ 50% paid']) : null,
         ]);
       }))
     : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['🪟']), s.quotes.length ? 'No quotes in this filter.' : 'No quotes yet. Click “New Quote” to start.']);
@@ -59,7 +62,7 @@ function editor(q) {
     el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list' }; renderQuotes(); } }, ['← All quotes']),
     el('div', { class: 'row' }, [
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
-      el('button', { class: 'btn', onclick: () => { deleteQuote(q.id); sub = { view: 'list' }; renderQuotes(); toast('Quote deleted'); } }, ['Delete']),
+      el('button', { class: 'btn', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list' }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
     ]),
   ]);
 
@@ -75,6 +78,7 @@ function editor(q) {
       input('Quote date', q.date, (v) => set(() => (q.date = v)), { type: 'date' }),
       input('Install date', q.installDate, (v) => set(() => (q.installDate = v)), { type: 'date' }),
       select('Status', STATUSES, q.status || 'draft', (v) => set(() => (q.status = v))),
+      select('Payment', PAYMENT_OPTS, q.payment || 'Unpaid', (v) => set(() => (q.payment = v))),
     ]),
   ]);
 
@@ -103,6 +107,13 @@ function blankLine(s) {
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, sideChannel: false, installation: '', brackets: '',
   };
+}
+
+// A draft row is "empty" if nothing but the default table is set (so clearing needs no confirm).
+function isRowEmpty(l) {
+  return !l.width && !l.height && !l.location && !l.wdNumber && !l.product && !l.fabric &&
+    !l.color && !l.control && !l.system && !l.style && !l.headrail && !l.bottomRail &&
+    !l.fascia && !l.sideChannel && !l.installation && !l.brackets;
 }
 
 // A shade is Zebra or Roller based on its table. Products/fabrics are filtered to
@@ -187,9 +198,11 @@ function sheet(q, rerender) {
       const hasDims = p.item.width && p.item.height;
       p.node.textContent = c.unit != null ? money(c.unit) : (hasDims ? 'off chart' : '—');
       p.node.classList.toggle('off', c.unit == null && hasDims);
+      p.td.querySelector('.mintag')?.remove();
+      if (c.floored) p.td.append(el('span', { class: 'mintag', title: `Table minimum ${money(c.floor)} for ${p.item.table} — raise the size or lower the minimum in Price Tables` }, ['min']));
       p.node.title = c.list == null
         ? (hasDims ? `Size is larger than the ${p.item.table} chart` : '')
-        : `List ${money(c.list)}`;
+        : (c.floored ? `List ${money(c.list)} · minimum ${money(c.floor)} applied` : `List ${money(c.list)}`);
     }
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
     // number is never a surprising $0 while a priced line sits in the draft row.
@@ -202,15 +215,16 @@ function sheet(q, rerender) {
     // Changing the table refilters the Product/Description options, so rebuild the row.
     const onChange = (key, val) => { item[key] = val; if (!draftRow) save(); recalc(); if (key === 'table') rerender(); };
     const priceNode = el('strong', {}, ['—']);
-    priceCells.push({ item, node: priceNode });
+    const priceTd = el('td', { class: 'r price' }, [priceNode]);
+    priceCells.push({ item, node: priceNode, td: priceTd });
     const cells = cols.map((col) => cell(col, item, onChange));
-    cells.push(el('td', { class: 'r price' }, [priceNode]));
+    cells.push(priceTd);
     if (draftRow) {
-      cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Clear this row', onclick: () => { q._draft = blankLine(s); save(); rerender(); } }, ['↺'])]));
+      cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Clear this row', onclick: () => { if (isRowEmpty(item) || confirmAction('Clear this row?')) { q._draft = blankLine(s); save(); rerender(); } } }, ['↺'])]));
       return el('tr', { class: 'draftrow' }, cells);
     }
     const idx = q.items.indexOf(item);
-    cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Remove', onclick: () => { q.items.splice(idx, 1); save(); rerender(); } }, ['✕'])]));
+    cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Remove', onclick: () => { if (confirmAction('Delete this line?')) { q.items.splice(idx, 1); save(); rerender(); } } }, ['✕'])]));
     return el('tr', {}, cells);
   };
 
@@ -322,13 +336,21 @@ function invoice(q) {
 
   const doc = el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
     head, bill, table,
-    isWork ? null : el('div', { class: 'sum' }, [
-      el('div', { class: 'sum-box' }, [
-        el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
-        t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
-        el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
-      ]),
-    ]),
+    isWork ? null : (() => {
+      const pct = paymentPct(q.payment);
+      const paid = round2(t.total * pct);
+      const balance = round2(t.total - paid);
+      return el('div', { class: 'sum' }, [
+        el('div', { class: 'sum-box' }, [
+          el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
+          t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
+          el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
+          pct > 0 ? el('div', { class: 'line paid' }, [el('span', {}, ['Paid' + (pct < 1 ? ' (50%)' : '')]), el('span', {}, ['−' + money(paid)])]) : null,
+          pct > 0 && pct < 1 ? el('div', { class: 'line balance' }, [el('span', {}, ['Balance due']), el('span', {}, [money(balance)])]) : null,
+          pct >= 1 ? el('div', { class: 'paid-stamp' }, ['PAID IN FULL']) : null,
+        ]),
+      ]);
+    })(),
     el('div', { class: 'terms' }, [isWork ? 'Fabrication spec sheet — measurements are finished sizes. No pricing shown.' : co.terms]),
   ]);
 
@@ -356,28 +378,34 @@ function clientTable(q, s) {
   ]);
 }
 
-// Work-order version: every build spec incl. dimensions, NO prices.
+// Every build spec joined into one comma description — no prices. Few columns so it
+// always fits a page and converts cleanly to PDF.
+function workSpecs(l) {
+  const parts = [l.table];
+  if (l.control) parts.push(/^C/.test(l.control) ? 'Chain ' + l.control : /M/i.test(l.control) ? 'Motor ' + l.control : l.control);
+  if (l.system) parts.push(l.system.replace('Batt.', 'Battery'));
+  if (l.style) parts.push(l.style);
+  if (l.headrail) parts.push('Headrail: ' + l.headrail);
+  if (l.bottomRail) parts.push('Bottom: ' + l.bottomRail);
+  if (l.fascia) parts.push('Fascia');
+  if (l.sideChannel) parts.push('Side channels');
+  if (Number(l.brackets) > 0) parts.push('Extra brackets');
+  return parts.filter(Boolean).join(', ');
+}
+
 function workTable(q, s) {
-  const cols = ['#', 'Table', 'Location', 'W/D', 'Size (W×H)', 'Product', 'Description', 'Color', 'Ctrl', 'System', 'Style', 'Headrails', 'Bottom Rail', 'Fascia', 'S/Ch'];
-  const yn = (v) => (v ? 'Yes' : '—');
+  const cols = ['#', 'Location', 'W/D', 'Size (W×H)', 'Product', 'Fabric', 'Color', 'Specifications'];
   const rows = q.items.map((l, i) => el('tr', {}, [
     el('td', { class: 'num' }, [String(i + 1)]),
-    el('td', {}, [l.table]),
     el('td', {}, [l.location]),
     el('td', {}, [l.wdNumber]),
     el('td', { class: 'strong' }, [sizeText(l)]),
-    el('td', {}, [l.product]),
-    el('td', { class: 'desc' }, [l.fabric]),
+    el('td', { class: 'strong' }, [l.product]),
+    el('td', {}, [l.fabric]),
     el('td', {}, [l.color]),
-    el('td', {}, [l.control]),
-    el('td', {}, [l.system]),
-    el('td', {}, [l.style]),
-    el('td', {}, [l.headrail]),
-    el('td', {}, [l.bottomRail]),
-    el('td', {}, [yn(l.fascia)]),
-    el('td', {}, [yn(l.sideChannel)]),
+    el('td', { class: 'desc' }, [workSpecs(l)]),
   ]));
-  return el('table', { class: 'items work' }, [
+  return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),
     el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
   ]);

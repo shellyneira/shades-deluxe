@@ -48,8 +48,9 @@ export function computeLine(line, state) {
   const base = (list || 0) + fascia + sideChannel + installation + brackets;
   const floor = Number(state.minPrice[line.table]) || 0;
   const unit = list == null ? null : Math.max(base, floor);
+  const floored = list != null && floor > 0 && floor > round2(base);
 
-  return { list, fascia, sideChannel, installation, brackets, unit: unit == null ? null : round2(unit) };
+  return { list, fascia, sideChannel, installation, brackets, floor, floored, unit: unit == null ? null : round2(unit) };
 }
 
 // Customer-facing description — mirrors the Invoice sheet's TEXTJOIN.

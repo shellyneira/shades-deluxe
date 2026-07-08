@@ -1,6 +1,7 @@
 // Settings — company info on invoices, plus backup (export/import) and reset.
-import { el, mount, input, toast } from './dom.js';
+import { el, mount, input, toast, confirmAction } from './dom.js';
 import { getState, save, exportJSON, importJSON, resetToDefaults } from './store.js';
+import { dbEnabled } from './db.js';
 
 export function renderSettings() {
   const s = getState();
@@ -15,6 +16,7 @@ export function renderSettings() {
 
   const fileInput = el('input', { type: 'file', accept: 'application/json', style: 'display:none', onchange: (e) => {
     const f = e.target.files[0]; if (!f) return;
+    if (!confirmAction('Restore this backup? It replaces ALL current data (tables, lists, quotes) and cannot be undone.')) { e.target.value = ''; return; }
     const r = new FileReader();
     r.onload = () => { try { importJSON(r.result); toast('Backup restored'); renderSettings(); } catch { toast('Invalid file'); } };
     r.readAsText(f);
@@ -40,7 +42,9 @@ export function renderSettings() {
     ]),
     el('div', { class: 'panel' }, [
       el('h2', {}, ['Backup & data']),
-      el('p', { class: 'muted' }, ['Everything is stored in this browser. Download a backup regularly, and use it to move data to another computer.']),
+      dbEnabled()
+        ? el('p', { class: 'muted' }, ['✅ Connected to the cloud — everything saves to your Supabase database automatically and syncs across devices. Backups are optional; keep one if you like an extra copy.'])
+        : el('p', { class: 'muted' }, ['Everything is stored in this browser. Download a backup regularly, and use it to move data to another computer. (Connect Supabase to sync automatically and stop needing manual backups.)']),
       el('div', { class: 'row' }, [
         el('button', { class: 'btn primary', onclick: downloadBackup }, ['⬇ Download backup']),
         el('button', { class: 'btn', onclick: () => fileInput.click() }, ['⬆ Restore backup']),

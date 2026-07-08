@@ -46,6 +46,11 @@ export function checkbox(labelText, checked, onChange) {
   return el('label', { class: 'field check' }, [box, labelText]);
 }
 
+// Guard for irreversible actions (delete / overwrite). Returns true if confirmed.
+export function confirmAction(message) {
+  return window.confirm(message);
+}
+
 export function mount(node) {
   const app = document.getElementById('app');
   app.replaceChildren(node);

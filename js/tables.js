@@ -1,7 +1,7 @@
 // Price Tables editor — the pricing "database". Tables are grouped by type
 // (Roller / Zebra) so it's clear each product line carries its own values.
 // Create, rename, duplicate, delete tables and edit each width×length grid.
-import { el, mount, toast } from './dom.js';
+import { el, mount, toast, confirmAction } from './dom.js';
 import { getState, save } from './store.js';
 
 let active = null;
@@ -105,7 +105,7 @@ function gridEditor(name) {
   table.widths.forEach((w, ci) => {
     headCells.push(el('th', {}, [
       numInput(w, (v) => (table.widths[ci] = v)),
-      el('div', { class: 'delcol', title: 'Delete this width column', onclick: () => { table.widths.splice(ci, 1); table.rows.forEach((r) => r.prices.splice(ci, 1)); save(); renderTables(); } }, ['✕']),
+      el('div', { class: 'delcol', title: 'Delete this width column', onclick: () => { if (confirmAction(`Delete the ${w ?? ''}" width column and all its prices?`)) { table.widths.splice(ci, 1); table.rows.forEach((r) => r.prices.splice(ci, 1)); save(); renderTables(); } } }, ['✕']),
     ]));
   });
   headCells.push(el('th', { class: 'corner' }, ['']));
@@ -113,7 +113,7 @@ function gridEditor(name) {
   const bodyRows = table.rows.map((row, ri) => {
     const cells = [el('td', { class: 'rowhead' }, [numInput(row.length, (v) => (row.length = v))])];
     row.prices.forEach((p, ci) => cells.push(el('td', {}, [numInput(p, (v) => (row.prices[ci] = v))])));
-    cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Delete this length row', onclick: () => { table.rows.splice(ri, 1); save(); renderTables(); } }, ['✕'])]));
+    cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Delete this length row', onclick: () => { if (confirmAction(`Delete the ${row.length ?? ''}" length row and all its prices?`)) { table.rows.splice(ri, 1); save(); renderTables(); } } }, ['✕'])]));
     return el('tr', {}, cells);
   });
 

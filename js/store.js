@@ -96,6 +96,7 @@ export function newQuote() {
     client: { name: '', address: '', phone: '', email: '' },
     discount: 0,
     status: 'draft',
+    payment: 'Unpaid',
     items: [],
   };
   state.quotes.unshift(q);

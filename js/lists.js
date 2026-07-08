@@ -1,7 +1,7 @@
 // Lists editor — the dropdown option lists. Products and Fabrics are shown split
 // into Roller vs Zebra (anything containing "Zebra" is a zebra option), matching
 // how the quote form filters them.
-import { el, mount, toast } from './dom.js';
+import { el, mount, toast, confirmAction } from './dom.js';
 import { getState, save } from './store.js';
 
 const LABELS = {
@@ -18,7 +18,7 @@ export function renderLists() {
 
   const chip = (items, i) => el('span', { class: 'pill', style: 'display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 12px' }, [
     String(items[i]),
-    el('button', { class: 'icon', style: 'padding:0 4px;font-size:13px', title: 'Remove', onclick: () => { items.splice(i, 1); save(); renderLists(); } }, ['✕']),
+    el('button', { class: 'icon', style: 'padding:0 4px;font-size:13px', title: 'Remove', onclick: () => { if (confirmAction(`Remove “${items[i]}” from the list?`)) { items.splice(i, 1); save(); renderLists(); } } }, ['✕']),
   ]);
 
   const panels = keys.map((key) => {
