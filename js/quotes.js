@@ -116,11 +116,10 @@ function isRowEmpty(l) {
     !l.fascia && !l.sideChannel && !l.installation && !l.brackets;
 }
 
-// A shade is Zebra or Roller based on its table. Products/fabrics are filtered to
-// match, so a Zebra line only offers Zebra options and a Roller line the Roller ones.
+// A shade is Zebra or Roller based on its table. Products/fabrics are stored per
+// type, so a Zebra line only offers Zebra options and a Roller line the Roller ones.
 export const isZebra = (table) => /zebra/i.test(table || '');
-const productsFor = (table, all) => all.filter((p) => (isZebra(table) ? /zebra/i.test(p) : !/zebra/i.test(p)));
-const fabricsFor = (table, all) => all.filter((f) => (isZebra(table) ? /zebra/i.test(f) : !/zebra/i.test(f)));
+export const groupKey = (table) => (isZebra(table) ? 'zebra' : 'roller');
 
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
@@ -134,8 +133,8 @@ function columns(o, tableNames) {
     { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'height', label: 'H', kind: 'num', w: 52 },
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(productsFor(it.table, o.products)), w: 150 },
-    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(fabricsFor(it.table, o.fabrics)), w: 160 },
+    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[groupKey(it.table)] || []), w: 150 },
+    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[groupKey(it.table)] || []), w: 160 },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
     { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
     { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108 },

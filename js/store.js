@@ -16,14 +16,30 @@ const DEFAULT_COMPANY = {
 };
 
 function freshState() {
-  return {
+  return normalize({
     company: { ...DEFAULT_COMPANY },
     tables: structuredClone(SEED.tables),
     minPrice: { ...SEED.minPrice },
     options: structuredClone(SEED.options),
     quotes: [],
     nextQuoteNumber: 1001,
-  };
+  });
+}
+
+// Products and Fabrics are stored per shade type ({roller, zebra}) so membership is
+// explicit rather than guessed from the name. Migrate any legacy flat arrays.
+function normalize(state) {
+  for (const key of ['products', 'fabrics']) {
+    const v = state.options[key];
+    if (Array.isArray(v)) {
+      state.options[key] = { roller: v.filter((x) => !/zebra/i.test(x)), zebra: v.filter((x) => /zebra/i.test(x)) };
+    } else if (v && typeof v === 'object') {
+      v.roller = v.roller || []; v.zebra = v.zebra || [];
+    } else {
+      state.options[key] = { roller: [], zebra: [] };
+    }
+  }
+  return state;
 }
 
 let state = load();
@@ -32,7 +48,7 @@ function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return freshState();
-    return { ...freshState(), ...JSON.parse(raw) };
+    return normalize({ ...freshState(), ...JSON.parse(raw) });
   } catch {
     return freshState();
   }
@@ -56,7 +72,7 @@ export async function initCloud() {
   try {
     const remote = await pullState();
     if (remote) {
-      state = { ...freshState(), ...remote };
+      state = normalize({ ...freshState(), ...remote });
       localStorage.setItem(KEY, JSON.stringify(state));
       return true;
     }
@@ -82,7 +98,7 @@ export function exportJSON() {
 
 export function importJSON(text) {
   const parsed = JSON.parse(text);
-  state = { ...freshState(), ...parsed };
+  state = normalize({ ...freshState(), ...parsed });
   save();
 }
 
