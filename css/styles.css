@@ -163,6 +163,33 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .subtab:hover { border-color: var(--brand); color: var(--brand); }
 .subtab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
+/* ---------- editable worksheet (Excel-style) ---------- */
+.sheet-wrap { border: 1px solid var(--line); border-radius: var(--radius-sm); }
+table.sheet { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; }
+table.sheet th {
+  position: sticky; top: 0; z-index: 1;
+  background: #f5f1ea; color: var(--ink-soft); font-weight: 700;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px;
+  padding: 8px 6px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--line-strong);
+}
+table.sheet th.r { text-align: right; }
+table.sheet td { padding: 3px 4px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.sheet tbody tr:hover td { background: #faf7f2; }
+table.sheet select, table.sheet input {
+  width: 100%; border: 1px solid transparent; border-radius: 6px; padding: 6px 6px;
+  font-size: 13px; background: #fff; color: var(--ink); font-weight: 500;
+}
+table.sheet select { background: #fff; }
+table.sheet input.r { text-align: right; font-variant-numeric: tabular-nums; }
+table.sheet select:hover, table.sheet input:hover { border-color: var(--line-strong); }
+table.sheet select:focus, table.sheet input:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-tint); }
+table.sheet .ck { display: flex; justify-content: center; }
+table.sheet .ck input { width: 18px; height: 18px; accent-color: var(--brand); }
+table.sheet td.r, table.sheet td.price { text-align: right; font-variant-numeric: tabular-nums; padding-right: 10px; white-space: nowrap; }
+table.sheet td.price strong { color: var(--ink); }
+table.sheet tr.draftrow td { background: var(--brand-tint); border-top: 2px solid var(--brand); }
+table.sheet tr.draftrow:hover td { background: var(--brand-tint); }
+
 .hint { color: var(--muted); font-size: 13px; }
 .divider { height: 1px; background: var(--line); margin: 20px 0; border: 0; }
 

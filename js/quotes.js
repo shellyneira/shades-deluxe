@@ -1,5 +1,5 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
-import { el, select, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
+import { el, select, input, mount, toast, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote } from './store.js';
 import { computeLine, describeLine, quoteTotals, money } from './pricing.js';
 
@@ -78,9 +78,9 @@ function editor(q) {
     ]),
   ]);
 
-  // Only the form + items table are data-driven, so rebuild just those on change.
+  // The worksheet rebuilds itself only when rows are added/removed (keeps input focus otherwise).
   const dynamic = el('div', {});
-  const reRender = () => dynamic.replaceChildren(lineForm(q, reRender), itemsTable(q, s, reRender));
+  const reRender = () => dynamic.replaceChildren(sheet(q, reRender));
   reRender();
   return el('div', {}, [toolbar, client, dynamic]);
 }
@@ -94,107 +94,140 @@ function blankLine(s) {
   };
 }
 
-function lineForm(q, rerender) {
-  const s = getState();
-  const draft = q._draft || (q._draft = blankLine(s));
-  const o = s.options;
-  const fracOpts = [0, ...o.fractions];
-  const fracVals = fracOpts.map((f) => FRACTION_LABEL[f] || f);
-  const bind = (k) => (v) => (draft[k] = v);
-  const fracSelect = (label, key) =>
-    select(label, fracVals, FRACTION_LABEL[draft[key]] ?? '—', (v) => {
-      draft[key] = fracOpts[fracVals.indexOf(v)];
-    }, '');
+// Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
+function columns(o, tableNames) {
+  const opt = (arr) => ['', ...arr];
+  return [
+    { key: 'table', label: 'Table', kind: 'select', opts: tableNames, w: 108 },
+    { key: 'location', label: 'Location', kind: 'select', opts: opt(o.locations), w: 116 },
+    { key: 'wdNumber', label: 'W/D #', kind: 'select', opts: opt(o.wdNumbers), w: 92 },
+    { key: 'width', label: 'W', kind: 'num', w: 52 },
+    { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
+    { key: 'height', label: 'H', kind: 'num', w: 52 },
+    { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
+    { key: 'product', label: 'Product', kind: 'select', opts: opt(o.products), w: 150 },
+    { key: 'fabric', label: 'Description', kind: 'select', opts: opt(o.fabrics), w: 160 },
+    { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
+    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
+    { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108 },
+    { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
+    { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
+    { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
+    { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
+    { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
+    { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
+    { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
+  ];
+}
 
-  const preview = el('span', { class: 'pill' }, ['—']);
-  const refreshPreview = () => {
-    const c = computeLine(draft, s);
-    preview.textContent = c.unit == null ? 'size off chart' : 'Unit: ' + money(c.unit);
+const FRAC_OPTS = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
+
+function cell(col, item, onChange) {
+  const style = `width:${col.w}px`;
+  if (col.kind === 'check') {
+    const box = el('input', { type: 'checkbox', onchange: (e) => onChange(col.key, e.target.checked) });
+    box.checked = !!item[col.key];
+    return el('td', { class: 'c' }, [el('div', { class: 'ck' }, [box])]);
+  }
+  if (col.kind === 'frac') {
+    const sel = el('select', { style, onchange: (e) => onChange(col.key, FRAC_OPTS[e.target.selectedIndex]) });
+    FRAC_OPTS.forEach((f, i) => {
+      const o = el('option', { value: f }, [FRACTION_LABEL[f] || String(f)]);
+      if (f === (Number(item[col.key]) || 0)) o.selected = true;
+      sel.append(o);
+    });
+    return el('td', {}, [sel]);
+  }
+  if (col.kind === 'num') {
+    const inp = el('input', { type: 'number', value: item[col.key] ?? '', style, class: 'r', oninput: (e) => onChange(col.key, e.target.value) });
+    return el('td', {}, [inp]);
+  }
+  // select
+  const sel = el('select', { style, onchange: (e) => onChange(col.key, e.target.value) });
+  for (const opt of col.opts) {
+    const o = el('option', { value: opt }, [String(opt)]);
+    if (String(opt) === String(item[col.key] ?? '')) o.selected = true;
+    sel.append(o);
+  }
+  return el('td', {}, [sel]);
+}
+
+function sheet(q, rerender) {
+  const s = getState();
+  const cols = columns(s.options, Object.keys(s.tables));
+  const draft = q._draft || (q._draft = blankLine(s));
+
+  const priceCells = []; // {getItem, node}
+  const totalsRefs = {};
+
+  const recalc = () => {
+    for (const p of priceCells) {
+      const c = computeLine(p.item, s);
+      p.node.textContent = c.unit == null ? '—' : money(c.unit);
+      p.node.title = c.list == null ? 'Size is off this table’s chart' : `List ${money(c.list)}`;
+    }
+    const t = quoteTotals(q, s);
+    totalsRefs.sub.textContent = money(t.subtotal);
+    totalsRefs.total.textContent = money(t.total);
   };
 
-  const rows = el('div', {}, [
-    el('div', { class: 'row' }, [
-      select('Table', Object.keys(s.tables), draft.table, bind('table')),
-      select('Location', ['', ...o.locations], draft.location, bind('location'), 'grow'),
-      select('W/D #', ['', ...o.wdNumbers], draft.wdNumber, bind('wdNumber')),
-    ]),
-    el('div', { class: 'row' }, [
-      el('div', { class: 'dim' }, [input('Width', draft.width, bind('width'), { type: 'number' }), fracSelect(' ', 'widthFrac')]),
-      el('div', { class: 'dim' }, [input('Height', draft.height, bind('height'), { type: 'number' }), fracSelect(' ', 'heightFrac')]),
-      select('Product', ['', ...o.products], draft.product, bind('product'), 'grow'),
-    ]),
-    el('div', { class: 'row' }, [
-      select('Fabric / Description', ['', ...o.fabrics], draft.fabric, bind('fabric'), 'grow'),
-      select('Color', ['', ...o.colors], draft.color, bind('color'), 'grow'),
-      select('Control', ['', ...o.controls], draft.control, bind('control')),
-    ]),
-    el('div', { class: 'row' }, [
-      select('System', ['', ...o.systems], draft.system, bind('system')),
-      select('Style', ['', ...o.styles], draft.style, bind('style')),
-      select('Headrail', ['', ...o.headrails], draft.headrail, bind('headrail')),
-      select('Bottom rail', ['', ...o.headrails], draft.bottomRail, bind('bottomRail')),
-    ]),
-    el('div', { class: 'row' }, [
-      checkbox('Fascia', draft.fascia, bind('fascia')),
-      checkbox('Side channel', draft.sideChannel, bind('sideChannel')),
-      input('Installation $', draft.installation, bind('installation'), { type: 'number' }),
-      input('Brackets $', draft.brackets, bind('brackets'), { type: 'number' }),
-      el('div', { class: 'field check' }, [preview]),
-      el('div', { class: 'spacer' }),
-      el('button', {
-        class: 'btn accent', onclick: () => {
-          if (!draft.width || !draft.height) return toast('Enter width and height');
-          q.items.push({ ...draft });
+  const makeRow = (item, { draftRow } = {}) => {
+    const onChange = (key, val) => { item[key] = val; if (!draftRow) save(); recalc(); };
+    const priceNode = el('strong', {}, ['—']);
+    priceCells.push({ item, node: priceNode });
+    const cells = cols.map((col) => cell(col, item, onChange));
+    cells.push(el('td', { class: 'r price' }, [priceNode]));
+    if (draftRow) {
+      cells.push(el('td', {}, [el('button', {
+        class: 'btn accent small', onclick: () => {
+          if (!item.width || !item.height) return toast('Enter width and height');
+          q.items.push({ ...item });
           q._draft = blankLine(s);
           save();
           rerender();
         },
-      }, ['+ Add line']),
-    ]),
+      }, ['＋ Add'])]));
+      return el('tr', { class: 'draftrow' }, cells);
+    }
+    const idx = q.items.indexOf(item);
+    cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Remove', onclick: () => { q.items.splice(idx, 1); save(); rerender(); } }, ['✕'])]));
+    return el('tr', {}, cells);
+  };
+
+  const head = el('tr', {}, [
+    ...cols.map((c) => el('th', { style: `min-width:${c.w}px` }, [c.label])),
+    el('th', { class: 'r' }, ['Unit $']),
+    el('th', {}, ['']),
   ]);
 
-  rows.addEventListener('input', refreshPreview);
-  rows.addEventListener('change', refreshPreview);
-  refreshPreview();
+  const bodyRows = q.items.map((it) => makeRow(it));
+  const draftRow = makeRow(draft, { draftRow: true });
 
-  return el('div', { class: 'panel' }, [el('h3', {}, ['Add window / shade']), rows]);
-}
-
-function itemsTable(q, s, rerender) {
-  if (!q.items.length) return el('div', { class: 'panel' }, [el('div', { class: 'empty' }, ['No lines yet.'])]);
-  const cols = ['Table', 'Location', 'W/D', 'Size', 'Product', 'Fabric', 'Color', 'List', 'Fascia', 'S/Ch', 'Inst', 'Bra', 'Unit', ''];
-  const head = el('tr', {}, cols.map((c) => el('th', { class: ['List','Fascia','S/Ch','Inst','Bra','Unit'].includes(c) ? 'num' : '' }, [c])));
-  const size = (l) => `${l.width}${FRACTION_LABEL[l.widthFrac] && l.widthFrac ? ' ' + FRACTION_LABEL[l.widthFrac] : ''} × ${l.height}${FRACTION_LABEL[l.heightFrac] && l.heightFrac ? ' ' + FRACTION_LABEL[l.heightFrac] : ''}`;
-
-  const body = q.items.map((l, i) => {
-    const c = computeLine(l, s);
-    return el('tr', {}, [
-      el('td', {}, [el('span', { class: 'pill' }, [l.table])]),
-      el('td', {}, [l.location]), el('td', {}, [l.wdNumber]), el('td', {}, [size(l)]),
-      el('td', {}, [l.product]), el('td', {}, [l.fabric]), el('td', {}, [l.color]),
-      el('td', { class: 'num' }, [c.list == null ? '⚠︎' : money(c.list)]),
-      el('td', { class: 'num' }, [c.fascia ? money(c.fascia) : '—']),
-      el('td', { class: 'num' }, [c.sideChannel ? money(c.sideChannel) : '—']),
-      el('td', { class: 'num' }, [c.installation ? money(c.installation) : '—']),
-      el('td', { class: 'num' }, [c.brackets ? money(c.brackets) : '—']),
-      el('td', { class: 'num' }, [el('strong', {}, [c.unit == null ? '—' : money(c.unit)])]),
-      el('td', {}, [el('button', { class: 'icon', title: 'Remove', onclick: () => { q.items.splice(i, 1); save(); rerender(); } }, ['✕'])]),
-    ]);
-  });
+  const table = el('table', { class: 'sheet' }, [
+    el('thead', {}, [head]),
+    el('tbody', {}, [...bodyRows, draftRow]),
+  ]);
 
   const t = quoteTotals(q, s);
+  totalsRefs.sub = el('span', {}, [money(t.subtotal)]);
+  totalsRefs.total = el('span', {}, [money(t.total)]);
   const totals = el('div', { class: 'totals' }, [
-    el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
+    el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), totalsRefs.sub]),
     el('div', { class: 'line' }, [
       el('span', {}, ['Discount']),
-      (() => { const i = input('', q.discount, (v) => { q.discount = Number(v) || 0; save(); rerender(); }, { type: 'number', width: '120px' }); i.style.margin = '0'; return i; })(),
+      (() => { const i = el('input', { type: 'number', value: q.discount || 0, style: 'width:120px;padding:8px;border:1px solid var(--line-strong);border-radius:8px', oninput: (e) => { q.discount = Number(e.target.value) || 0; save(); recalc(); } }); return i; })(),
     ]),
-    el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
+    el('div', { class: 'line grand' }, [el('span', {}, ['Total']), totalsRefs.total]),
   ]);
 
+  recalc();
+
   return el('div', { class: 'panel' }, [
-    el('h3', {}, ['Lines (internal worksheet)']),
-    el('div', { class: 'scroll' }, [el('table', { class: 'data' }, [el('thead', {}, [head]), el('tbody', {}, body)])]),
+    el('div', { class: 'section-head' }, [
+      el('h3', { style: 'margin:0' }, ['Worksheet']),
+      el('span', { class: 'hint' }, ['Fill the bottom row and press ＋ Add. Scroll sideways for more columns. Every cell is editable.']),
+    ]),
+    el('div', { class: 'scroll sheet-wrap' }, [table]),
     totals,
   ]);
 }
