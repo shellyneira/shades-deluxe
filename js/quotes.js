@@ -105,7 +105,14 @@ function blankLine(s) {
   };
 }
 
+// A shade is Zebra or Roller based on its table. Products/fabrics are filtered to
+// match, so a Zebra line only offers Zebra options and a Roller line the Roller ones.
+export const isZebra = (table) => /zebra/i.test(table || '');
+const productsFor = (table, all) => all.filter((p) => (isZebra(table) ? /zebra/i.test(p) : !/zebra/i.test(p)));
+const fabricsFor = (table, all) => all.filter((f) => (isZebra(table) ? /zebra/i.test(f) : !/zebra/i.test(f)));
+
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
+// `opts` may be an array or a function of the row item (used for table-aware filtering).
 function columns(o, tableNames) {
   const opt = (arr) => ['', ...arr];
   return [
@@ -116,8 +123,8 @@ function columns(o, tableNames) {
     { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'height', label: 'H', kind: 'num', w: 52 },
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'product', label: 'Product', kind: 'select', opts: opt(o.products), w: 150 },
-    { key: 'fabric', label: 'Description', kind: 'select', opts: opt(o.fabrics), w: 160 },
+    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(productsFor(it.table, o.products)), w: 150 },
+    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(fabricsFor(it.table, o.fabrics)), w: 160 },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
     { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
     { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108 },
@@ -153,11 +160,14 @@ function cell(col, item, onChange) {
     const inp = el('input', { type: 'number', value: item[col.key] ?? '', style, class: 'r', oninput: (e) => onChange(col.key, e.target.value) });
     return el('td', {}, [inp]);
   }
-  // select
+  // select — options may be table-dependent (a function of the row item)
   const sel = el('select', { style, onchange: (e) => onChange(col.key, e.target.value) });
-  for (const opt of col.opts) {
+  const options = typeof col.opts === 'function' ? col.opts(item) : col.opts;
+  const cur = String(item[col.key] ?? '');
+  if (cur && !options.some((o) => String(o) === cur)) options.push(cur); // keep a value not in the filtered set
+  for (const opt of options) {
     const o = el('option', { value: opt }, [String(opt)]);
-    if (String(opt) === String(item[col.key] ?? '')) o.selected = true;
+    if (String(opt) === cur) o.selected = true;
     sel.append(o);
   }
   return el('td', {}, [sel]);
@@ -174,8 +184,12 @@ function sheet(q, rerender) {
   const recalc = () => {
     for (const p of priceCells) {
       const c = computeLine(p.item, s);
-      p.node.textContent = c.unit == null ? '—' : money(c.unit);
-      p.node.title = c.list == null ? 'Size is off this table’s chart' : `List ${money(c.list)}`;
+      const hasDims = p.item.width && p.item.height;
+      p.node.textContent = c.unit != null ? money(c.unit) : (hasDims ? 'off chart' : '—');
+      p.node.classList.toggle('off', c.unit == null && hasDims);
+      p.node.title = c.list == null
+        ? (hasDims ? `Size is larger than the ${p.item.table} chart` : '')
+        : `List ${money(c.list)}`;
     }
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
     // number is never a surprising $0 while a priced line sits in the draft row.
@@ -185,13 +199,14 @@ function sheet(q, rerender) {
   };
 
   const makeRow = (item, { draftRow } = {}) => {
-    const onChange = (key, val) => { item[key] = val; if (!draftRow) save(); recalc(); };
+    // Changing the table refilters the Product/Description options, so rebuild the row.
+    const onChange = (key, val) => { item[key] = val; if (!draftRow) save(); recalc(); if (key === 'table') rerender(); };
     const priceNode = el('strong', {}, ['—']);
     priceCells.push({ item, node: priceNode });
     const cells = cols.map((col) => cell(col, item, onChange));
     cells.push(el('td', { class: 'r price' }, [priceNode]));
     if (draftRow) {
-      cells.push(el('td', {}, [])); // action cell kept empty; Add button lives below the scroll
+      cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Clear this row', onclick: () => { q._draft = blankLine(s); save(); rerender(); } }, ['↺'])]));
       return el('tr', { class: 'draftrow' }, cells);
     }
     const idx = q.items.indexOf(item);
