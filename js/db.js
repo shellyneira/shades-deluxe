@@ -3,6 +3,7 @@
 // startup and push a debounced copy on every change. Last write wins, which is
 // the right trade-off for a single small business editing one thing at a time.
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { accessToken } from './auth.js';
 
 export function dbEnabled() {
   return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
@@ -11,7 +12,7 @@ export function dbEnabled() {
 function headers(extra = {}) {
   return {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+    Authorization: 'Bearer ' + accessToken(),
     'Content-Type': 'application/json',
     ...extra,
   };

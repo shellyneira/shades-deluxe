@@ -177,9 +177,11 @@ function sheet(q, rerender) {
       p.node.textContent = c.unit == null ? '—' : money(c.unit);
       p.node.title = c.list == null ? 'Size is off this table’s chart' : `List ${money(c.list)}`;
     }
-    const t = quoteTotals(q, s);
-    totalsRefs.sub.textContent = money(t.subtotal);
-    totalsRefs.total.textContent = money(t.total);
+    // Subtotal reflects committed lines PLUS the row currently being filled, so the
+    // number is never a surprising $0 while a priced line sits in the draft row.
+    const sub = [...q.items, draft].reduce((sum, it) => sum + (computeLine(it, s).unit || 0), 0);
+    totalsRefs.sub.textContent = money(sub);
+    totalsRefs.total.textContent = money(sub - (Number(q.discount) || 0));
   };
 
   const makeRow = (item, { draftRow } = {}) => {
@@ -249,18 +251,78 @@ function sheet(q, rerender) {
   ]);
 }
 
-/* ---------------- customer invoice (no dimensions) ---------------- */
+/* ---------------- printable documents (Client quote + Work order) ---------------- */
+let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
+
+const sizeText = (l) => {
+  const f = (v, fr) => `${v ?? ''}${fr && FRACTION_LABEL[fr] ? ' ' + FRACTION_LABEL[fr] : ''}`;
+  return `${f(l.width, l.widthFrac)} × ${f(l.height, l.heightFrac)}`;
+};
+
 function invoice(q) {
   const s = getState();
   const co = s.company;
   const t = quoteTotals(q, s);
+  const isWork = invMode === 'work';
 
   const toolbar = el('div', { class: 'section-head no-print' }, [
     el('button', { class: 'btn ghost', onclick: () => open(q.id, 'edit') }, ['← Back to worksheet']),
-    el('button', { class: 'btn primary', onclick: () => window.print() }, ['🖨 Print / Save PDF']),
+    el('div', { class: 'subtabs', style: 'margin:0' }, [
+      el('button', { class: 'subtab' + (isWork ? '' : ' active'), onclick: () => { invMode = 'client'; renderQuotes(); } }, ['Client Quote']),
+      el('button', { class: 'subtab' + (isWork ? ' active' : ''), onclick: () => { invMode = 'work'; renderQuotes(); } }, ['Work Order']),
+      el('button', { class: 'btn primary small', onclick: () => window.print() }, ['🖨 Print / PDF']),
+    ]),
   ]);
 
-  const items = q.items.map((l) => {
+  const meta = (label, val) => el('div', { class: 'mrow' }, [el('span', { class: 'ml' }, [label]), el('span', { class: 'mv' }, [val])]);
+
+  const head = el('div', { class: 'head' }, [
+    el('div', { class: 'co' }, [
+      el('img', { class: 'logo', src: 'assets/logo.jpg', alt: co.name }),
+      el('div', { class: 'co-lines' }, [
+        el('div', { class: 'co-meta' }, [co.address]),
+        el('div', { class: 'co-meta' }, [co.phone]),
+        el('div', { class: 'co-meta' }, [co.email]),
+      ]),
+    ]),
+    el('div', { class: 'doc-title' }, [
+      el('div', { class: 't' }, [isWork ? 'WORK ORDER' : 'QUOTE']),
+      el('div', { class: 'doc-meta' }, [
+        meta(isWork ? 'Order #' : 'Quote #', String(q.number)),
+        meta('Date', q.date || '—'),
+        q.installDate ? meta('Install', q.installDate) : null,
+        el('div', { class: 'mrow status' }, [el('span', { class: 'badge ' + (q.status || 'draft') }, [q.status || 'draft'])]),
+      ]),
+    ]),
+  ]);
+
+  const bill = el('div', { class: 'bill' }, [
+    el('h4', {}, [isWork ? 'Client' : 'Bill To']),
+    el('div', { class: 'bill-name' }, [q.client.name || '—']),
+    q.client.address ? el('div', {}, [q.client.address]) : null,
+    el('div', { class: 'co-meta' }, [[q.client.phone, q.client.email].filter(Boolean).join(' · ')]),
+  ]);
+
+  const table = isWork ? workTable(q, s) : clientTable(q, s);
+
+  const doc = el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
+    head, bill, table,
+    isWork ? null : el('div', { class: 'sum' }, [
+      el('div', { class: 'sum-box' }, [
+        el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
+        t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
+        el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
+      ]),
+    ]),
+    el('div', { class: 'terms' }, [isWork ? 'Fabrication spec sheet — measurements are finished sizes. No pricing shown.' : co.terms]),
+  ]);
+
+  return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [doc])]);
+}
+
+// Client version: all product options in the description, client price, no dimensions.
+function clientTable(q, s) {
+  const rows = q.items.map((l) => {
     const c = computeLine(l, s);
     return el('tr', {}, [
       el('td', { class: 'num' }, ['1']),
@@ -272,50 +334,36 @@ function invoice(q) {
       el('td', { class: 'num strong' }, [money(c.unit || 0)]),
     ]);
   });
-
-  const meta = (label, val) => el('div', { class: 'mrow' }, [el('span', { class: 'ml' }, [label]), el('span', { class: 'mv' }, [val])]);
-
-  const doc = el('div', { class: 'invoice' }, [
-    el('div', { class: 'accent-strip' }, []),
-    el('div', { class: 'head' }, [
-      el('div', { class: 'co' }, [
-        el('img', { class: 'logo', src: 'assets/logo.jpg', alt: co.name }),
-        el('div', { class: 'co-lines' }, [
-          el('div', { class: 'co-meta' }, [co.address]),
-          el('div', { class: 'co-meta' }, [co.phone]),
-          el('div', { class: 'co-meta' }, [co.email]),
-        ]),
-      ]),
-      el('div', { class: 'doc-title' }, [
-        el('div', { class: 't' }, ['QUOTE']),
-        el('div', { class: 'doc-meta' }, [
-          meta('Quote #', String(q.number)),
-          meta('Date', q.date || '—'),
-          q.installDate ? meta('Install', q.installDate) : null,
-          el('div', { class: 'mrow status' }, [el('span', { class: 'badge ' + (q.status || 'draft') }, [q.status || 'draft'])]),
-        ]),
-      ]),
-    ]),
-    el('div', { class: 'bill' }, [
-      el('h4', {}, ['Bill To']),
-      el('div', { class: 'bill-name' }, [q.client.name || '—']),
-      q.client.address ? el('div', {}, [q.client.address]) : null,
-      el('div', { class: 'co-meta' }, [[q.client.phone, q.client.email].filter(Boolean).join(' · ')]),
-    ]),
-    el('table', { class: 'items' }, [
-      el('thead', {}, [el('tr', {}, ['Qty', 'Location', 'Product', 'Description', 'Color', 'Unit Price', 'Total'].map((h, i) =>
-        el('th', { class: i >= 5 || i === 0 ? 'num' : '' }, [h])))]),
-      el('tbody', {}, items.length ? items : [el('tr', {}, [el('td', { colspan: 7, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
-    ]),
-    el('div', { class: 'sum' }, [
-      el('div', { class: 'sum-box' }, [
-        el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
-        t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
-        el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
-      ]),
-    ]),
-    el('div', { class: 'terms' }, [co.terms]),
+  const cols = ['Qty', 'Location', 'Product', 'Description', 'Color', 'Unit Price', 'Total'];
+  return el('table', { class: 'items' }, [
+    el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i >= 5 || i === 0 ? 'num' : '' }, [h])))]),
+    el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
   ]);
+}
 
-  return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [doc])]);
+// Work-order version: every build spec incl. dimensions, NO prices.
+function workTable(q, s) {
+  const cols = ['#', 'Table', 'Location', 'W/D', 'Size (W×H)', 'Product', 'Description', 'Color', 'Ctrl', 'System', 'Style', 'Headrails', 'Bottom Rail', 'Fascia', 'S/Ch'];
+  const yn = (v) => (v ? 'Yes' : '—');
+  const rows = q.items.map((l, i) => el('tr', {}, [
+    el('td', { class: 'num' }, [String(i + 1)]),
+    el('td', {}, [l.table]),
+    el('td', {}, [l.location]),
+    el('td', {}, [l.wdNumber]),
+    el('td', { class: 'strong' }, [sizeText(l)]),
+    el('td', {}, [l.product]),
+    el('td', { class: 'desc' }, [l.fabric]),
+    el('td', {}, [l.color]),
+    el('td', {}, [l.control]),
+    el('td', {}, [l.system]),
+    el('td', {}, [l.style]),
+    el('td', {}, [l.headrail]),
+    el('td', {}, [l.bottomRail]),
+    el('td', {}, [yn(l.fascia)]),
+    el('td', {}, [yn(l.sideChannel)]),
+  ]));
+  return el('table', { class: 'items work' }, [
+    el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),
+    el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
+  ]);
 }
