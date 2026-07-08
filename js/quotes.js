@@ -58,7 +58,7 @@ function editor(q) {
   const toolbar = el('div', { class: 'section-head' }, [
     el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list' }; renderQuotes(); } }, ['← All quotes']),
     el('div', { class: 'row' }, [
-      el('button', { class: 'btn', onclick: () => open(q.id, 'invoice') }, ['View Invoice']),
+      el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
       el('button', { class: 'btn', onclick: () => { deleteQuote(q.id); sub = { view: 'list' }; renderQuotes(); toast('Quote deleted'); } }, ['Delete']),
     ]),
   ]);
@@ -83,6 +83,17 @@ function editor(q) {
   const reRender = () => dynamic.replaceChildren(sheet(q, reRender));
   reRender();
   return el('div', {}, [toolbar, client, dynamic]);
+}
+
+// If the bottom "add" row was filled in but never committed, keep it so the user
+// doesn't silently lose a line when they jump to the invoice.
+function commitDraftIfFilled(q) {
+  const d = q._draft;
+  if (d && d.width && d.height) {
+    q.items.push({ ...d });
+    delete q._draft;
+    save();
+  }
 }
 
 function blankLine(s) {
@@ -256,12 +267,14 @@ function invoice(q) {
     ]);
   });
 
-  const doc = el('div', { class: 'invoice' }, [
+  const doc = el('div', { class: 'invoice blue' }, [
     el('div', { class: 'head' }, [
-      el('div', {}, [
-        el('div', { class: 'co-name' }, [co.name]),
-        el('div', { class: 'co-meta' }, [co.address]),
-        el('div', { class: 'co-meta' }, [co.phone + ' · ' + co.email]),
+      el('div', { class: 'co' }, [
+        el('img', { class: 'logo', src: 'assets/logo.jpg', alt: co.name }),
+        el('div', {}, [
+          el('div', { class: 'co-meta' }, [co.address]),
+          el('div', { class: 'co-meta' }, [co.phone + ' · ' + co.email]),
+        ]),
       ]),
       el('div', { class: 'doc-title' }, [
         el('div', { class: 't' }, ['QUOTE']),

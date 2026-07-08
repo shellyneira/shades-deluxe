@@ -1,5 +1,7 @@
-// Single source of truth. State lives in localStorage; the whole app reads/writes here.
+// Single source of truth. State lives in localStorage (instant) and syncs to
+// Supabase when configured (survives device loss, shared across devices).
 import { SEED } from './seed-data.js';
+import { dbEnabled, pullState, pushState } from './db.js';
 
 const KEY = 'shades-deluxe-v1';
 
@@ -36,8 +38,33 @@ function load() {
   }
 }
 
+let syncTimer;
+function scheduleSync() {
+  if (!dbEnabled()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { pushState(state).catch((e) => console.warn('cloud sync failed', e)); }, 700);
+}
+
 export function save() {
   localStorage.setItem(KEY, JSON.stringify(state));
+  scheduleSync();
+}
+
+// Pull the shared cloud copy at startup. Returns true if remote data replaced local.
+export async function initCloud() {
+  if (!dbEnabled()) return false;
+  try {
+    const remote = await pullState();
+    if (remote) {
+      state = { ...freshState(), ...remote };
+      localStorage.setItem(KEY, JSON.stringify(state));
+      return true;
+    }
+    await pushState(state); // first run — seed the cloud from local
+  } catch (e) {
+    console.warn('cloud init failed, using local data', e);
+  }
+  return false;
 }
 
 export function getState() {
