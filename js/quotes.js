@@ -18,26 +18,36 @@ function open(id, view = 'edit') {
 }
 
 /* ---------------- list ---------------- */
+const STATUSES = ['draft', 'sent', 'won', 'lost'];
+let filter = 'all';
+
 function list() {
   const s = getState();
   const head = el('div', { class: 'section-head' }, [
-    el('h2', {}, ['Quotes']),
-    el('button', { class: 'btn primary', onclick: () => open(newQuote().id) }, ['+ New Quote']),
+    el('div', {}, [el('h2', {}, ['Quotes & Orders']), el('div', { class: 'hint' }, [s.quotes.length + ' total'])]),
+    el('button', { class: 'btn primary', onclick: () => open(newQuote().id) }, ['＋ New Quote']),
   ]);
 
-  const body = s.quotes.length
-    ? el('div', { class: 'cards' }, s.quotes.map((q) => {
+  const filters = el('div', { class: 'subtabs' }, ['all', ...STATUSES].map((f) =>
+    el('button', { class: 'subtab' + (f === filter ? ' active' : ''), onclick: () => { filter = f; renderQuotes(); } },
+      [f[0].toUpperCase() + f.slice(1)])));
+
+  const shown = s.quotes.filter((q) => filter === 'all' || (q.status || 'draft') === filter);
+  const body = shown.length
+    ? el('div', { class: 'cards' }, shown.map((q) => {
         const t = quoteTotals(q, s);
+        const st = q.status || 'draft';
         return el('div', { class: 'card', onclick: () => open(q.id) }, [
+          el('div', { class: 'status' }, [el('span', { class: 'badge ' + st }, [st])]),
           el('div', { class: 'muted' }, ['#' + q.number + ' · ' + (q.date || '')]),
           el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
           el('div', { class: 'muted' }, [q.items.length + ' item(s)']),
           el('div', { class: 'total' }, [money(t.total)]),
         ]);
       }))
-    : el('div', { class: 'empty' }, ['No quotes yet. Click “New Quote” to start.']);
+    : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['🪟']), s.quotes.length ? 'No quotes in this filter.' : 'No quotes yet. Click “New Quote” to start.']);
 
-  return el('div', { class: 'panel' }, [head, body]);
+  return el('div', { class: 'panel' }, [head, filters, body]);
 }
 
 /* ---------------- estimator worksheet ---------------- */
@@ -64,6 +74,7 @@ function editor(q) {
       input('Address', q.client.address, (v) => set(() => (q.client.address = v)), { class: 'grow' }),
       input('Quote date', q.date, (v) => set(() => (q.date = v)), { type: 'date' }),
       input('Install date', q.installDate, (v) => set(() => (q.installDate = v)), { type: 'date' }),
+      select('Status', STATUSES, q.status || 'draft', (v) => set(() => (q.status = v))),
     ]),
   ]);
 

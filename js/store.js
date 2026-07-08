@@ -68,6 +68,7 @@ export function newQuote() {
     installDate: '',
     client: { name: '', address: '', phone: '', email: '' },
     discount: 0,
+    status: 'draft',
     items: [],
   };
   state.quotes.unshift(q);
