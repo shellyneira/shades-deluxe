@@ -451,7 +451,7 @@ function labelsView(q, s) {
   const labels = q.items.map((l) => el('div', { class: 'dymo-label' }, [
     el('div', { class: 'dl-text' }, [
       el('div', { class: 'dl-name' }, [q.client.name || '']),
-      el('div', {}, [l.location || '']),
+      el('div', { class: 'dl-loc' }, [l.location || '']),
       el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg)].filter(Boolean).join(' — ')]),
       el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
     ]),
