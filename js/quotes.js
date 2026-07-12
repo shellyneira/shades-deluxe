@@ -2,6 +2,7 @@
 import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote } from './store.js';
 import { computeLine, describeLine, quoteTotals, money, round2 } from './pricing.js';
+import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
 
@@ -347,7 +348,18 @@ function shareButton(q, s, isWork) {
     if (wrap.querySelector('.share-menu')) { wrap.querySelector('.share-menu').remove(); return; }
     const enc = () => encodeURIComponent(text());
     const item = (label, fn) => el('button', { class: 'share-item', onclick: () => { fn(); menu.remove(); } }, [label]);
+    const sharePdf = async () => {
+      const blob = textToPdfBlob(text().split('\n'));
+      const file = new File([blob], `${isWork ? 'work-order' : 'quote'}-${q.number}.pdf`, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title, text: text() }); } catch { /* cancelled */ }
+      } else {
+        const a = el('a', { href: URL.createObjectURL(blob), download: file.name }); document.body.append(a); a.click(); a.remove();
+        toast('PDF downloaded — attach it to WhatsApp/email');
+      }
+    };
     const menu = el('div', { class: 'share-menu' }, [
+      item('📄 Share as PDF', sharePdf),
       item('💬 WhatsApp', () => window.open('https://wa.me/?text=' + enc(), '_blank')),
       item('✉️ Email', () => { window.location.href = `mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc()}`; }),
       item('📋 Copy text', async () => { try { await navigator.clipboard.writeText(text()); toast('Copied to clipboard'); } catch { toast('Copy failed'); } }),
