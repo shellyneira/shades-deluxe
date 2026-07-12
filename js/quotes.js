@@ -38,17 +38,17 @@ function list() {
   const shown = s.quotes.filter((q) => filter === 'all' || (q.status || 'draft') === filter);
   const body = shown.length
     ? el('div', { class: 'cards' }, shown.map((q) => {
-        const t = quoteTotals(q, s);
-        const st = q.status || 'draft';
-        return el('div', { class: 'card', onclick: () => open(q.id) }, [
-          el('div', { class: 'status' }, [el('span', { class: 'badge ' + st }, [st])]),
-          el('div', { class: 'muted' }, ['#' + q.number + ' · ' + (q.date || '')]),
-          el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
-          el('div', { class: 'muted' }, [q.items.length + ' item(s)']),
-          el('div', { class: 'total' }, [money(t.total)]),
-          q.payment && q.payment !== 'Unpaid' ? el('span', { class: 'pay-tag ' + (q.payment === 'Paid' ? 'full' : 'half') }, [q.payment === 'Paid' ? '✓ Paid' : '◐ 50% paid']) : null,
-        ]);
-      }))
+      const t = quoteTotals(q, s);
+      const st = q.status || 'draft';
+      return el('div', { class: 'card', onclick: () => open(q.id) }, [
+        el('div', { class: 'status' }, [el('span', { class: 'badge ' + st }, [st])]),
+        el('div', { class: 'muted' }, ['#' + q.number + ' · ' + (q.date || '')]),
+        el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
+        el('div', { class: 'muted' }, [q.items.length + ' item(s)']),
+        el('div', { class: 'total' }, [money(t.total)]),
+        q.payment && q.payment !== 'Unpaid' ? el('span', { class: 'pay-tag ' + (q.payment === 'Paid' ? 'full' : 'half') }, [q.payment === 'Paid' ? '✓ Paid' : '◐ 50% paid']) : null,
+      ]);
+    }))
     : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['🪟']), s.quotes.length ? 'No quotes in this filter.' : 'No quotes yet. Click “New Quote” to start.']);
 
   return el('div', { class: 'panel' }, [head, filters, body]);
@@ -395,7 +395,7 @@ function invoice(q) {
 
   const head = el('div', { class: 'head' }, [
     el('div', { class: 'co' }, [
-      el('img', { class: 'logo', src: 'assets/logo.jpg', alt: co.name }),
+      el('img', { class: 'logo', src: 'assets/logo.png', alt: co.name }),
       el('div', { class: 'co-lines' }, [
         el('div', { class: 'co-meta' }, [co.address]),
         el('div', { class: 'co-meta' }, [co.phone]),
@@ -455,7 +455,7 @@ function labelsView(q, s) {
       el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg)].filter(Boolean).join(' — ')]),
       el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
     ]),
-    el('img', { class: 'dl-logo', src: 'assets/logo.jpg', alt: '' }),
+    el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),
   ]));
   return el('div', {}, [
     el('p', { class: 'hint no-print', style: 'margin:0 0 14px' }, ['One label per shade · DYMO 30252 (1⅛" × 3½"). Click Print, then choose your LabelWriter 550 and the 30252 label — each shade prints on its own label.']),

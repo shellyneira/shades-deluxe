@@ -33,7 +33,7 @@ function renderLogin() {
   document.getElementById('app').replaceChildren(
     el('div', { class: 'login-wrap' }, [
       el('div', { class: 'login-card' }, [
-        el('img', { class: 'login-logo', src: 'assets/logo.jpg', alt: 'Shades Deluxe' }),
+        el('img', { class: 'login-logo', src: 'assets/logo.png', alt: 'Shades Deluxe' }),
         el('h2', {}, ['Sign in']),
         el('p', { class: 'muted', style: 'margin:0 0 18px' }, ['Shades Deluxe — Quotes']),
         email, pass, btn, err,
