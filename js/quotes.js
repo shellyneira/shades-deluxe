@@ -293,6 +293,45 @@ const sizeText = (l) => {
   return `${f(l.width, l.widthFrac)} × ${f(l.height, l.heightFrac)}`;
 };
 
+// Plain-text version of the document — pasteable into WhatsApp / email.
+function docText(q, s, isWork) {
+  const cfg = isWork ? s.docConfig.work : s.docConfig.client;
+  const t = quoteTotals(q, s);
+  const rows = q.items.map((l, i) => {
+    const desc = describeLine(l, cfg);
+    const size = isWork ? ` [${sizeText(l)}]` : '';
+    const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
+    return `${i + 1}. ${l.location ? l.location + ' · ' : ''}${desc}${size}${price}`;
+  });
+  const header = `${s.company.name}\n${isWork ? 'WORK ORDER' : 'QUOTE'} #${q.number}${q.date ? ' · ' + q.date : ''}`;
+  const client = q.client.name ? `\nClient: ${q.client.name}` : '';
+  const footer = isWork ? '' : `\n\nTotal: ${money(t.total)}`;
+  return `${header}${client}\n\n${rows.join('\n')}${footer}`;
+}
+
+// Share via the native sheet (WhatsApp/email/etc) when available, otherwise a small menu.
+function shareButton(q, s, isWork) {
+  const btn = el('button', { class: 'btn small', title: 'Share this document' }, ['↗ Share']);
+  btn.onclick = async () => {
+    const text = docText(q, s, isWork);
+    const title = `${s.company.name} — ${isWork ? 'Work Order' : 'Quote'} #${q.number}`;
+    if (navigator.share) { try { await navigator.share({ title, text }); } catch { /* cancelled */ } return; }
+    // Desktop fallback: WhatsApp / Email / Copy
+    document.querySelector('.share-menu')?.remove();
+    const enc = encodeURIComponent(text);
+    const item = (label, onclick) => el('button', { class: 'share-item', onclick: () => { onclick(); menu.remove(); } }, [label]);
+    const menu = el('div', { class: 'share-menu' }, [
+      item('💬 WhatsApp', () => window.open('https://wa.me/?text=' + enc, '_blank')),
+      item('✉️ Email', () => window.open(`mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc}`)),
+      item('📋 Copy text', () => { navigator.clipboard?.writeText(text); toast('Copied'); }),
+    ]);
+    btn.parentElement.style.position = 'relative';
+    btn.after(menu);
+    setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('click', h); } }), 0);
+  };
+  return btn;
+}
+
 function invoice(q) {
   const s = getState();
   const co = s.company;
@@ -304,6 +343,7 @@ function invoice(q) {
     el('div', { class: 'subtabs', style: 'margin:0' }, [
       el('button', { class: 'subtab' + (isWork ? '' : ' active'), onclick: () => { invMode = 'client'; renderQuotes(); } }, ['Client Quote']),
       el('button', { class: 'subtab' + (isWork ? ' active' : ''), onclick: () => { invMode = 'work'; renderQuotes(); } }, ['Work Order']),
+      shareButton(q, s, isWork),
       el('button', { class: 'btn primary small', onclick: () => window.print() }, ['🖨 Print / PDF']),
     ]),
   ]);
@@ -325,7 +365,6 @@ function invoice(q) {
         meta(isWork ? 'Order #' : 'Quote #', String(q.number)),
         meta('Date', q.date || '—'),
         q.installDate ? meta('Install', q.installDate) : null,
-        el('div', { class: 'mrow status' }, [el('span', { class: 'badge ' + (q.status || 'draft') }, [q.status || 'draft'])]),
       ]),
     ]),
   ]);
@@ -337,7 +376,7 @@ function invoice(q) {
     el('div', { class: 'co-meta' }, [[q.client.phone, q.client.email].filter(Boolean).join(' · ')]),
   ]);
 
-  const table = isWork ? workTable(q, s) : clientTable(q, s);
+  const table = el('div', { class: 'inv-scroll' }, [isWork ? workTable(q, s) : clientTable(q, s)]);
 
   const doc = el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
     head, bill, table,
