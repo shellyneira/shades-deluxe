@@ -107,7 +107,7 @@ function blankLine(s) {
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, fasciaAmount: '', sideChannel: false, sideChannelAmount: '',
-    installation: s.defaultInstallation || '', brackets: '',
+    installation: s.defaultInstallation || '', brackets: '', markup: '',
   };
 }
 
@@ -150,6 +150,7 @@ function columns(o, tableNames) {
     { key: 'sideChannelAmount', label: 'S/Ch $', kind: 'num', w: 72, placeholder: 'auto' },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
+    { key: 'markup', label: 'Profit +$', kind: 'num', w: 74, placeholder: 'auto' },
   ];
 }
 

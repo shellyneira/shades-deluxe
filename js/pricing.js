@@ -71,7 +71,8 @@ export function computeLine(line, state) {
   const brackets = Number(line.brackets) || 0;
   const extras = optionExtras(line, state); // priced dropdown options
 
-  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras;
+  const markup = Number(line.markup) || 0; // extra profit the user adds on this line
+  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras + markup;
   const floor = Number(state.minPrice[line.table]) || 0;
   const unit = list == null ? null : Math.max(base, floor);
   const floored = list != null && floor > 0 && floor > round2(base);
