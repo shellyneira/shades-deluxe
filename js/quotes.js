@@ -102,7 +102,7 @@ function commitDraftIfFilled(q) {
 
 function blankLine(s) {
   return {
-    table: Object.keys(s.tables)[0], location: '', wdNumber: '',
+    table: Object.keys(s.tables)[0], qty: 1, location: '', wdNumber: '',
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, fasciaAmount: '', sideChannel: false, sideChannelAmount: '',
@@ -128,6 +128,7 @@ function columns(o, tableNames) {
   const opt = (arr) => ['', ...arr];
   return [
     { key: 'table', label: 'Table', kind: 'select', opts: tableNames, w: 108 },
+    { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
     { key: 'location', label: 'Location', kind: 'select', opts: opt(o.locations), w: 116 },
     { key: 'wdNumber', label: 'W/D #', kind: 'select', opts: opt(o.wdNumbers), w: 92 },
     { key: 'width', label: 'W', kind: 'num', w: 52 },
@@ -216,13 +217,14 @@ function sheet(q, rerender) {
     }
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
     // number is never a surprising $0 while a priced line sits in the draft row.
-    const priced = [...q.items, draft].map((it) => computeLine(it, s));
-    const sub = priced.reduce((sum, c) => sum + (c.unit || 0), 0);
+    const rows = [...q.items, draft];
+    const priced = rows.map((it) => ({ c: computeLine(it, s), qty: Number(it.qty) || 1 }));
+    const sub = priced.reduce((sum, p) => sum + (p.c.unit || 0) * p.qty, 0);
     const total = sub - (Number(q.discount) || 0);
     totalsRefs.sub.textContent = money(sub);
     totalsRefs.total.textContent = money(total);
     // Internal only — never shown to the client. Profit ≈ price − wholesale material cost.
-    const cost = priced.reduce((sum, c) => sum + (c.cost || 0), 0);
+    const cost = priced.reduce((sum, p) => sum + (p.c.cost || 0) * p.qty, 0);
     const profit = total - cost;
     totalsRefs.cost.textContent = money(cost);
     totalsRefs.profit.textContent = money(profit);
@@ -242,7 +244,10 @@ function sheet(q, rerender) {
       return el('tr', { class: 'draftrow' }, cells);
     }
     const idx = q.items.indexOf(item);
-    cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Remove', onclick: () => { if (confirmAction('Delete this line?')) { q.items.splice(idx, 1); save(); rerender(); } } }, ['✕'])]));
+    cells.push(el('td', { style: 'white-space:nowrap' }, [
+      el('button', { class: 'icon', style: 'color:var(--muted)', title: 'Duplicate', onclick: () => { q.items.splice(idx + 1, 0, { ...item }); save(); rerender(); } }, ['⎘']),
+      el('button', { class: 'icon', title: 'Remove', onclick: () => { if (confirmAction('Delete this line?')) { q.items.splice(idx, 1); save(); rerender(); } } }, ['✕']),
+    ]));
     return el('tr', {}, cells);
   };
 

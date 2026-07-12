@@ -114,7 +114,7 @@ export function describeLine(line, cfg) {
 }
 
 export function quoteTotals(quote, state) {
-  const subtotal = quote.items.reduce((s, it) => s + (computeLine(it, state).unit || 0), 0);
+  const subtotal = quote.items.reduce((s, it) => s + (computeLine(it, state).unit || 0) * (Number(it.qty) || 1), 0);
   const discount = Number(quote.discount) || 0;
   const minOrder = Number(state.minimumOrder) || 0;
   let total = subtotal - discount;
