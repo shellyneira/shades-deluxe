@@ -53,27 +53,37 @@ export function computeLine(line, state) {
   return { list, fascia, sideChannel, installation, brackets, floor, floored, unit: unit == null ? null : round2(unit) };
 }
 
-// Customer-facing description — mirrors the Invoice sheet's TEXTJOIN.
-// Installation is labor baked into the price, so it is intentionally not described.
-export function describeLine(line) {
-  const parts = [line.fabric || line.product || ''];
-  const ctrl = line.control || '';
-  if (ctrl) {
-    let c;
-    if (ctrl.startsWith('C')) c = 'Chain Control';
-    else if (/M/i.test(ctrl)) c = 'Motor Control';
-    else c = ctrl;
-    if (/LH/i.test(ctrl)) c += ' - Left Hand';
-    else if (/RH/i.test(ctrl)) c += ' - Right Hand';
-    parts.push(c);
-  }
-  if (line.system) parts.push(line.system.replace('Batt.', 'Battery'));
-  if (line.style) parts.push(line.style);
-  if (line.bottomRail) parts.push('with ' + line.bottomRail);
-  if (line.fascia) parts.push('with Fascia');
-  if (line.sideChannel) parts.push('with Side Channels');
-  if ((Number(line.brackets) || 0) > 0) parts.push('with Extra Brackets');
-  return parts.filter(Boolean).join(', ');
+function controlText(ctrl) {
+  if (!ctrl) return '';
+  let c = ctrl.startsWith('C') ? 'Chain Control' : /M/i.test(ctrl) ? 'Motor Control' : ctrl;
+  if (/LH/i.test(ctrl)) c += ' - Left Hand';
+  else if (/RH/i.test(ctrl)) c += ' - Right Hand';
+  return c;
+}
+
+// Every field that can go into a document's Description, in display order.
+// Settings → Documents lets the user toggle each per document (Client vs Work order).
+export const DESC_FIELDS = [
+  { key: 'table', label: 'Shade type', fmt: (l) => l.table },
+  { key: 'product', label: 'Product', fmt: (l) => l.product },
+  { key: 'fabric', label: 'Fabric', fmt: (l) => l.fabric },
+  { key: 'color', label: 'Color', fmt: (l) => l.color },
+  { key: 'control', label: 'Control', fmt: (l) => controlText(l.control) },
+  { key: 'system', label: 'System', fmt: (l) => (l.system ? l.system.replace('Batt.', 'Battery') : '') },
+  { key: 'style', label: 'Style', fmt: (l) => l.style },
+  { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : '') },
+  { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : '') },
+  { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
+  { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
+  { key: 'brackets', label: 'Extra brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? 'with Extra Brackets' : '') },
+];
+
+export function describeLine(line, cfg) {
+  return DESC_FIELDS
+    .filter((f) => !cfg || cfg[f.key])
+    .map((f) => f.fmt(line))
+    .filter(Boolean)
+    .join(', ');
 }
 
 export function quoteTotals(quote, state) {

@@ -1,6 +1,6 @@
 // Lists editor — the dropdown option lists. Products and Fabrics are stored per shade
 // type ({roller, zebra}) with their own Add box each, so membership is explicit.
-import { el, mount, confirmAction } from './dom.js';
+import { el, mount, confirmAction, toast } from './dom.js';
 import { getState, save } from './store.js';
 
 const LABELS = {
@@ -54,11 +54,27 @@ export function renderLists() {
     ]);
   });
 
+  // Custom user-defined lists (reference lists you maintain yourself).
+  const custom = (s.customLists || []).map((list, li) => el('div', { class: 'panel' }, [
+    el('div', { class: 'section-head', style: 'margin-bottom:12px' }, [
+      el('h3', { style: 'margin:0' }, [list.name]),
+      el('div', { class: 'row', style: 'gap:8px' }, [
+        el('button', { class: 'btn small', onclick: () => { const nn = prompt('Rename list:', list.name); if (nn) { list.name = nn; save(); renderLists(); } } }, ['✎ Rename']),
+        el('button', { class: 'btn small', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete the “${list.name}” list?`)) { s.customLists.splice(li, 1); save(); renderLists(); } } }, ['🗑 Delete']),
+      ]),
+    ]),
+    flatList(list.items),
+    addBox(list.items, list.name.toLowerCase()),
+  ]));
+
   mount(el('div', {}, [
     el('div', { class: 'panel' }, [
-      el('h2', {}, ['Lists']),
-      el('div', { class: 'hint' }, ['These fill the dropdowns in the quote form. Products & fabrics are kept per type (Roller / Zebra). Colors are shared — the chain/cassette colors are the same for both. Everything here saves to the cloud.']),
+      el('div', { class: 'section-head' }, [
+        el('div', {}, [el('h2', {}, ['Lists']), el('div', { class: 'hint' }, ['Fill the dropdowns in the quote form. Products & fabrics are per type (Roller / Zebra); colors are shared. Saves to the cloud.'])]),
+        el('button', { class: 'btn', onclick: () => { const name = prompt('Name of the new list:'); if (!name) return; (s.customLists = s.customLists || []).push({ name, items: [] }); save(); renderLists(); toast('List created'); } }, ['＋ New list']),
+      ]),
     ]),
     ...panels,
+    ...custom,
   ]));
 }

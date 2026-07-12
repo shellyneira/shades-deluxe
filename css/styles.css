@@ -257,8 +257,8 @@ table.sheet td.r, table.sheet td.price { text-align: right; font-variant-numeric
 table.sheet td.price strong { color: var(--ink); }
 table.sheet td.price strong.off { color: var(--warn); font-weight: 600; font-size: 11.5px; }
 table.sheet td.price .mintag { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--warn); background: #fbf0dc; border-radius: 4px; padding: 1px 4px; vertical-align: middle; cursor: help; }
-table.sheet tr.draftrow td { background: var(--brand-tint); border-top: 2px solid var(--brand); }
-table.sheet tr.draftrow:hover td { background: var(--brand-tint); }
+table.sheet tr.draftrow td { background: var(--bg); border-top: 2px solid var(--line-strong); }
+table.sheet tr.draftrow:hover td { background: var(--bg); }
 
 /* ---------- login ---------- */
 .login-wrap { min-height: 80vh; display: flex; align-items: center; justify-content: center; }

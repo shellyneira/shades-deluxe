@@ -167,7 +167,13 @@ function cell(col, item, onChange) {
     return el('td', {}, [sel]);
   }
   if (col.kind === 'num') {
-    const inp = el('input', { type: 'number', value: item[col.key] ?? '', style, class: 'r', oninput: (e) => onChange(col.key, e.target.value) });
+    const inp = el('input', {
+      type: 'number', value: item[col.key] ?? '', style, class: 'r', min: '0', step: 'any',
+      oninput: (e) => {
+        if (e.target.value !== '' && Number(e.target.value) < 0) e.target.value = '0'; // no negative sizes/costs
+        onChange(col.key, e.target.value);
+      },
+    });
     return el('td', {}, [inp]);
   }
   // select — options may be table-dependent (a function of the row item)
@@ -356,53 +362,38 @@ function invoice(q) {
   return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [doc])]);
 }
 
-// Client version: all product options in the description, client price, no dimensions.
+// Client version: everything goes into the Description (fields chosen in Settings),
+// client price shown, NO dimensions.
 function clientTable(q, s) {
-  const rows = q.items.map((l) => {
+  const cfg = s.docConfig.client;
+  const rows = q.items.map((l, i) => {
     const c = computeLine(l, s);
     return el('tr', {}, [
-      el('td', { class: 'num' }, ['1']),
-      el('td', {}, [l.location]),
-      el('td', { class: 'strong' }, [l.product]),
-      el('td', { class: 'desc' }, [describeLine(l)]),
-      el('td', {}, [l.color]),
+      el('td', { class: 'num' }, [String(i + 1)]),
+      el('td', { class: 'strong' }, [l.location]),
+      el('td', { class: 'desc' }, [describeLine(l, cfg)]),
       el('td', { class: 'num' }, [money(c.unit || 0)]),
       el('td', { class: 'num strong' }, [money(c.unit || 0)]),
     ]);
   });
-  const cols = ['Qty', 'Location', 'Product', 'Description', 'Color', 'Unit Price', 'Total'];
+  const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
   return el('table', { class: 'items' }, [
-    el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i >= 5 || i === 0 ? 'num' : '' }, [h])))]),
+    el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
     el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
   ]);
 }
 
-// Every build spec joined into one comma description — no prices. Few columns so it
-// always fits a page and converts cleanly to PDF.
-function workSpecs(l) {
-  const parts = [l.table];
-  if (l.control) parts.push(/^C/.test(l.control) ? 'Chain ' + l.control : /M/i.test(l.control) ? 'Motor ' + l.control : l.control);
-  if (l.system) parts.push(l.system.replace('Batt.', 'Battery'));
-  if (l.style) parts.push(l.style);
-  if (l.headrail) parts.push('Headrail: ' + l.headrail);
-  if (l.bottomRail) parts.push('Bottom: ' + l.bottomRail);
-  if (l.fascia) parts.push('Fascia');
-  if (l.sideChannel) parts.push('Side channels');
-  if (Number(l.brackets) > 0) parts.push('Extra brackets');
-  return parts.filter(Boolean).join(', ');
-}
-
+// Work order: same Description style (fields chosen in Settings) PLUS dimensions,
+// NO prices. Few columns so it always fits a page / PDF.
 function workTable(q, s) {
-  const cols = ['#', 'Location', 'W/D', 'Size (W×H)', 'Product', 'Fabric', 'Color', 'Specifications'];
+  const cfg = s.docConfig.work;
+  const cols = ['#', 'Location', 'W/D', 'Size (W×H)', 'Description'];
   const rows = q.items.map((l, i) => el('tr', {}, [
     el('td', { class: 'num' }, [String(i + 1)]),
-    el('td', {}, [l.location]),
+    el('td', { class: 'strong' }, [l.location]),
     el('td', {}, [l.wdNumber]),
     el('td', { class: 'strong' }, [sizeText(l)]),
-    el('td', { class: 'strong' }, [l.product]),
-    el('td', {}, [l.fabric]),
-    el('td', {}, [l.color]),
-    el('td', { class: 'desc' }, [workSpecs(l)]),
+    el('td', { class: 'desc' }, [describeLine(l, cfg)]),
   ]));
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),

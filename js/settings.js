@@ -1,7 +1,33 @@
-// Settings — company info on invoices, plus backup (export/import) and reset.
+// Settings — company info, document field visibility, backup/export and reset.
 import { el, mount, input, toast, confirmAction } from './dom.js';
 import { getState, save, exportJSON, importJSON, resetToDefaults } from './store.js';
 import { dbEnabled } from './db.js';
+import { DESC_FIELDS } from './pricing.js';
+
+// Two checkbox columns controlling what each document's Description includes.
+function documentsPanel(s) {
+  const col = (docKey, title, note) => {
+    const cfg = s.docConfig[docKey];
+    const boxes = DESC_FIELDS.map((f) => {
+      const box = el('input', { type: 'checkbox', onchange: (e) => { cfg[f.key] = e.target.checked; save(); } });
+      box.checked = !!cfg[f.key];
+      return el('label', { class: 'field check', style: 'margin:0' }, [box, f.label]);
+    });
+    return el('div', { class: 'list-group' }, [
+      el('div', { class: 'list-group-head', style: 'color:var(--ink)' }, [title]),
+      el('p', { class: 'hint', style: 'margin:-6px 0 12px' }, [note]),
+      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px 14px' }, boxes),
+    ]);
+  };
+  return el('div', { class: 'panel' }, [
+    el('h2', {}, ['Documents — what to show']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Pick which details go into each document’s Description. Location, size and price are handled by their own columns.']),
+    el('div', { class: 'list-split' }, [
+      col('client', 'Client Quote', 'Shown to the customer. No dimensions; prices shown.'),
+      col('work', 'Work Order', 'For your maker. Dimensions shown; no prices.'),
+    ]),
+  ]);
+}
 
 export function renderSettings() {
   const s = getState();
@@ -40,6 +66,7 @@ export function renderSettings() {
       el('div', { class: 'row' }, [input('Address', co.address, set('address'), { class: 'grow' })]),
       el('label', { class: 'field', style: 'margin-top:14px' }, ['Payment & terms', terms]),
     ]),
+    documentsPanel(s),
     el('div', { class: 'panel' }, [
       el('h2', {}, ['Backup & data']),
       dbEnabled()

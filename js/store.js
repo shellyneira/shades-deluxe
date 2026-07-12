@@ -15,12 +15,22 @@ const DEFAULT_COMPANY = {
     '* Any additional work shall be invoiced and billed separately - Delivery time 10 working days',
 };
 
+// Which fields land in each document's Description column (Settings → Documents).
+const DEFAULT_DOC_CONFIG = {
+  // Client quote: no dimensions, shown with prices.
+  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, fascia: true, sideChannel: true, brackets: true },
+  // Work order: every build detail, dimensions shown, no prices.
+  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, sideChannel: true, brackets: true },
+};
+
 function freshState() {
   return normalize({
     company: { ...DEFAULT_COMPANY },
     tables: structuredClone(SEED.tables),
     minPrice: { ...SEED.minPrice },
     options: structuredClone(SEED.options),
+    docConfig: structuredClone(DEFAULT_DOC_CONFIG),
+    customLists: [],
     quotes: [],
     nextQuoteNumber: 1001,
   });
@@ -39,6 +49,12 @@ function normalize(state) {
       state.options[key] = { roller: [], zebra: [] };
     }
   }
+  // Backfill document config + custom lists for states saved before they existed.
+  state.docConfig = state.docConfig || structuredClone(DEFAULT_DOC_CONFIG);
+  for (const doc of ['client', 'work']) {
+    state.docConfig[doc] = { ...DEFAULT_DOC_CONFIG[doc], ...(state.docConfig[doc] || {}) };
+  }
+  state.customLists = state.customLists || [];
   return state;
 }
 
