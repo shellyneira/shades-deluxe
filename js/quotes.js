@@ -105,7 +105,8 @@ function blankLine(s) {
     table: Object.keys(s.tables)[0], location: '', wdNumber: '',
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
-    headrail: '', bottomRail: '', fascia: false, sideChannel: false, installation: '', brackets: '',
+    headrail: '', bottomRail: '', fascia: false, fasciaAmount: '', sideChannel: false, sideChannelAmount: '',
+    installation: s.defaultInstallation || '', brackets: '',
   };
 }
 
@@ -142,7 +143,9 @@ function columns(o, tableNames) {
     { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
+    { key: 'fasciaAmount', label: 'Fascia $', kind: 'num', w: 72, placeholder: 'auto' },
     { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
+    { key: 'sideChannelAmount', label: 'S/Ch $', kind: 'num', w: 72, placeholder: 'auto' },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
   ];
@@ -168,7 +171,7 @@ function cell(col, item, onChange) {
   }
   if (col.kind === 'num') {
     const inp = el('input', {
-      type: 'number', value: item[col.key] ?? '', style, class: 'r', min: '0', step: 'any',
+      type: 'number', value: item[col.key] ?? '', style, class: 'r', min: '0', step: 'any', placeholder: col.placeholder || '',
       oninput: (e) => {
         if (e.target.value !== '' && Number(e.target.value) < 0) e.target.value = '0'; // no negative sizes/costs
         onChange(col.key, e.target.value);

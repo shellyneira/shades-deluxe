@@ -61,8 +61,12 @@ export function computeLine(line, state) {
   const table = state.tables[line.table];
   const rates = { ...FALLBACK_RATES, ...(state.rates || {}) };
   const list = lookupListPrice(table, line.width, line.widthFrac, line.height, line.heightFrac);
-  const fascia = line.fascia ? ((Number(line.width) || 0) / 12) * rates.fascia : 0;
-  const sideChannel = line.sideChannel ? ((Number(line.height) || 0) / 12) * rates.sideChannel * 2 : 0;
+  // Fascia / side channel: a typed amount wins (manual); otherwise the checkbox uses the
+  // per-foot rate (auto). This gives "click for auto, or type your own price".
+  const fasciaOverride = line.fasciaAmount !== '' && line.fasciaAmount != null ? Number(line.fasciaAmount) : null;
+  const scOverride = line.sideChannelAmount !== '' && line.sideChannelAmount != null ? Number(line.sideChannelAmount) : null;
+  const fascia = fasciaOverride != null ? fasciaOverride : (line.fascia ? ((Number(line.width) || 0) / 12) * rates.fascia : 0);
+  const sideChannel = scOverride != null ? scOverride : (line.sideChannel ? ((Number(line.height) || 0) / 12) * rates.sideChannel * 2 : 0);
   const installation = Number(line.installation) || 0;
   const brackets = Number(line.brackets) || 0;
   const extras = optionExtras(line, state); // priced dropdown options
