@@ -12,7 +12,26 @@
 // (Values!O/P: 300/400/550/600). It is applied as a floor on the unit price
 // and is editable per-table in the Price Tables screen (set 0 to disable).
 
-const FASCIA_RATE = 4.5;
+const FALLBACK_RATES = { fascia: 4.5, sideChannel: 4.5, costFactor: 0.43 };
+
+// Each selected option can carry its own flat price (Lists editor). Fields → their list.
+const PRICED_FIELDS = [
+  ['control', 'controls'], ['system', 'systems'], ['style', 'styles'],
+  ['headrail', 'headrails'], ['bottomRail', 'headrails'], ['color', 'colors'],
+  ['product', 'products'], ['fabric', 'fabrics'],
+];
+
+function optionPrice(state, listKey, name, table) {
+  if (!name) return 0;
+  let arr = state.options[listKey];
+  if (listKey === 'products' || listKey === 'fabrics') arr = arr?.[/zebra/i.test(table || '') ? 'zebra' : 'roller'];
+  const found = (arr || []).find((o) => o && o.name === name);
+  return found ? Number(found.price) || 0 : 0;
+}
+
+function optionExtras(line, state) {
+  return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field], line.table), 0);
+}
 
 export function effectiveDim(inches, fraction) {
   const n = Number(inches) || 0;
@@ -39,18 +58,21 @@ export function lookupListPrice(table, width, widthFrac, height, heightFrac) {
 
 export function computeLine(line, state) {
   const table = state.tables[line.table];
+  const rates = { ...FALLBACK_RATES, ...(state.rates || {}) };
   const list = lookupListPrice(table, line.width, line.widthFrac, line.height, line.heightFrac);
-  const fascia = line.fascia ? ((Number(line.width) || 0) / 12) * FASCIA_RATE : 0;
-  const sideChannel = line.sideChannel ? ((Number(line.height) || 0) / 12) * FASCIA_RATE * 2 : 0;
+  const fascia = line.fascia ? ((Number(line.width) || 0) / 12) * rates.fascia : 0;
+  const sideChannel = line.sideChannel ? ((Number(line.height) || 0) / 12) * rates.sideChannel * 2 : 0;
   const installation = Number(line.installation) || 0;
   const brackets = Number(line.brackets) || 0;
+  const extras = optionExtras(line, state); // priced dropdown options
 
-  const base = (list || 0) + fascia + sideChannel + installation + brackets;
+  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras;
   const floor = Number(state.minPrice[line.table]) || 0;
   const unit = list == null ? null : Math.max(base, floor);
   const floored = list != null && floor > 0 && floor > round2(base);
+  const cost = list == null ? null : round2((list || 0) * rates.costFactor); // wholesale material cost
 
-  return { list, fascia, sideChannel, installation, brackets, floor, floored, unit: unit == null ? null : round2(unit) };
+  return { list, fascia, sideChannel, installation, brackets, extras, floor, floored, cost, unit: unit == null ? null : round2(unit) };
 }
 
 function controlText(ctrl) {

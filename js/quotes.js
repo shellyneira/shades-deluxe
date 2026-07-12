@@ -176,14 +176,16 @@ function cell(col, item, onChange) {
     });
     return el('td', {}, [inp]);
   }
-  // select — options may be table-dependent (a function of the row item)
+  // select — options may be plain strings, priced objects {name, price}, or a
+  // function of the row item (table-dependent product/fabric lists)
   const sel = el('select', { style, onchange: (e) => onChange(col.key, e.target.value) });
-  const options = typeof col.opts === 'function' ? col.opts(item) : col.opts;
+  const options = (typeof col.opts === 'function' ? col.opts(item) : col.opts).map((o) => (typeof o === 'string' ? { name: o, price: 0 } : o));
   const cur = String(item[col.key] ?? '');
-  if (cur && !options.some((o) => String(o) === cur)) options.push(cur); // keep a value not in the filtered set
+  if (cur && !options.some((o) => o.name === cur)) options.push({ name: cur, price: 0 }); // keep a value not in the filtered set
   for (const opt of options) {
-    const o = el('option', { value: opt }, [String(opt)]);
-    if (String(opt) === cur) o.selected = true;
+    const label = opt.price > 0 ? `${opt.name} (${money(opt.price)})` : opt.name;
+    const o = el('option', { value: opt.name }, [label || ' ']);
+    if (opt.name === cur) o.selected = true;
     sel.append(o);
   }
   return el('td', {}, [sel]);

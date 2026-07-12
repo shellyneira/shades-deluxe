@@ -29,6 +29,25 @@ function documentsPanel(s) {
   ]);
 }
 
+// Pricing rates — the per-foot add-on charges and wholesale cost factor, all editable.
+function ratesPanel(s) {
+  const r = s.rates;
+  const num = (label, key, hint) => el('label', { class: 'field', style: 'flex:1 1 200px' }, [
+    label,
+    el('input', { type: 'number', min: '0', step: '0.01', value: r[key], oninput: (e) => { r[key] = Number(e.target.value) || 0; save(); } }),
+    el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, [hint]),
+  ]);
+  return el('div', { class: 'panel' }, [
+    el('h2', {}, ['Rates']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Fascia and side channels are charged per foot (from the All Blinds price list). Change a rate here and every quote recalculates.']),
+    el('div', { class: 'row' }, [
+      num('Fascia — $ / foot of width', 'fascia', 'Fascia cost = width ÷ 12 × this rate.'),
+      num('Side channel — $ / foot (each side)', 'sideChannel', 'Side channels = height ÷ 12 × this rate × 2 sides.'),
+      num('Wholesale cost factor', 'costFactor', 'Your material cost ≈ list price × this (All Blinds = 0.43). Used for profit on the dashboard.'),
+    ]),
+  ]);
+}
+
 export function renderSettings() {
   const s = getState();
   const co = s.company;
@@ -66,6 +85,7 @@ export function renderSettings() {
       el('div', { class: 'row' }, [input('Address', co.address, set('address'), { class: 'grow' })]),
       el('label', { class: 'field', style: 'margin-top:14px' }, ['Payment & terms', terms]),
     ]),
+    ratesPanel(s),
     documentsPanel(s),
     el('div', { class: 'panel' }, [
       el('h2', {}, ['Backup & data']),

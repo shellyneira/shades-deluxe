@@ -14,17 +14,26 @@ export function renderLists() {
   const s = getState();
   const keys = Object.keys(LABELS).filter((k) => s.options[k]);
 
-  const chip = (arr, i) => el('span', { class: 'pill', style: 'display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 12px' }, [
-    String(arr[i]),
-    el('button', { class: 'icon', style: 'padding:0 4px;font-size:13px', title: 'Remove', onclick: () => { if (confirmAction(`Remove “${arr[i]}” from the list?`)) { arr.splice(i, 1); save(); renderLists(); } } }, ['✕']),
-  ]);
+  const money = (n) => '$' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const chip = (arr, i) => {
+    const it = arr[i];
+    return el('span', { class: 'pill', style: 'display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 12px' }, [
+      it.name,
+      it.price > 0 ? el('span', { class: 'price-tag' }, [money(it.price)]) : null,
+      el('button', { class: 'icon', style: 'padding:0 4px;font-size:13px', title: 'Remove', onclick: () => { if (confirmAction(`Remove “${it.name}” from the list?`)) { arr.splice(i, 1); save(); renderLists(); } } }, ['✕']),
+    ]);
+  };
 
   const addBox = (arr, label) => {
-    const box = el('input', { type: 'text', placeholder: 'Add ' + label + '…', style: 'min-width:200px' });
-    const add = () => { const v = box.value.trim(); if (!v) return; arr.push(v); box.value = ''; save(); renderLists(); };
-    box.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+    const name = el('input', { type: 'text', placeholder: 'Add ' + label + '…', style: 'min-width:180px' });
+    const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: '$ (optional)', style: 'width:120px' });
+    const add = () => { const v = name.value.trim(); if (!v) return; arr.push({ name: v, price: Number(price.value) || 0 }); name.value = ''; price.value = ''; save(); renderLists(); };
+    name.addEventListener('keydown', (e) => { if (e.key === 'Enter') price.focus(); });
+    price.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
     return el('div', { class: 'row', style: 'margin-top:12px' }, [
-      el('label', { class: 'field' }, [' ', box]),
+      el('label', { class: 'field' }, [' ', name]),
+      el('label', { class: 'field' }, [' ', price]),
       el('button', { class: 'btn small', onclick: add }, ['＋ Add']),
     ]);
   };

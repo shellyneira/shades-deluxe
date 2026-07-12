@@ -23,6 +23,9 @@ const DEFAULT_DOC_CONFIG = {
   work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, sideChannel: true, brackets: true },
 };
 
+// Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
+const DEFAULT_RATES = { fascia: 4.5, sideChannel: 4.5, costFactor: 0.43 };
+
 function freshState() {
   return normalize({
     company: { ...DEFAULT_COMPANY },
@@ -30,11 +33,17 @@ function freshState() {
     minPrice: { ...SEED.minPrice },
     options: structuredClone(SEED.options),
     docConfig: structuredClone(DEFAULT_DOC_CONFIG),
+    rates: { ...DEFAULT_RATES },
     customLists: [],
     quotes: [],
     nextQuoteNumber: 1001,
   });
 }
+
+// Option list items carry an optional price: stored as { name, price }. Strings from
+// older data (or the seed) migrate to { name, price: 0 }.
+const toPriced = (arr) => (arr || []).map((x) => (typeof x === 'string' ? { name: x, price: 0 } : { name: x.name, price: Number(x.price) || 0 }));
+const FLAT_PRICED_LISTS = ['locations', 'wdNumbers', 'colors', 'controls', 'systems', 'styles', 'headrails'];
 
 // Products and Fabrics are stored per shade type ({roller, zebra}) so membership is
 // explicit rather than guessed from the name. Migrate any legacy flat arrays.
@@ -42,19 +51,23 @@ function normalize(state) {
   for (const key of ['products', 'fabrics']) {
     const v = state.options[key];
     if (Array.isArray(v)) {
-      state.options[key] = { roller: v.filter((x) => !/zebra/i.test(x)), zebra: v.filter((x) => /zebra/i.test(x)) };
+      state.options[key] = { roller: v.filter((x) => !/zebra/i.test(typeof x === 'string' ? x : x.name)), zebra: v.filter((x) => /zebra/i.test(typeof x === 'string' ? x : x.name)) };
     } else if (v && typeof v === 'object') {
       v.roller = v.roller || []; v.zebra = v.zebra || [];
     } else {
       state.options[key] = { roller: [], zebra: [] };
     }
+    state.options[key].roller = toPriced(state.options[key].roller);
+    state.options[key].zebra = toPriced(state.options[key].zebra);
   }
+  for (const key of FLAT_PRICED_LISTS) state.options[key] = toPriced(state.options[key]);
+  state.rates = { ...DEFAULT_RATES, ...(state.rates || {}) };
   // Backfill document config + custom lists for states saved before they existed.
   state.docConfig = state.docConfig || structuredClone(DEFAULT_DOC_CONFIG);
   for (const doc of ['client', 'work']) {
     state.docConfig[doc] = { ...DEFAULT_DOC_CONFIG[doc], ...(state.docConfig[doc] || {}) };
   }
-  state.customLists = state.customLists || [];
+  state.customLists = (state.customLists || []).map((l) => ({ name: l.name, items: toPriced(l.items) }));
   return state;
 }
 

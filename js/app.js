@@ -2,15 +2,16 @@
 import { el } from './dom.js';
 import { initCloud } from './store.js';
 import { authRequired, ensureSession, login, logout, userEmail } from './auth.js';
+import { renderDashboard } from './dashboard.js';
 import { renderQuotes } from './quotes.js';
 import { renderTables } from './tables.js';
 import { renderLists } from './lists.js';
 import { renderSettings } from './settings.js';
 
-const VIEWS = { quotes: renderQuotes, tables: renderTables, lists: renderLists, settings: renderSettings };
+const VIEWS = { dashboard: renderDashboard, quotes: renderQuotes, tables: renderTables, lists: renderLists, settings: renderSettings };
 
 function go(view) {
-  if (!VIEWS[view]) view = 'quotes';
+  if (!VIEWS[view]) view = 'dashboard';
   location.hash = view;
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
   VIEWS[view]();
@@ -55,8 +56,8 @@ function startApp() {
   addLogout();
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
   window.addEventListener('hashchange', () => go(location.hash.slice(1)));
-  go(location.hash.slice(1) || 'quotes');
-  initCloud().then((replaced) => { if (replaced) go(location.hash.slice(1) || 'quotes'); });
+  go(location.hash.slice(1) || 'dashboard');
+  initCloud().then((replaced) => { if (replaced) go(location.hash.slice(1) || 'dashboard'); });
 }
 
 async function boot() {
