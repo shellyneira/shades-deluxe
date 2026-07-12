@@ -141,6 +141,11 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .totals { margin-left: auto; width: 340px; margin-top: 18px; }
 .totals .line { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; color: var(--ink-soft); }
 .totals .line.grand { border-top: 2px solid var(--ink); margin-top: 8px; padding-top: 12px; font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -.5px; }
+.profit-box { margin-top: 14px; padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); }
+.profit-box .pb-head { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+.profit-box .line { padding: 4px 0; font-size: 14px; }
+.profit-box .line.profit { color: var(--accent); font-weight: 800; }
+.profit-box .line.profit span:first-child { display: inline-flex; align-items: baseline; gap: 6px; }
 
 /* ---------- printable document (refined greyscale, brand logo) ---------- */
 .invoice-panel { padding: 0; overflow: hidden; }

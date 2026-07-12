@@ -216,9 +216,17 @@ function sheet(q, rerender) {
     }
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
     // number is never a surprising $0 while a priced line sits in the draft row.
-    const sub = [...q.items, draft].reduce((sum, it) => sum + (computeLine(it, s).unit || 0), 0);
+    const priced = [...q.items, draft].map((it) => computeLine(it, s));
+    const sub = priced.reduce((sum, c) => sum + (c.unit || 0), 0);
+    const total = sub - (Number(q.discount) || 0);
     totalsRefs.sub.textContent = money(sub);
-    totalsRefs.total.textContent = money(sub - (Number(q.discount) || 0));
+    totalsRefs.total.textContent = money(total);
+    // Internal only — never shown to the client. Profit ≈ price − wholesale material cost.
+    const cost = priced.reduce((sum, c) => sum + (c.cost || 0), 0);
+    const profit = total - cost;
+    totalsRefs.cost.textContent = money(cost);
+    totalsRefs.profit.textContent = money(profit);
+    totalsRefs.margin.textContent = total > 0 ? Math.round((profit / total) * 100) + '% margin' : '';
   };
 
   const makeRow = (item, { draftRow } = {}) => {
@@ -265,6 +273,9 @@ function sheet(q, rerender) {
   const t = quoteTotals(q, s);
   totalsRefs.sub = el('span', {}, [money(t.subtotal)]);
   totalsRefs.total = el('span', {}, [money(t.total)]);
+  totalsRefs.cost = el('span', {}, ['—']);
+  totalsRefs.profit = el('span', {}, ['—']);
+  totalsRefs.margin = el('span', { class: 'muted', style: 'font-size:12px' }, ['']);
   const totals = el('div', { class: 'totals' }, [
     el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), totalsRefs.sub]),
     el('div', { class: 'line' }, [
@@ -272,6 +283,11 @@ function sheet(q, rerender) {
       (() => { const i = el('input', { type: 'number', value: q.discount || 0, style: 'width:120px;padding:8px;border:1px solid var(--line-strong);border-radius:8px', oninput: (e) => { q.discount = Number(e.target.value) || 0; save(); recalc(); } }); return i; })(),
     ]),
     el('div', { class: 'line grand' }, [el('span', {}, ['Total']), totalsRefs.total]),
+    el('div', { class: 'profit-box' }, [
+      el('div', { class: 'pb-head' }, ['Internal · not shown to client']),
+      el('div', { class: 'line' }, [el('span', {}, ['Material cost']), totalsRefs.cost]),
+      el('div', { class: 'line profit' }, [el('span', {}, ['Est. profit ', totalsRefs.margin]), totalsRefs.profit]),
+    ]),
   ]);
 
   recalc();

@@ -42,6 +42,11 @@ function ratesPanel(s) {
     el('input', { type: 'number', min: '0', step: '0.01', value: s.minimumOrder || 0, oninput: (e) => { s.minimumOrder = Number(e.target.value) || 0; save(); } }),
     el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['If a quote total is below this, it is raised to this amount. 0 = off.']),
   ]);
+  const defInstall = el('label', { class: 'field', style: 'flex:1 1 200px' }, [
+    'Default installation / labor ($)',
+    el('input', { type: 'number', min: '0', step: '0.01', value: s.defaultInstallation || 0, oninput: (e) => { s.defaultInstallation = Number(e.target.value) || 0; save(); } }),
+    el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['Pre-fills the “Ins” column on each new line. Change it on the line anytime.']),
+  ]);
   return el('div', { class: 'panel' }, [
     el('h2', {}, ['Rates & minimums']),
     el('p', { class: 'muted', style: 'margin-top:0' }, ['Fascia and side channels are charged per foot (from the All Blinds price list). Change a rate here and every quote recalculates.']),
@@ -50,6 +55,7 @@ function ratesPanel(s) {
       num('Side channel — $ / foot (each side)', 'sideChannel', 'Side channels = height ÷ 12 × this rate × 2 sides.'),
       num('Wholesale cost factor', 'costFactor', 'Your material cost ≈ list price × this (All Blinds = 0.43). Used for profit on the dashboard.'),
       minOrder,
+      defInstall,
     ]),
   ]);
 }
