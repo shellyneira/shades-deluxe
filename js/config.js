@@ -3,4 +3,4 @@
 // Paste your project's anon key below to turn on cloud sync. Leave it empty to
 // run purely local (browser storage only).
 export const SUPABASE_URL = 'https://evfnbgmvuiokhpegnyid.supabase.co';
-export const SUPABASE_ANON_KEY = '';
+export const SUPABASE_ANON_KEY = 'sb_publishable_xwmbwFdwLWOdym8oELofzw_G35gYB_S';
