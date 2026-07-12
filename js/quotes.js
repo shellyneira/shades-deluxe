@@ -350,7 +350,7 @@ function shareButton(q, s, isWork) {
     // Phones: one tap → native share sheet WITH the PDF attached (WhatsApp/email/etc).
     const file = pdfFile();
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title, text: text() }); } catch { /* cancelled */ }
+      try { await navigator.share({ files: [file], title }); } catch { /* cancelled */ } // send the PDF, not text
       return;
     }
     // Desktop can't attach files to wa.me/mailto — download the PDF, then offer text links.
