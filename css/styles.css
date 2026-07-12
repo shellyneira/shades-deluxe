@@ -187,7 +187,7 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .inv-scroll { overflow-x: auto; }
 /* DYMO 30252 stickers */
 .labels-wrap { display: flex; flex-wrap: wrap; gap: 14px; }
-.dymo-label { width: 3.5in; height: 1.125in; box-sizing: border-box; padding: 0.1in 0.16in; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: #000; display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow: hidden; }
+.dymo-label { width: 3.5in; height: 1.125in; box-sizing: border-box; padding: 0.07in 0.12in; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: #000; display: flex; align-items: center; justify-content: space-between; gap: 6px; overflow: hidden; }
 .dl-text { font-size: 11px; line-height: 1.3; min-width: 0; }
 .dl-name { font-weight: 800; }
 .dl-size { font-weight: 800; }

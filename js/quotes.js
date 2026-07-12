@@ -389,7 +389,7 @@ function invoice(q) {
     ]),
   ]);
 
-  if (invMode === 'labels') return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [labelsView(q, s)])]);
+  if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
 
   const meta = (label, val) => el('div', { class: 'mrow' }, [el('span', { class: 'ml' }, [label]), el('span', { class: 'mv' }, [val])]);
 
