@@ -329,10 +329,11 @@ function docText(q, s, isWork) {
     const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
     return `${i + 1}. ${l.location ? l.location + ' · ' : ''}${desc}${size}${price}`;
   });
-  const header = `${s.company.name}\n${isWork ? 'WORK ORDER' : 'QUOTE'} #${q.number}${q.date ? ' · ' + q.date : ''}`;
-  const client = q.client.name ? `\nClient: ${q.client.name}` : '';
-  const footer = isWork ? '' : `\n\nTotal: ${money(t.total)}`;
-  return `${header}${client}\n\n${rows.join('\n')}${footer}`;
+  if (isWork) {
+    return `${s.company.name} — WORK ORDER #${q.number}${q.date ? ' · ' + q.date : ''}\n\n${rows.join('\n')}`;
+  }
+  const hi = q.client.name ? `Hi ${q.client.name}, ` : 'Hi, ';
+  return `${hi}here's your quote from ${s.company.name} (#${q.number}):\n\n${rows.join('\n')}\n\nTotal: ${money(t.total)}\n\nThank you! Let us know if you'd like to proceed. — ${s.company.name}, ${s.company.phone}`;
 }
 
 // Share menu that works everywhere: WhatsApp, Email, Copy, plus the native share
@@ -435,12 +436,13 @@ function clientTable(q, s) {
   const cfg = s.docConfig.client;
   const rows = q.items.map((l, i) => {
     const c = computeLine(l, s);
+    const qty = Number(l.qty) || 1;
     return el('tr', {}, [
-      el('td', { class: 'num' }, [String(i + 1)]),
+      el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
       el('td', { class: 'desc' }, [describeLine(l, cfg)]),
       el('td', { class: 'num' }, [money(c.unit || 0)]),
-      el('td', { class: 'num strong' }, [money(c.unit || 0)]),
+      el('td', { class: 'num strong' }, [money((c.unit || 0) * qty)]),
     ]);
   });
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
