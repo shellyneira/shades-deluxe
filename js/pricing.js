@@ -14,11 +14,12 @@
 
 const FALLBACK_RATES = { fascia: 4.5, sideChannel: 4.5, costFactor: 0.43 };
 
-// Each selected option can carry its own flat price (Lists editor). Fields → their list.
+// Fields whose selected option can carry a flat add-on price (Lists editor). Product,
+// fabric, color, location, w/d and control are NOT here: their cost comes from the
+// price tables (product/fabric) or they're plain labels.
 const PRICED_FIELDS = [
-  ['control', 'controls'], ['system', 'systems'], ['style', 'styles'],
-  ['headrail', 'headrails'], ['bottomRail', 'headrails'], ['color', 'colors'],
-  ['product', 'products'], ['fabric', 'fabrics'],
+  ['system', 'systems'], ['style', 'styles'],
+  ['headrail', 'headrails'], ['bottomRail', 'headrails'],
 ];
 
 function optionPrice(state, listKey, name, table) {
@@ -111,7 +112,11 @@ export function describeLine(line, cfg) {
 export function quoteTotals(quote, state) {
   const subtotal = quote.items.reduce((s, it) => s + (computeLine(it, state).unit || 0), 0);
   const discount = Number(quote.discount) || 0;
-  return { subtotal: round2(subtotal), discount, total: round2(subtotal - discount) };
+  const minOrder = Number(state.minimumOrder) || 0;
+  let total = subtotal - discount;
+  const minApplied = quote.items.length > 0 && minOrder > 0 && total < minOrder;
+  if (minApplied) total = minOrder;
+  return { subtotal: round2(subtotal), discount, minOrder, minApplied, total: round2(total) };
 }
 
 export function round2(n) {

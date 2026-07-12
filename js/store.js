@@ -34,6 +34,7 @@ function freshState() {
     options: structuredClone(SEED.options),
     docConfig: structuredClone(DEFAULT_DOC_CONFIG),
     rates: { ...DEFAULT_RATES },
+    minimumOrder: 0,
     customLists: [],
     quotes: [],
     nextQuoteNumber: 1001,
@@ -62,6 +63,7 @@ function normalize(state) {
   }
   for (const key of FLAT_PRICED_LISTS) state.options[key] = toPriced(state.options[key]);
   state.rates = { ...DEFAULT_RATES, ...(state.rates || {}) };
+  state.minimumOrder = Number(state.minimumOrder) || 0;
   // Backfill document config + custom lists for states saved before they existed.
   state.docConfig = state.docConfig || structuredClone(DEFAULT_DOC_CONFIG);
   for (const doc of ['client', 'work']) {

@@ -280,7 +280,7 @@ function sheet(q, rerender) {
     ]),
     el('div', { class: 'sheet-wrap' }, [table]),
     el('div', { class: 'addbar' }, [
-      el('button', { class: 'btn accent', onclick: addLine }, ['＋ Add line']),
+      el('button', { class: 'btn primary', onclick: addLine }, ['＋ Add line']),
       el('span', { class: 'hint' }, ['or press Enter']),
     ]),
     totals,
@@ -311,27 +311,28 @@ function docText(q, s, isWork) {
   return `${header}${client}\n\n${rows.join('\n')}${footer}`;
 }
 
-// Share via the native sheet (WhatsApp/email/etc) when available, otherwise a small menu.
+// Share menu that works everywhere: WhatsApp, Email, Copy, plus the native share
+// sheet when the device offers it (phones). Always a visible menu — no silent no-op.
 function shareButton(q, s, isWork) {
+  const wrap = el('div', { style: 'position:relative;display:inline-block' });
   const btn = el('button', { class: 'btn small', title: 'Share this document' }, ['↗ Share']);
-  btn.onclick = async () => {
-    const text = docText(q, s, isWork);
-    const title = `${s.company.name} — ${isWork ? 'Work Order' : 'Quote'} #${q.number}`;
-    if (navigator.share) { try { await navigator.share({ title, text }); } catch { /* cancelled */ } return; }
-    // Desktop fallback: WhatsApp / Email / Copy
-    document.querySelector('.share-menu')?.remove();
-    const enc = encodeURIComponent(text);
-    const item = (label, onclick) => el('button', { class: 'share-item', onclick: () => { onclick(); menu.remove(); } }, [label]);
+  const text = () => docText(q, s, isWork);
+  const title = `${s.company.name} — ${isWork ? 'Work Order' : 'Quote'} #${q.number}`;
+  btn.onclick = () => {
+    if (wrap.querySelector('.share-menu')) { wrap.querySelector('.share-menu').remove(); return; }
+    const enc = () => encodeURIComponent(text());
+    const item = (label, fn) => el('button', { class: 'share-item', onclick: () => { fn(); menu.remove(); } }, [label]);
     const menu = el('div', { class: 'share-menu' }, [
-      item('💬 WhatsApp', () => window.open('https://wa.me/?text=' + enc, '_blank')),
-      item('✉️ Email', () => window.open(`mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc}`)),
-      item('📋 Copy text', () => { navigator.clipboard?.writeText(text); toast('Copied'); }),
+      item('💬 WhatsApp', () => window.open('https://wa.me/?text=' + enc(), '_blank')),
+      item('✉️ Email', () => { window.location.href = `mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc()}`; }),
+      item('📋 Copy text', async () => { try { await navigator.clipboard.writeText(text()); toast('Copied to clipboard'); } catch { toast('Copy failed'); } }),
+      navigator.share ? item('📱 More…', async () => { try { await navigator.share({ title, text: text() }); } catch { /* cancelled */ } }) : null,
     ]);
-    btn.parentElement.style.position = 'relative';
-    btn.after(menu);
-    setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('click', h); } }), 0);
+    wrap.append(menu);
+    setTimeout(() => document.addEventListener('click', function h(e) { if (!wrap.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
   };
-  return btn;
+  wrap.append(btn);
+  return wrap;
 }
 
 function invoice(q) {
@@ -390,6 +391,7 @@ function invoice(q) {
         el('div', { class: 'sum-box' }, [
           el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
           t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
+          t.minApplied ? el('div', { class: 'line' }, [el('span', {}, ['Minimum order']), el('span', {}, [money(t.minOrder)])]) : null,
           el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
           pct > 0 ? el('div', { class: 'line paid' }, [el('span', {}, ['Paid' + (pct < 1 ? ' (50%)' : '')]), el('span', {}, ['−' + money(paid)])]) : null,
           pct > 0 && pct < 1 ? el('div', { class: 'line balance' }, [el('span', {}, ['Balance due']), el('span', {}, [money(balance)])]) : null,
@@ -428,11 +430,10 @@ function clientTable(q, s) {
 // NO prices. Few columns so it always fits a page / PDF.
 function workTable(q, s) {
   const cfg = s.docConfig.work;
-  const cols = ['#', 'Location', 'W/D', 'Size (W×H)', 'Description'];
+  const cols = ['#', 'Location', 'Size (W×H)', 'Description'];
   const rows = q.items.map((l, i) => el('tr', {}, [
     el('td', { class: 'num' }, [String(i + 1)]),
     el('td', { class: 'strong' }, [l.location]),
-    el('td', {}, [l.wdNumber]),
     el('td', { class: 'strong' }, [sizeText(l)]),
     el('td', { class: 'desc' }, [describeLine(l, cfg)]),
   ]));

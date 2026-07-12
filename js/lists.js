@@ -9,6 +9,13 @@ const LABELS = {
   systems: 'Systems', styles: 'Styles', headrails: 'Headrails / Bottom rails',
 };
 const GROUPED = { products: true, fabrics: true }; // stored as {roller, zebra}
+// Only these add-ons carry a price. Products/fabrics get their price from the Price
+// Tables; colors, locations, w/d and controls are plain labels.
+const PRICEABLE = { systems: true, styles: true, headrails: true };
+const PRICE_NOTE = {
+  products: 'Price comes from the Price Tables — no extra charge here.',
+  fabrics: 'Price comes from the Price Tables — no extra charge here.',
+};
 
 export function renderLists() {
   const s = getState();
@@ -25,15 +32,15 @@ export function renderLists() {
     ]);
   };
 
-  const addBox = (arr, label) => {
+  const addBox = (arr, label, priced) => {
     const name = el('input', { type: 'text', placeholder: 'Add ' + label + '…', style: 'min-width:180px' });
-    const price = el('input', { type: 'number', min: '0', step: '0.01', placeholder: '$ (optional)', style: 'width:120px' });
-    const add = () => { const v = name.value.trim(); if (!v) return; arr.push({ name: v, price: Number(price.value) || 0 }); name.value = ''; price.value = ''; save(); renderLists(); };
-    name.addEventListener('keydown', (e) => { if (e.key === 'Enter') price.focus(); });
-    price.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+    const price = priced ? el('input', { type: 'number', min: '0', step: '0.01', placeholder: '$ (optional)', style: 'width:120px' }) : null;
+    const add = () => { const v = name.value.trim(); if (!v) return; arr.push({ name: v, price: priced ? Number(price.value) || 0 : 0 }); name.value = ''; if (price) price.value = ''; save(); renderLists(); };
+    name.addEventListener('keydown', (e) => { if (e.key === 'Enter') { if (price) price.focus(); else add(); } });
+    if (price) price.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
     return el('div', { class: 'row', style: 'margin-top:12px' }, [
       el('label', { class: 'field' }, [' ', name]),
-      el('label', { class: 'field' }, [' ', price]),
+      price ? el('label', { class: 'field' }, [' ', price]) : null,
       el('button', { class: 'btn small', onclick: add }, ['＋ Add']),
     ]);
   };
@@ -42,22 +49,23 @@ export function renderLists() {
     ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i)))
     : el('div', { class: 'muted' }, ['(empty)']);
 
-  const groupCol = (arr, title, cls) => el('div', { class: 'list-group' }, [
+  const groupCol = (arr, title, cls, priced) => el('div', { class: 'list-group' }, [
     el('div', { class: 'list-group-head ' + cls }, [el('span', { class: 'dot' }, []), title, el('span', { class: 'count' }, [String(arr.length)])]),
     arr.length ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i))) : el('div', { class: 'muted', style: 'font-size:13px' }, ['(none)']),
-    addBox(arr, title.toLowerCase()),
+    addBox(arr, title.toLowerCase(), priced),
   ]);
 
   const panels = keys.map((key) => {
     const val = s.options[key];
+    const priced = !!PRICEABLE[key];
     const body = GROUPED[key]
-      ? el('div', { class: 'list-split' }, [groupCol(val.roller, 'Roller', 'roller'), groupCol(val.zebra, 'Zebra', 'zebra')])
-      : el('div', {}, [flatList(val), addBox(val, LABELS[key].toLowerCase())]);
+      ? el('div', { class: 'list-split' }, [groupCol(val.roller, 'Roller', 'roller', priced), groupCol(val.zebra, 'Zebra', 'zebra', priced)])
+      : el('div', {}, [flatList(val), addBox(val, LABELS[key].toLowerCase(), priced)]);
 
     return el('div', { class: 'panel' }, [
       el('div', { class: 'section-head', style: 'margin-bottom:12px' }, [
         el('h3', { style: 'margin:0' }, [LABELS[key]]),
-        GROUPED[key] ? el('span', { class: 'hint' }, ['Each type has its own list — add to the right column']) : null,
+        el('span', { class: 'hint' }, [PRICE_NOTE[key] || (GROUPED[key] ? 'Each type has its own list — add to the right column' : priced ? 'Add an optional $ to charge extra when selected' : '')]),
       ]),
       body,
     ]);
@@ -73,7 +81,7 @@ export function renderLists() {
       ]),
     ]),
     flatList(list.items),
-    addBox(list.items, list.name.toLowerCase()),
+    addBox(list.items, list.name.toLowerCase(), true),
   ]));
 
   mount(el('div', {}, [
