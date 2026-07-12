@@ -345,26 +345,25 @@ function shareButton(q, s, isWork) {
   const btn = el('button', { class: 'btn small', title: 'Share this document' }, ['↗ Share']);
   const text = () => docText(q, s, isWork);
   const title = `${s.company.name} — ${isWork ? 'Work Order' : 'Quote'} #${q.number}`;
-  btn.onclick = () => {
+  const pdfFile = () => new File([textToPdfBlob(text().split('\n'))], `${isWork ? 'work-order' : 'quote'}-${q.number}.pdf`, { type: 'application/pdf' });
+  btn.onclick = async () => {
+    // Phones: one tap → native share sheet WITH the PDF attached (WhatsApp/email/etc).
+    const file = pdfFile();
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title, text: text() }); } catch { /* cancelled */ }
+      return;
+    }
+    // Desktop can't attach files to wa.me/mailto — download the PDF, then offer text links.
     if (wrap.querySelector('.share-menu')) { wrap.querySelector('.share-menu').remove(); return; }
+    const blob = textToPdfBlob(text().split('\n'));
+    const a = el('a', { href: URL.createObjectURL(blob), download: file.name }); document.body.append(a); a.click(); a.remove();
+    toast('PDF downloaded — attach it below');
     const enc = () => encodeURIComponent(text());
     const item = (label, fn) => el('button', { class: 'share-item', onclick: () => { fn(); menu.remove(); } }, [label]);
-    const sharePdf = async () => {
-      const blob = textToPdfBlob(text().split('\n'));
-      const file = new File([blob], `${isWork ? 'work-order' : 'quote'}-${q.number}.pdf`, { type: 'application/pdf' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title, text: text() }); } catch { /* cancelled */ }
-      } else {
-        const a = el('a', { href: URL.createObjectURL(blob), download: file.name }); document.body.append(a); a.click(); a.remove();
-        toast('PDF downloaded — attach it to WhatsApp/email');
-      }
-    };
     const menu = el('div', { class: 'share-menu' }, [
-      item('📄 Share as PDF', sharePdf),
-      item('💬 WhatsApp', () => window.open('https://wa.me/?text=' + enc(), '_blank')),
-      item('✉️ Email', () => { window.location.href = `mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc()}`; }),
-      item('📋 Copy text', async () => { try { await navigator.clipboard.writeText(text()); toast('Copied to clipboard'); } catch { toast('Copy failed'); } }),
-      navigator.share ? item('📱 More…', async () => { try { await navigator.share({ title, text: text() }); } catch { /* cancelled */ } }) : null,
+      item('💬 WhatsApp (attach the PDF)', () => window.open('https://wa.me/?text=' + enc(), '_blank')),
+      item('✉️ Email (attach the PDF)', () => { window.location.href = `mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc()}`; }),
+      item('📋 Copy text', async () => { try { await navigator.clipboard.writeText(text()); toast('Copied'); } catch { toast('Copy failed'); } }),
     ]);
     wrap.append(menu);
     setTimeout(() => document.addEventListener('click', function h(e) { if (!wrap.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
