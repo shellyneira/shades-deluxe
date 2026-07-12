@@ -25,6 +25,7 @@ function documentsPanel(s) {
     el('div', { class: 'list-split' }, [
       col('client', 'Client Quote', 'Shown to the customer. No dimensions; prices shown.'),
       col('work', 'Work Order', 'For your maker. Dimensions shown; no prices.'),
+      col('label', 'Stickers (DYMO)', 'Extra info line on each shade label (name, location, product, size & control are always shown).'),
     ]),
   ]);
 }

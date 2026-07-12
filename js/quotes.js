@@ -381,12 +381,15 @@ function invoice(q) {
   const toolbar = el('div', { class: 'section-head no-print' }, [
     el('button', { class: 'btn ghost', onclick: () => open(q.id, 'edit') }, ['← Back to worksheet']),
     el('div', { class: 'subtabs', style: 'margin:0' }, [
-      el('button', { class: 'subtab' + (isWork ? '' : ' active'), onclick: () => { invMode = 'client'; renderQuotes(); } }, ['Client Quote']),
-      el('button', { class: 'subtab' + (isWork ? ' active' : ''), onclick: () => { invMode = 'work'; renderQuotes(); } }, ['Work Order']),
-      shareButton(q, s, isWork),
-      el('button', { class: 'btn primary small', onclick: () => window.print() }, ['🖨 Print / PDF']),
+      el('button', { class: 'subtab' + (invMode === 'client' ? ' active' : ''), onclick: () => { invMode = 'client'; renderQuotes(); } }, ['Client Quote']),
+      el('button', { class: 'subtab' + (invMode === 'work' ? ' active' : ''), onclick: () => { invMode = 'work'; renderQuotes(); } }, ['Work Order']),
+      el('button', { class: 'subtab' + (invMode === 'labels' ? ' active' : ''), onclick: () => { invMode = 'labels'; renderQuotes(); } }, ['Labels']),
+      invMode === 'labels' ? null : shareButton(q, s, isWork),
+      el('button', { class: 'btn primary small', onclick: () => window.print() }, ['🖨 Print']),
     ]),
   ]);
+
+  if (invMode === 'labels') return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [labelsView(q, s)])]);
 
   const meta = (label, val) => el('div', { class: 'mrow' }, [el('span', { class: 'ml' }, [label]), el('span', { class: 'mv' }, [val])]);
 
@@ -440,6 +443,24 @@ function invoice(q) {
   ]);
 
   return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [doc])]);
+}
+
+// DYMO 30252 stickers (1⅛" × 3½"), one per shade, for the LabelWriter 550.
+function labelsView(q, s) {
+  const cfg = s.docConfig.label;
+  const labels = q.items.map((l) => el('div', { class: 'dymo-label' }, [
+    el('div', { class: 'dl-text' }, [
+      el('div', { class: 'dl-name' }, [q.client.name || '']),
+      el('div', {}, [l.location || '']),
+      el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg)].filter(Boolean).join(' — ')]),
+      el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
+    ]),
+    el('img', { class: 'dl-logo', src: 'assets/logo.jpg', alt: '' }),
+  ]));
+  return el('div', {}, [
+    el('p', { class: 'hint no-print', style: 'margin:0 0 14px' }, ['One label per shade · DYMO 30252 (1⅛" × 3½"). Click Print, then choose your LabelWriter 550 and the 30252 label — each shade prints on its own label.']),
+    el('div', { class: 'labels-wrap' }, labels.length ? labels : [el('div', { class: 'muted' }, ['No items'])]),
+  ]);
 }
 
 // Client version: everything goes into the Description (fields chosen in Settings),

@@ -21,6 +21,8 @@ const DEFAULT_DOC_CONFIG = {
   client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, fascia: true, sideChannel: true, brackets: true },
   // Work order: every build detail, dimensions shown, no prices.
   work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, sideChannel: true, brackets: true },
+  // DYMO sticker: short — product shown separately, so description = fabric + control.
+  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, fascia: false, sideChannel: false, brackets: false },
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
@@ -68,7 +70,7 @@ function normalize(state) {
   state.defaultInstallation = Number(state.defaultInstallation) || 0;
   // Backfill document config + custom lists for states saved before they existed.
   state.docConfig = state.docConfig || structuredClone(DEFAULT_DOC_CONFIG);
-  for (const doc of ['client', 'work']) {
+  for (const doc of ['client', 'work', 'label']) {
     state.docConfig[doc] = { ...DEFAULT_DOC_CONFIG[doc], ...(state.docConfig[doc] || {}) };
   }
   state.customLists = (state.customLists || []).map((l) => ({ name: l.name, items: toPriced(l.items) }));

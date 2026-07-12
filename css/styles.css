@@ -185,6 +185,18 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .invoice.work table.items th, .invoice.work table.items td { padding: 8px 9px; font-size: 11.5px; white-space: nowrap; }
 .invoice.work table.items td.desc { white-space: normal; max-width: 150px; }
 .inv-scroll { overflow-x: auto; }
+/* DYMO 30252 stickers */
+.labels-wrap { display: flex; flex-wrap: wrap; gap: 14px; }
+.dymo-label { width: 3.5in; height: 1.125in; box-sizing: border-box; padding: 0.1in 0.16in; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: #000; display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow: hidden; }
+.dl-text { font-size: 11px; line-height: 1.3; min-width: 0; }
+.dl-name { font-weight: 800; }
+.dl-size { font-weight: 800; }
+.dl-logo { width: 0.9in; height: auto; flex: none; filter: grayscale(1) contrast(1.8) brightness(.85); }
+@page dymo { size: 3.5in 1.125in; margin: 0; }
+@media print {
+  .dymo-label { page: dymo; break-after: page; border: 0; border-radius: 0; padding: 0.09in 0.14in; }
+  .labels-wrap { display: block; gap: 0; }
+}
 /* share dropdown */
 .share-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; display: flex; flex-direction: column; }
 .share-item { border: 0; background: transparent; text-align: left; padding: 9px 12px; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink); }
