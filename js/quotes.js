@@ -384,8 +384,7 @@ function invoice(q) {
       el('button', { class: 'subtab' + (invMode === 'client' ? ' active' : ''), onclick: () => { invMode = 'client'; renderQuotes(); } }, ['Client Quote']),
       el('button', { class: 'subtab' + (invMode === 'work' ? ' active' : ''), onclick: () => { invMode = 'work'; renderQuotes(); } }, ['Work Order']),
       el('button', { class: 'subtab' + (invMode === 'labels' ? ' active' : ''), onclick: () => { invMode = 'labels'; renderQuotes(); } }, ['Labels']),
-      invMode === 'labels' ? null : shareButton(q, s, isWork),
-      el('button', { class: 'btn primary small', onclick: () => window.print() }, ['🖨 Print']),
+      el('button', { class: 'btn primary small', onclick: () => window.print() }, ['🖨 Print / Save PDF']),
     ]),
   ]);
 
