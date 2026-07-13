@@ -463,7 +463,7 @@ function invoice(q) {
         ]),
       ]);
     })(),
-    el('div', { class: 'terms' }, [isWork ? 'Fabrication spec sheet — measurements are finished sizes. No pricing shown.' : co.terms]),
+    isWork ? null : el('div', { class: 'terms' }, [co.terms]),
   ]);
 
   return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [doc])]);
