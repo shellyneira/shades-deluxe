@@ -1,7 +1,7 @@
 // Single source of truth. State lives in localStorage (instant) and syncs to
 // Supabase when configured (survives device loss, shared across devices).
 import { SEED } from './seed-data.js';
-import { dbEnabled, pullState, pushState } from './db.js';
+import { dbEnabled, pullState, pushState, pullQuotes, pushQuotes, deleteQuoteRow } from './db.js';
 
 const KEY = 'shades-deluxe-v1';
 
@@ -93,7 +93,12 @@ let syncTimer;
 function scheduleSync() {
   if (!dbEnabled()) return;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => { pushState(state).catch((e) => console.warn('cloud sync failed', e)); }, 700);
+  syncTimer = setTimeout(() => {
+    const { quotes, ...config } = state;
+    // Config (tables/lists/settings) → app_state; each quote → its own row in quotes.
+    Promise.all([pushState({ ...config, quotes: [] }), pushQuotes(quotes)])
+      .catch((e) => console.warn('cloud sync failed', e));
+  }, 700);
 }
 
 export function save() {
@@ -105,13 +110,17 @@ export function save() {
 export async function initCloud() {
   if (!dbEnabled()) return false;
   try {
-    const remote = await pullState();
-    if (remote) {
-      state = normalize({ ...freshState(), ...remote });
+    const [remote, remoteQuotes] = await Promise.all([pullState(), pullQuotes()]);
+    if (remote || (remoteQuotes && remoteQuotes.length)) {
+      // Prefer the quotes table; fall back to quotes embedded in the old blob (migration).
+      const quotes = (remoteQuotes && remoteQuotes.length) ? remoteQuotes : (remote?.quotes || []);
+      state = normalize({ ...freshState(), ...(remote || {}), quotes });
       localStorage.setItem(KEY, JSON.stringify(state));
+      scheduleSync(); // push migrated quotes into their own rows
       return true;
     }
-    await pushState(state); // first run — seed the cloud from local
+    const { quotes, ...config } = state;
+    await Promise.all([pushState({ ...config, quotes: [] }), pushQuotes(quotes)]); // seed cloud from local
   } catch (e) {
     console.warn('cloud init failed, using local data', e);
   }
@@ -162,4 +171,5 @@ export function getQuote(id) {
 export function deleteQuote(id) {
   state.quotes = state.quotes.filter((q) => q.id !== id);
   save();
+  deleteQuoteRow(id).catch((e) => console.warn('cloud delete failed', e));
 }
