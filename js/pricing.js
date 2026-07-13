@@ -73,8 +73,9 @@ export function computeLine(line, state) {
 
   const markup = Number(line.markup) || 0; // extra profit the user adds on this line
   const motor = Number(line.motorPrice) || 0; // per-line motor charge
-  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras + markup + motor;
-  const unit = list == null ? null : base;
+  const lineDisc = Number(line.discount) || 0; // per-item discount
+  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras + markup + motor - lineDisc;
+  const unit = list == null ? null : Math.max(0, base);
   // True cost = wholesale material (list × factor) + labor + accessories billed at
   // cost (conservative: no margin claimed on pass-throughs). Keeps profit honest.
   const cost = list == null ? null : round2((list || 0) * rates.costFactor + fascia + sideChannel + installation + brackets + extras);

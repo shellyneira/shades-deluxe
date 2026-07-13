@@ -107,7 +107,7 @@ function blankLine(s) {
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, fasciaAmount: '', sideChannel: false, sideChannelAmount: '',
-    installation: s.defaultInstallation || '', brackets: '', markup: '', motorPrice: '',
+    installation: s.defaultInstallation || '', brackets: '', discount: '', markup: '', motorPrice: '',
   };
 }
 
@@ -151,6 +151,7 @@ function columns(o, tableNames) {
     { key: 'sideChannelAmount', label: 'S/Ch $', kind: 'num', w: 72, placeholder: 'auto' },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
+    { key: 'discount', label: 'Disc −$', kind: 'num', w: 70, placeholder: '0' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
 }
@@ -171,6 +172,7 @@ const COL_HELP = {
   control: 'Chain or motor + side (RH/LH)',
   system: 'Manual or motor — add its price in Lists → Systems',
   motorPrice: 'Motor charge for this line ($). Adds to the price. Empty = 0.',
+  discount: 'Discount for THIS shade ($). Subtracts from its price. The quote-level discount is separate.',
   style: 'Mount/operation (IB/OB/One-way) — price in Lists → Styles',
   headrail: 'Headrail — price in Lists → Headrails',
   bottomRail: 'Bottom rail — price in Lists → Headrails',
@@ -518,18 +520,32 @@ function invoice(q) {
 // DYMO 30252 stickers (1⅛" × 3½"), one per shade, for the LabelWriter 550.
 function labelsView(q, s) {
   const cfg = s.docConfig.label;
-  const labels = q.items.map((l) => el('div', { class: 'dymo-label' }, [
-    el('div', { class: 'dl-text' }, [
-      el('div', { class: 'dl-name' }, [q.client.name || '']),
-      el('div', { class: 'dl-loc' }, [l.location || '']),
-      el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg)].filter(Boolean).join(' — ')]),
-      el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
-    ]),
-    el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),
-  ]));
+  const labels = q.items.map((l) => {
+    const card = el('div', { class: 'dymo-label' }, [
+      el('div', { class: 'dl-text' }, [
+        el('div', { class: 'dl-name' }, [q.client.name || '']),
+        el('div', { class: 'dl-loc' }, [l.location || '']),
+        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg)].filter(Boolean).join(' — ')]),
+        el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
+      ]),
+      el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),
+    ]);
+    const cb = el('input', { type: 'checkbox', class: 'dl-check no-print' });
+    cb.checked = true;
+    cb.onchange = () => card.classList.toggle('deselected', !cb.checked);
+    return el('div', { class: 'dl-wrap' }, [cb, card]);
+  });
   setTimeout(fitLabels, 0); // shrink each label's text just enough to fit nicely
+  const toggleAll = el('button', { class: 'btn small no-print', onclick: () => {
+    const boxes = [...document.querySelectorAll('.dl-check')];
+    const target = boxes.some((b) => !b.checked); // if any off → select all, else clear all
+    boxes.forEach((b) => { b.checked = target; b.onchange(); });
+  } }, ['Select / clear all']);
   return el('div', {}, [
-    el('p', { class: 'hint no-print', style: 'margin:0 0 14px' }, ['One label per shade · DYMO 30252 (1⅛" × 3½"). Click Print, then choose your LabelWriter 550 and the 30252 label — each shade prints on its own label.']),
+    el('div', { class: 'section-head no-print', style: 'margin-bottom:12px' }, [
+      el('span', { class: 'hint' }, ['One label per shade · DYMO 30252. Uncheck any you don’t want, then Print. Only checked labels print.']),
+      toggleAll,
+    ]),
     el('div', { class: 'labels-wrap' }, labels.length ? labels : [el('div', { class: 'muted' }, ['No items'])]),
   ]);
 }

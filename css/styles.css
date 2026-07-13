@@ -193,6 +193,10 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .inv-scroll { overflow-x: auto; }
 /* DYMO 30252 stickers */
 .labels-wrap { display: flex; flex-wrap: wrap; gap: 14px; }
+.dl-wrap { position: relative; display: inline-block; }
+.dl-check { position: absolute; top: 7px; left: 7px; width: 18px; height: 18px; z-index: 2; accent-color: var(--brand); cursor: pointer; }
+.dymo-label.deselected { opacity: .32; }
+@media print { .dymo-label.deselected, .dl-wrap:has(.dl-check:not(:checked)) { display: none !important; } }
 .dymo-label { width: 3.5in; height: 1.125in; box-sizing: border-box; padding: 0.07in 0.12in; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: #000; display: flex; align-items: center; justify-content: space-between; gap: 6px; overflow: hidden; }
 /* base size is auto-fit per label in JS; children scale in em, everything uppercase */
 .dl-text { font-size: 13px; line-height: 1.24; flex: 1; min-width: 0; max-height: 100%; overflow: hidden; text-transform: uppercase; }
