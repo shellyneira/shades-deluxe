@@ -212,7 +212,7 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 }
 
 /* ---------- responsive (phone / tablet) ---------- */
-@media (max-width: 760px) {
+@media screen and (max-width: 760px) {
   .topbar { height: auto; min-height: 56px; padding: 8px 14px; flex-wrap: wrap; gap: 6px 16px; }
   .brand { font-size: 16px; }
   .tabs { width: 100%; overflow-x: auto; gap: 2px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
@@ -331,7 +331,7 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 .vbar-label { font-size: 11px; color: var(--muted); font-weight: 600; }
 .legend { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 4px 0; }
 .legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-@media (max-width: 760px) { .kpi-row { grid-template-columns: 1fr 1fr; } .dash-grid { grid-template-columns: 1fr; } }
+@media screen and (max-width: 760px) { .kpi-row { grid-template-columns: 1fr 1fr; } .dash-grid { grid-template-columns: 1fr; } }
 
 /* ---------- login ---------- */
 .login-wrap { min-height: 80vh; display: flex; align-items: center; justify-content: center; }
