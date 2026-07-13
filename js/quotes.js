@@ -1,6 +1,6 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
-import { getState, save, newQuote, getQuote, deleteQuote } from './store.js';
+import { getState, save, newQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
 import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2 } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
@@ -19,9 +19,11 @@ function open(id, view = 'edit') {
 }
 
 /* ---------------- list ---------------- */
-const STATUSES = ['draft', 'sent', 'won', 'lost'];
-const PAYMENT_OPTS = ['Unpaid', '50% paid', 'Paid'];
-const paymentPct = (p) => (p === 'Paid' ? 1 : p === '50% paid' ? 0.5 : 0);
+// One lifecycle: Quote → Sent (still a quote) → Accepted/Deposit Paid/Paid (an invoice).
+const STAGES = ['Quote', 'Sent', 'Accepted', 'Deposit Paid', 'Paid'];
+const stagePct = (st) => (st === 'Paid' ? 1 : st === 'Deposit Paid' ? 0.5 : 0);
+const isInvoiceStage = (st) => st === 'Accepted' || st === 'Deposit Paid' || st === 'Paid';
+const stageClass = (st) => (st || 'Quote').toLowerCase().replace(/\s+/g, '');
 let filter = 'all';
 
 function list() {
@@ -31,22 +33,21 @@ function list() {
     el('button', { class: 'btn primary', onclick: () => open(newQuote().id) }, ['＋ New Quote']),
   ]);
 
-  const filters = el('div', { class: 'subtabs' }, ['all', ...STATUSES].map((f) =>
-    el('button', { class: 'subtab' + (f === filter ? ' active' : ''), onclick: () => { filter = f; renderQuotes(); } },
-      [f[0].toUpperCase() + f.slice(1)])));
+  const filters = el('div', { class: 'subtabs' }, ['all', ...STAGES].map((f) =>
+    el('button', { class: 'subtab' + (f === filter ? ' active' : ''), onclick: () => { filter = f; renderQuotes(); } }, [f])));
 
-  const shown = s.quotes.filter((q) => filter === 'all' || (q.status || 'draft') === filter);
+  const shown = s.quotes.filter((q) => filter === 'all' || (q.stage || 'Quote') === filter);
   const body = shown.length
     ? el('div', { class: 'cards' }, shown.map((q) => {
       const t = quoteTotals(q, s);
-      const st = q.status || 'draft';
+      const st = q.stage || 'Quote';
+      const num = isInvoiceStage(st) && q.invoiceNumber ? 'INV #' + q.invoiceNumber : 'Q #' + q.number;
       return el('div', { class: 'card', onclick: () => open(q.id) }, [
-        el('div', { class: 'status' }, [el('span', { class: 'badge ' + st }, [st])]),
-        el('div', { class: 'muted' }, ['#' + q.number + ' · ' + (q.date || '')]),
+        el('div', { class: 'status' }, [el('span', { class: 'badge ' + stageClass(st) }, [st])]),
+        el('div', { class: 'muted' }, [num + ' · ' + (q.date || '')]),
         el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
         el('div', { class: 'muted' }, [q.items.length + ' item(s)']),
         el('div', { class: 'total' }, [money(t.total)]),
-        q.payment && q.payment !== 'Unpaid' ? el('span', { class: 'pay-tag ' + (q.payment === 'Paid' ? 'full' : 'half') }, [q.payment === 'Paid' ? '✓ Paid' : '◐ 50% paid']) : null,
       ]);
     }))
     : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['🪟']), s.quotes.length ? 'No quotes in this filter.' : 'No quotes yet. Click “New Quote” to start.']);
@@ -78,8 +79,7 @@ function editor(q) {
       input('Address', q.client.address, (v) => set(() => (q.client.address = v)), { class: 'grow' }),
       input('Quote date', q.date, (v) => set(() => (q.date = v)), { type: 'date' }),
       input('Install date', q.installDate, (v) => set(() => (q.installDate = v)), { type: 'date' }),
-      select('Status', STATUSES, q.status || 'draft', (v) => set(() => (q.status = v))),
-      select('Payment', PAYMENT_OPTS, q.payment || 'Unpaid', (v) => set(() => (q.payment = v))),
+      select('Stage', STAGES, q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
     ]),
   ]);
 
@@ -459,9 +459,9 @@ function invoice(q) {
       ]),
     ]),
     el('div', { class: 'doc-title' }, [
-      el('div', { class: 't' }, [isWork ? 'WORK ORDER' : 'QUOTE']),
+      el('div', { class: 't' }, [isWork ? 'WORK ORDER' : (isInvoiceStage(q.stage) ? 'INVOICE' : 'QUOTE')]),
       el('div', { class: 'doc-meta' }, [
-        meta(isWork ? 'Order #' : 'Quote #', String(q.number)),
+        meta(isWork ? 'Order #' : (isInvoiceStage(q.stage) ? 'Invoice #' : 'Quote #'), String(isInvoiceStage(q.stage) && q.invoiceNumber ? q.invoiceNumber : q.number)),
         meta('Date', q.date || '—'),
         q.installDate ? meta('Install', q.installDate) : null,
       ]),
@@ -494,7 +494,7 @@ function invoice(q) {
       const taxable = Math.max(sub + install - discount, t.minApplied ? roundWhole(t.minOrder) : 0);
       const tax = roundWhole(taxable * (Number(s.taxRate) || 0) / 100);
       const total = taxable + tax;
-      const pct = paymentPct(q.payment);
+      const pct = stagePct(q.stage);
       const paid = roundWhole(total * pct);
       return el('div', { class: 'sum' }, [
         el('div', { class: 'sum-box' }, [

@@ -43,6 +43,7 @@ function freshState() {
     customLists: [],
     quotes: [],
     nextQuoteNumber: 1001,
+    nextInvoiceNumber: 2001,
   });
 }
 
@@ -78,7 +79,23 @@ function normalize(state) {
     state.docConfig[doc] = { ...DEFAULT_DOC_CONFIG[doc], ...(state.docConfig[doc] || {}) };
   }
   state.customLists = (state.customLists || []).map((l) => ({ name: l.name, items: toPriced(l.items) }));
+  state.nextInvoiceNumber = Number(state.nextInvoiceNumber) || 2001;
+  // Migrate legacy status/payment into the single lifecycle stage.
+  (state.quotes || []).forEach((q) => {
+    if (!q.stage) {
+      q.stage = q.payment === 'Paid' ? 'Paid'
+        : q.payment === '50% paid' ? 'Deposit Paid'
+        : q.status === 'won' ? 'Accepted'
+        : q.status === 'sent' ? 'Sent' : 'Quote';
+    }
+  });
   return state;
+}
+
+// Invoice numbers are their own sequence, assigned once a quote becomes an invoice.
+export function assignInvoiceNumber(q) {
+  if (!q.invoiceNumber) { q.invoiceNumber = state.nextInvoiceNumber++; save(); }
+  return q.invoiceNumber;
 }
 
 let state = load();
@@ -163,8 +180,8 @@ export function newQuote() {
     installDate: '',
     client: { name: '', address: '', phone: '', email: '' },
     discount: 0,
-    status: 'draft',
-    payment: 'Unpaid',
+    stage: 'Quote',      // Quote → Sent → Accepted → Deposit Paid → Paid
+    invoiceNumber: null, // assigned when it first becomes an invoice (Accepted+)
     items: [],
   };
   state.quotes.unshift(q);
