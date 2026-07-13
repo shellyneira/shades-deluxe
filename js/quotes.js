@@ -107,7 +107,7 @@ function blankLine(s) {
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, fasciaAmount: '', sideChannel: false, sideChannelAmount: '',
-    installation: s.defaultInstallation || '', brackets: '', markup: '',
+    installation: s.defaultInstallation || '', brackets: '', markup: '', motorPrice: '',
   };
 }
 
@@ -141,6 +141,7 @@ function columns(o, tableNames) {
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
     { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
     { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108 },
+    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
     { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
     { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
@@ -169,6 +170,7 @@ const COL_HELP = {
   color: 'Chain/cassette color, shared for both (edit in Lists)',
   control: 'Chain or motor + side (RH/LH)',
   system: 'Manual or motor — add its price in Lists → Systems',
+  motorPrice: 'Motor charge for this line ($). Adds to the price. Empty = 0.',
   style: 'Mount/operation (IB/OB/One-way) — price in Lists → Styles',
   headrail: 'Headrail — price in Lists → Headrails',
   bottomRail: 'Bottom rail — price in Lists → Headrails',

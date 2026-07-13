@@ -72,7 +72,8 @@ export function computeLine(line, state) {
   const extras = optionExtras(line, state); // priced dropdown options
 
   const markup = Number(line.markup) || 0; // extra profit the user adds on this line
-  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras + markup;
+  const motor = Number(line.motorPrice) || 0; // per-line motor charge
+  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras + markup + motor;
   const unit = list == null ? null : base;
   // True cost = wholesale material (list × factor) + labor + accessories billed at
   // cost (conservative: no margin claimed on pass-throughs). Keeps profit honest.
