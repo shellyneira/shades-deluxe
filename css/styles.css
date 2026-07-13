@@ -164,7 +164,10 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .invoice .mrow .ml { color: var(--ink3); font-weight: 500; }
 .invoice .mrow .mv { color: var(--ink1); font-weight: 600; font-variant-numeric: tabular-nums; }
 .invoice .mrow.status { justify-content: flex-end; margin-top: 2px; }
-.invoice .bill { padding: 2px 0 0; margin-bottom: 28px; }
+.invoice .parties { display: flex; justify-content: space-between; gap: 40px; margin-bottom: 28px; }
+.invoice .parties .ship { text-align: right; }
+@media screen and (max-width: 760px) { .invoice .parties { flex-direction: column; gap: 16px; } .invoice .parties .ship { text-align: left; } }
+.invoice .bill { padding: 2px 0 0; }
 .invoice .bill h4 { margin: 0 0 6px; font-size: 10.5px; text-transform: uppercase; color: var(--ink3); letter-spacing: 1px; font-weight: 700; }
 .invoice .bill-name { font-size: 16px; font-weight: 700; color: var(--ink1); }
 .invoice .bill div { font-size: 13px; color: var(--ink2); }

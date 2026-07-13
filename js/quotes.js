@@ -468,11 +468,16 @@ function invoice(q) {
     ]),
   ]);
 
-  const bill = el('div', { class: 'bill' }, [
-    el('h4', {}, [isWork ? 'Client' : 'Bill To']),
-    el('div', { class: 'bill-name' }, [q.client.name || '—']),
-    q.client.address ? el('div', {}, [q.client.address]) : null,
-    el('div', { class: 'co-meta' }, [[q.client.phone, q.client.email].filter(Boolean).join(' · ')]),
+  const bill = el('div', { class: 'parties' }, [
+    el('div', { class: 'bill' }, [
+      el('h4', {}, [isWork ? 'Client' : 'Bill To']),
+      el('div', { class: 'bill-name' }, [q.client.name || '—']),
+      el('div', { class: 'co-meta' }, [[q.client.phone, q.client.email].filter(Boolean).join(' · ')]),
+    ]),
+    q.client.address ? el('div', { class: 'bill ship' }, [
+      el('h4', {}, ['Ship To']),
+      el('div', {}, [q.client.address]),
+    ]) : null,
   ]);
 
   const table = el('div', { class: 'inv-scroll' }, [isWork ? workTable(q, s) : clientTable(q, s)]);
