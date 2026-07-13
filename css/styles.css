@@ -361,6 +361,8 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
   .no-print { display: none !important; }
   body, main { background: #fff; margin: 0; max-width: none; padding: 0; }
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
-  .invoice { padding: 0; max-width: none; }
+  /* margin:0 page leaves the browser no room to inject its URL/date/page footer */
+  .invoice { padding: 12mm; max-width: none; page: inv; }
+  @page inv { margin: 0; }
   @page { margin: 14mm; }
 }
