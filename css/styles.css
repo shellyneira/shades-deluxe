@@ -368,8 +368,14 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
   /* margin:0 page leaves the browser no room to inject its URL/date/page footer */
   html, body, main { height: auto !important; min-height: 0 !important; }
-  .invoice { padding: 12mm 12mm 0; max-width: none; page: inv; }
-  .invoice .terms { break-inside: avoid; }
+  .invoice { padding: 9mm 10mm; max-width: none; page: inv; }
+  /* compact so a short quote always fits ONE page (Edge is stricter than Chrome) */
+  .invoice .head { margin-bottom: 18px; padding-bottom: 14px; }
+  .invoice .parties { margin-bottom: 16px; }
+  .invoice table.items td { padding: 8px 11px; }
+  .invoice .sum { margin-top: 14px; }
+  .invoice .terms { margin-top: 20px; break-inside: avoid; }
+  .invoice table.items tr { break-inside: avoid; }
   @page inv { margin: 0; }
-  @page { margin: 14mm; }
+  @page { margin: 12mm; }
 }
