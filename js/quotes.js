@@ -255,11 +255,17 @@ function sheet(q, rerender) {
     totalsRefs.taxRow.style.display = rate > 0 ? '' : 'none';
     totalsRefs.taxLbl.textContent = `Tax (${rate}%)`;
     totalsRefs.total.textContent = money0(taxable + tax);
-    // Internal only — profit excludes tax (pass-through); uses the rounded revenue.
+    // Internal breakdown — profit excludes tax (pass-through); revenue = rounded taxable.
     const cost = priced.reduce((a, p) => a + (p.c.cost || 0) * p.qty, 0);
+    const labor = priced.reduce((a, p) => a + (p.c.installation || 0) * p.qty, 0);
+    const acc = priced.reduce((a, p) => a + ((p.c.fascia || 0) + (p.c.sideChannel || 0) + (p.c.brackets || 0) + (p.c.extras || 0)) * p.qty, 0);
+    const material = cost - labor - acc; // = list × cost factor
     const profit = taxable - cost;
-    totalsRefs.cost.textContent = money(cost);
-    totalsRefs.profit.textContent = money0(profit);
+    totalsRefs.revenue.textContent = money(taxable);
+    totalsRefs.material.textContent = '−' + money(material);
+    totalsRefs.labor.textContent = '−' + money(labor);
+    totalsRefs.acc.textContent = '−' + money(acc);
+    totalsRefs.profit.textContent = money(profit);
     totalsRefs.margin.textContent = taxable > 0 ? Math.round((profit / taxable) * 100) + '% margin' : '';
   };
 
@@ -319,6 +325,10 @@ function sheet(q, rerender) {
   totalsRefs.tax = el('span', {}, ['—']);
   totalsRefs.taxLbl = el('span', {}, ['Tax']);
   totalsRefs.taxRow = el('div', { class: 'line', style: 'display:none' }, [totalsRefs.taxLbl, totalsRefs.tax]);
+  totalsRefs.revenue = el('span', {}, ['—']);
+  totalsRefs.material = el('span', {}, ['—']);
+  totalsRefs.labor = el('span', {}, ['—']);
+  totalsRefs.acc = el('span', {}, ['—']);
   const totals = el('div', { class: 'totals' }, [
     el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), totalsRefs.sub]),
     el('div', { class: 'line' }, [
@@ -329,7 +339,10 @@ function sheet(q, rerender) {
     el('div', { class: 'line grand' }, [el('span', {}, ['Total']), totalsRefs.total]),
     el('div', { class: 'profit-box' }, [
       el('div', { class: 'pb-head' }, ['Internal · not shown to client']),
-      el('div', { class: 'line' }, [el('span', {}, ['Material cost']), totalsRefs.cost]),
+      el('div', { class: 'line' }, [el('span', {}, ['Revenue (taxable)']), totalsRefs.revenue]),
+      el('div', { class: 'line sub' }, [el('span', {}, ['Material']), totalsRefs.material]),
+      el('div', { class: 'line sub' }, [el('span', {}, ['Labor / install']), totalsRefs.labor]),
+      el('div', { class: 'line sub' }, [el('span', {}, ['Accessories']), totalsRefs.acc]),
       el('div', { class: 'line profit' }, [el('span', {}, ['Est. profit ', totalsRefs.margin]), totalsRefs.profit]),
     ]),
   ]);
