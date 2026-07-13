@@ -250,12 +250,14 @@ function sheet(q, rerender) {
     const total = sub - (Number(q.discount) || 0);
     totalsRefs.sub.textContent = money(sub);
     totalsRefs.total.textContent = money(total);
-    // Internal only — never shown to the client. Profit ≈ price − wholesale material cost.
+    // Internal only. Profit uses the ROUNDED revenue the client actually pays (whole
+    // dollars), so the round-up gain is captured as profit. Tax is excluded (pass-through).
     const cost = priced.reduce((sum, p) => sum + (p.c.cost || 0) * p.qty, 0);
-    const profit = total - cost;
+    const roundedRev = priced.reduce((sum, p) => sum + roundWhole(p.c.unit || 0) * p.qty, 0) - roundWhole(Number(q.discount) || 0);
+    const profit = roundedRev - cost;
     totalsRefs.cost.textContent = money(cost);
     totalsRefs.profit.textContent = money(profit);
-    totalsRefs.margin.textContent = total > 0 ? Math.round((profit / total) * 100) + '% margin' : '';
+    totalsRefs.margin.textContent = roundedRev > 0 ? Math.round((profit / roundedRev) * 100) + '% margin' : '';
   };
 
   const makeRow = (item, { draftRow } = {}) => {
