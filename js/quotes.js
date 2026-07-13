@@ -1,7 +1,7 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote } from './store.js';
-import { computeLine, describeLine, quoteTotals, money, round2 } from './pricing.js';
+import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2 } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -177,7 +177,7 @@ const COL_HELP = {
   sideChannel: 'Add side channels (auto, per-foot ×2 in Settings → Rates)',
   sideChannelAmount: 'Override side channel $ — blank = auto',
   installation: 'Installation/labor $ (default in Settings → Rates)',
-  brackets: 'Extra brackets $',
+  brackets: 'Brackets $',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
 };
 
@@ -448,17 +448,18 @@ function invoice(q) {
   const doc = el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
     head, bill, table,
     isWork ? null : (() => {
+      // Client-facing whole-dollar amounts: sum of rounded line totals, so it adds up.
+      const sub = q.items.reduce((a, l) => a + roundWhole(computeLine(l, s).unit || 0) * (Number(l.qty) || 1), 0);
+      const total = Math.max(sub - roundWhole(t.discount), t.minApplied ? roundWhole(t.minOrder) : 0);
       const pct = paymentPct(q.payment);
-      const paid = round2(t.total * pct);
-      const balance = round2(t.total - paid);
+      const paid = roundWhole(total * pct);
       return el('div', { class: 'sum' }, [
         el('div', { class: 'sum-box' }, [
-          el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money(t.subtotal)])]),
-          t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money(t.discount)])]) : null,
-          t.minApplied ? el('div', { class: 'line' }, [el('span', {}, ['Minimum order']), el('span', {}, [money(t.minOrder)])]) : null,
-          el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money(t.total)])]),
-          pct > 0 ? el('div', { class: 'line paid' }, [el('span', {}, ['Paid' + (pct < 1 ? ' (50%)' : '')]), el('span', {}, ['−' + money(paid)])]) : null,
-          pct > 0 && pct < 1 ? el('div', { class: 'line balance' }, [el('span', {}, ['Balance due']), el('span', {}, [money(balance)])]) : null,
+          el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money0(sub)])]),
+          t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money0(t.discount)])]) : null,
+          el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money0(total)])]),
+          pct > 0 ? el('div', { class: 'line paid' }, [el('span', {}, ['Paid' + (pct < 1 ? ' (50%)' : '')]), el('span', {}, ['−' + money0(paid)])]) : null,
+          pct > 0 && pct < 1 ? el('div', { class: 'line balance' }, [el('span', {}, ['Balance due']), el('span', {}, [money0(total - paid)])]) : null,
           pct >= 1 ? el('div', { class: 'paid-stamp' }, ['PAID IN FULL']) : null,
         ]),
       ]);
@@ -513,8 +514,8 @@ function clientTable(q, s) {
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
       el('td', { class: 'desc' }, [describeLine(l, cfg)]),
-      el('td', { class: 'num' }, [money(c.unit || 0)]),
-      el('td', { class: 'num strong' }, [money((c.unit || 0) * qty)]),
+      el('td', { class: 'num' }, [money0(c.unit || 0)]),
+      el('td', { class: 'num strong' }, [money0(roundWhole(c.unit || 0) * qty)]),
     ]);
   });
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];

@@ -103,7 +103,7 @@ export const DESC_FIELDS = [
   { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : '') },
   { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
   { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
-  { key: 'brackets', label: 'Extra brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? 'with Extra Brackets' : '') },
+  { key: 'brackets', label: 'Brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? 'with Brackets' : '') },
 ];
 
 export function describeLine(line, cfg) {
@@ -126,6 +126,12 @@ export function quoteTotals(quote, state) {
 
 export function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+// Whole-dollar money for client-facing amounts (no cents).
+export const roundWhole = (n) => Math.round(Number(n) || 0);
+export function money0(n) {
+  return '$' + roundWhole(n).toLocaleString('en-US');
 }
 
 export function money(n) {
