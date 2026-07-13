@@ -61,7 +61,7 @@ function ratesPanel(s) {
         const tax = el('label', { class: 'field', style: 'flex:1 1 200px' }, [
           'Sales tax (%)',
           el('input', { type: 'number', min: '0', step: '0.001', value: s.taxRate ?? 0, oninput: (e) => { s.taxRate = Number(e.target.value) || 0; save(); } }),
-          el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['Added on the client invoice. Miami-Dade, FL = 7. 0 = no tax.']),
+          el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['Added on the client invoice. FL = 7. 0 = no tax.']),
         ]);
         return tax;
       })(),
@@ -85,13 +85,15 @@ export function renderSettings() {
   });
   terms.value = co.terms;
 
-  const fileInput = el('input', { type: 'file', accept: 'application/json', style: 'display:none', onchange: (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    if (!confirmAction('Restore this backup? It replaces ALL current data (tables, lists, quotes) and cannot be undone.')) { e.target.value = ''; return; }
-    const r = new FileReader();
-    r.onload = () => { try { importJSON(r.result); toast('Backup restored'); renderSettings(); } catch { toast('Invalid file'); } };
-    r.readAsText(f);
-  } });
+  const fileInput = el('input', {
+    type: 'file', accept: 'application/json', style: 'display:none', onchange: (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      if (!confirmAction('Restore this backup? It replaces ALL current data (tables, lists, quotes) and cannot be undone.')) { e.target.value = ''; return; }
+      const r = new FileReader();
+      r.onload = () => { try { importJSON(r.result); toast('Backup restored'); renderSettings(); } catch { toast('Invalid file'); } };
+      r.readAsText(f);
+    }
+  });
 
   const downloadBackup = () => {
     const blob = new Blob([exportJSON()], { type: 'application/json' });
