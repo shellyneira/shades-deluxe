@@ -150,7 +150,7 @@ function columns(o, tableNames) {
     { key: 'sideChannelAmount', label: 'S/Ch $', kind: 'num', w: 72, placeholder: 'auto' },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
-    { key: 'markup', label: 'Profit +$', kind: 'num', w: 74, placeholder: 'auto' },
+    { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
 }
 
