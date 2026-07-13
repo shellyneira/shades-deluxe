@@ -20,10 +20,11 @@ function open(id, view = 'edit') {
 
 /* ---------------- list ---------------- */
 // One lifecycle: Quote → Sent (still a quote) → Accepted/Deposit Paid/Paid (an invoice).
-const STAGES = ['Quote', 'Sent', 'Accepted', 'Deposit Paid', 'Paid'];
-const stagePct = (st) => (st === 'Paid' ? 1 : st === 'Deposit Paid' ? 0.5 : 0);
-const isInvoiceStage = (st) => st === 'Accepted' || st === 'Deposit Paid' || st === 'Paid';
-const stageClass = (st) => (st || 'Quote').toLowerCase().replace(/\s+/g, '');
+const STAGES = ['Quote', 'Accepted', '50% Paid', '100% Paid'];
+const stagePct = (st) => (st === '100% Paid' ? 1 : st === '50% Paid' ? 0.5 : 0);
+const isInvoiceStage = (st) => st === 'Accepted' || st === '50% Paid' || st === '100% Paid';
+const STAGE_CLASS = { Quote: 'quote', Accepted: 'accepted', '50% Paid': 'half', '100% Paid': 'paid' };
+const stageClass = (st) => STAGE_CLASS[st] || 'quote';
 let filter = 'all';
 
 function list() {

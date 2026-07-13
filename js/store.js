@@ -83,11 +83,12 @@ function normalize(state) {
   // Migrate legacy status/payment into the single lifecycle stage.
   (state.quotes || []).forEach((q) => {
     if (!q.stage) {
-      q.stage = q.payment === 'Paid' ? 'Paid'
-        : q.payment === '50% paid' ? 'Deposit Paid'
-        : q.status === 'won' ? 'Accepted'
-        : q.status === 'sent' ? 'Sent' : 'Quote';
+      q.stage = q.payment === 'Paid' ? '100% Paid'
+        : q.payment === '50% paid' ? '50% Paid'
+        : q.status === 'won' ? 'Accepted' : 'Quote';
     }
+    // Rename earlier stage labels to the current, simpler set.
+    q.stage = { Sent: 'Quote', 'Deposit Paid': '50% Paid', Paid: '100% Paid' }[q.stage] || q.stage;
   });
   return state;
 }
