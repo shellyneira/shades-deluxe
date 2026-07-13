@@ -152,7 +152,7 @@ function columns(o, tableNames) {
     { key: 'sideChannelAmount', label: 'S/Ch $', kind: 'num', w: 72, placeholder: 'auto' },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
-    { key: 'discount', label: 'Disc −$', kind: 'num', w: 70, placeholder: '0' },
+    { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
 }
@@ -210,6 +210,7 @@ function cell(col, item, onChange) {
         onChange(col.key, e.target.value);
       },
     });
+    if (col.prefix) return el('td', {}, [el('div', { style: 'display:flex;align-items:center;gap:2px' }, [el('span', { style: 'color:var(--danger);font-weight:800' }, [col.prefix]), inp])]);
     return el('td', {}, [inp]);
   }
   // select — options may be plain strings, priced objects {name, price}, or a
