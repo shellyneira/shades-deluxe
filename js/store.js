@@ -39,7 +39,7 @@ function freshState() {
     minimumOrder: 0,
     defaultInstallation: 0,
     taxRate: 7,          // Miami-Dade, FL default (6% state + 1% county)
-    showInstall: true,   // break out installation as its own client-invoice line
+    showInstall: false,  // installation stays baked into the unit price (clients dislike a separate line)
     customLists: [],
     quotes: [],
     nextQuoteNumber: 1001,
@@ -71,7 +71,7 @@ function normalize(state) {
   state.minimumOrder = Number(state.minimumOrder) || 0;
   state.defaultInstallation = Number(state.defaultInstallation) || 0;
   state.taxRate = state.taxRate == null ? 7 : Number(state.taxRate) || 0;
-  state.showInstall = state.showInstall !== false;
+  state.showInstall = state.showInstall === true; // default OFF
   // Backfill document config + custom lists for states saved before they existed.
   state.docConfig = state.docConfig || structuredClone(DEFAULT_DOC_CONFIG);
   for (const doc of ['client', 'work', 'label']) {
