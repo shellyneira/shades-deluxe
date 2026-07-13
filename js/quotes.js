@@ -241,6 +241,7 @@ function sheet(q, rerender) {
       p.node.title = c.list == null
         ? (hasDims ? `Size is larger than the ${p.item.table} chart` : '')
         : (c.floored ? `List ${money(c.list)} · minimum ${money(c.floor)} applied` : `List ${money(c.list)}`);
+      p.client.textContent = c.unit == null ? '—' : money0((c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0));
     }
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
     // number is never a surprising $0 while a priced line sits in the draft row.
@@ -274,9 +275,12 @@ function sheet(q, rerender) {
     const onChange = (key, val) => { item[key] = val; if (!draftRow) save(); recalc(); if (key === 'table') rerender(); };
     const priceNode = el('strong', {}, ['—']);
     const priceTd = el('td', { class: 'r price' }, [priceNode]);
-    priceCells.push({ item, node: priceNode, td: priceTd });
+    const clientNode = el('span', {}, ['—']);
+    const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
+    priceCells.push({ item, node: priceNode, td: priceTd, client: clientNode });
     const cells = cols.map((col) => cell(col, item, onChange));
     cells.push(priceTd);
+    cells.push(clientTd);
     if (draftRow) {
       cells.push(el('td', { style: 'white-space:nowrap' }, [
         el('button', { class: 'icon', style: 'color:var(--accent);font-weight:800', title: 'Add this line', onclick: () => addLine() }, ['✓']),
@@ -302,7 +306,8 @@ function sheet(q, rerender) {
 
   const head = el('tr', {}, [
     ...cols.map((c) => el('th', { style: `min-width:${c.w}px`, title: COL_HELP[c.key] || '' }, [c.label])),
-    el('th', { class: 'r', title: 'Client price for ONE shade = table price + fascia + side channel + install + brackets + priced add-ons + extra. Line total = Unit × Qty.' }, ['Unit $']),
+    el('th', { class: 'r', title: 'Internal full price for ONE shade (with installation, cents).' }, ['Unit $']),
+    el('th', { class: 'r', title: 'What the client sees per shade on the invoice — rounded, with installation shown as its own line.' }, ['Client $']),
     el('th', {}, ['']),
   ]);
 
