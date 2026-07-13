@@ -73,14 +73,12 @@ export function computeLine(line, state) {
 
   const markup = Number(line.markup) || 0; // extra profit the user adds on this line
   const base = (list || 0) + fascia + sideChannel + installation + brackets + extras + markup;
-  const floor = Number(state.minPrice[line.table]) || 0;
-  const unit = list == null ? null : Math.max(base, floor);
-  const floored = list != null && floor > 0 && floor > round2(base);
+  const unit = list == null ? null : base;
   // True cost = wholesale material (list × factor) + labor + accessories billed at
   // cost (conservative: no margin claimed on pass-throughs). Keeps profit honest.
   const cost = list == null ? null : round2((list || 0) * rates.costFactor + fascia + sideChannel + installation + brackets + extras);
 
-  return { list, fascia, sideChannel, installation, brackets, extras, floor, floored, cost, unit: unit == null ? null : round2(unit) };
+  return { list, fascia, sideChannel, installation, brackets, extras, cost, unit: unit == null ? null : round2(unit) };
 }
 
 function controlText(ctrl) {

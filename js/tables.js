@@ -61,7 +61,6 @@ function summary(name, table) {
     stat('Widths', range(w)),
     stat('Lengths', range(l)),
     stat('Cells', String(w.length * l.length)),
-    stat('Minimum', '$' + (s.minPrice[name] || 0)),
   ]);
 }
 
@@ -122,11 +121,6 @@ function gridEditor(name) {
   const controls = el('div', { class: 'row', style: 'margin-top:16px;align-items:flex-end' }, [
     el('button', { class: 'btn small', onclick: () => { table.rows.push({ length: null, prices: table.widths.map(() => null) }); save(); renderTables(); } }, ['＋ Add length (row)']),
     el('button', { class: 'btn small', onclick: () => { table.widths.push(null); table.rows.forEach((r) => r.prices.push(null)); save(); renderTables(); } }, ['＋ Add width (column)']),
-    el('div', { class: 'spacer' }),
-    el('label', { class: 'field' }, [
-      'Minimum price ($)',
-      el('input', { type: 'number', value: s.minPrice[name] ?? 0, style: 'width:130px', oninput: (e) => { s.minPrice[name] = Number(e.target.value) || 0; save(); toast('Saved'); } }),
-    ]),
   ]);
 
   return el('div', { class: 'tbl-card ' + typeOf(name) }, [
@@ -136,7 +130,7 @@ function gridEditor(name) {
     ]),
     summary(name, table),
     el('div', { class: 'scroll' }, [grid]),
-    el('p', { class: 'hint', style: 'margin:10px 0 0' }, ['Widths run left→right, lengths top→bottom. A shade uses the first width ≥ its size and the first length ≥ its size. Minimum price is the floor for any shade on this table (0 disables it).']),
+    el('p', { class: 'hint', style: 'margin:10px 0 0' }, ['Widths run left→right, lengths top→bottom. A shade uses the first width ≥ its size and the first length ≥ its size.']),
     controls,
   ]);
 }
