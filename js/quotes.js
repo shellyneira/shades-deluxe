@@ -457,10 +457,25 @@ function labelsView(q, s) {
     ]),
     el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),
   ]));
+  setTimeout(fitLabels, 0); // shrink each label's text just enough to fit nicely
   return el('div', {}, [
     el('p', { class: 'hint no-print', style: 'margin:0 0 14px' }, ['One label per shade · DYMO 30252 (1⅛" × 3½"). Click Print, then choose your LabelWriter 550 and the 30252 label — each shade prints on its own label.']),
     el('div', { class: 'labels-wrap' }, labels.length ? labels : [el('div', { class: 'muted' }, ['No items'])]),
   ]);
+}
+
+// Auto-fit: reduce each label's base font-size until its text fits the sticker (FAANG-y
+// "shrink-to-fit" so long descriptions stay legible without overflowing).
+function fitLabels() {
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.dymo-label .dl-text').forEach((t) => {
+      let fs = 13;
+      t.style.fontSize = fs + 'px';
+      while (fs > 7 && (t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1)) {
+        fs -= 0.5; t.style.fontSize = fs + 'px';
+      }
+    });
+  });
 }
 
 // Client version: everything goes into the Description (fields chosen in Settings),
