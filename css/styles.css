@@ -206,7 +206,9 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .dl-logo { width: 0.8in; height: auto; flex: none; align-self: center; object-fit: contain; }
 @page dymo { size: 3.5in 1.125in; margin: 0; }
 @media print {
-  .dymo-label { page: dymo; break-after: page; border: 0; border-radius: 0; padding: 0.09in 0.14in; }
+  /* each wrapper is one DYMO page; checkbox is hidden, label fills the sticker */
+  .dl-wrap { display: block; page: dymo; break-after: page; }
+  .dymo-label { break-after: auto; border: 0; border-radius: 0; padding: 0.09in 0.14in; width: 3.5in; height: 1.125in; }
   .labels-wrap { display: block; gap: 0; }
 }
 /* share dropdown */
