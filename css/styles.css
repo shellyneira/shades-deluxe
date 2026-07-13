@@ -362,7 +362,9 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
   body, main { background: #fff; margin: 0; max-width: none; padding: 0; }
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
   /* margin:0 page leaves the browser no room to inject its URL/date/page footer */
-  .invoice { padding: 12mm; max-width: none; page: inv; }
+  html, body, main { height: auto !important; min-height: 0 !important; }
+  .invoice { padding: 12mm 12mm 0; max-width: none; page: inv; }
+  .invoice .terms { break-inside: avoid; }
   @page inv { margin: 0; }
   @page { margin: 14mm; }
 }

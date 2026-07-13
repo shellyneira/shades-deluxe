@@ -38,6 +38,8 @@ function freshState() {
     rates: { ...DEFAULT_RATES },
     minimumOrder: 0,
     defaultInstallation: 0,
+    taxRate: 7,          // Miami-Dade, FL default (6% state + 1% county)
+    showInstall: true,   // break out installation as its own client-invoice line
     customLists: [],
     quotes: [],
     nextQuoteNumber: 1001,
@@ -68,6 +70,8 @@ function normalize(state) {
   state.rates = { ...DEFAULT_RATES, ...(state.rates || {}) };
   state.minimumOrder = Number(state.minimumOrder) || 0;
   state.defaultInstallation = Number(state.defaultInstallation) || 0;
+  state.taxRate = state.taxRate == null ? 7 : Number(state.taxRate) || 0;
+  state.showInstall = state.showInstall !== false;
   // Backfill document config + custom lists for states saved before they existed.
   state.docConfig = state.docConfig || structuredClone(DEFAULT_DOC_CONFIG);
   for (const doc of ['client', 'work', 'label']) {
@@ -90,13 +94,16 @@ function load() {
 }
 
 let syncTimer;
+let lastPushed = {}; // id -> JSON snapshot, so we only push quotes THIS user changed
 function scheduleSync() {
   if (!dbEnabled()) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
     const { quotes, ...config } = state;
-    // Config (tables/lists/settings) → app_state; each quote → its own row in quotes.
-    Promise.all([pushState({ ...config, quotes: [] }), pushQuotes(quotes)])
+    // Only push quotes that actually changed here — never overwrite another user's quote.
+    const changed = quotes.filter((q) => JSON.stringify(q) !== lastPushed[q.id]);
+    Promise.all([pushState({ ...config, quotes: [] }), pushQuotes(changed)])
+      .then(() => changed.forEach((q) => { lastPushed[q.id] = JSON.stringify(q); }))
       .catch((e) => console.warn('cloud sync failed', e));
   }, 700);
 }
@@ -116,7 +123,8 @@ export async function initCloud() {
       const quotes = (remoteQuotes && remoteQuotes.length) ? remoteQuotes : (remote?.quotes || []);
       state = normalize({ ...freshState(), ...(remote || {}), quotes });
       localStorage.setItem(KEY, JSON.stringify(state));
-      scheduleSync(); // push migrated quotes into their own rows
+      (remoteQuotes || []).forEach((q) => { lastPushed[q.id] = JSON.stringify(q); }); // table rows are already synced
+      scheduleSync(); // push only quotes migrated from the old blob
       return true;
     }
     const { quotes, ...config } = state;

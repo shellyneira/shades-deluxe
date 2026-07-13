@@ -57,6 +57,19 @@ function ratesPanel(s) {
       num('Wholesale cost factor', 'costFactor', 'Your material cost ≈ list price × this (All Blinds = 0.43). Used for profit on the dashboard.'),
       minOrder,
       defInstall,
+      (() => {
+        const tax = el('label', { class: 'field', style: 'flex:1 1 200px' }, [
+          'Sales tax (%)',
+          el('input', { type: 'number', min: '0', step: '0.001', value: s.taxRate ?? 0, oninput: (e) => { s.taxRate = Number(e.target.value) || 0; save(); } }),
+          el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['Added on the client invoice. Miami-Dade, FL = 7. 0 = no tax.']),
+        ]);
+        return tax;
+      })(),
+      (() => {
+        const box = el('input', { type: 'checkbox', onchange: (e) => { s.showInstall = e.target.checked; save(); } });
+        box.checked = s.showInstall !== false;
+        return el('label', { class: 'field', style: 'flex:1 1 200px' }, ['Installation on invoice', el('label', { class: 'field check', style: 'margin-top:6px' }, [box, 'Show installation as its own line (client invoice)'])]);
+      })(),
     ]),
   ]);
 }

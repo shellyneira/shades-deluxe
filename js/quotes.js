@@ -448,15 +448,23 @@ function invoice(q) {
   const doc = el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
     head, bill, table,
     isWork ? null : (() => {
-      // Client-facing whole-dollar amounts: sum of rounded line totals, so it adds up.
-      const sub = q.items.reduce((a, l) => a + roundWhole(computeLine(l, s).unit || 0) * (Number(l.qty) || 1), 0);
-      const total = Math.max(sub - roundWhole(t.discount), t.minApplied ? roundWhole(t.minOrder) : 0);
+      // Whole-dollar, adds up: products (install broken out if enabled) + install + tax.
+      const showInstall = s.showInstall !== false;
+      const per = q.items.map((l) => ({ c: computeLine(l, s), qty: Number(l.qty) || 1 }));
+      const install = showInstall ? per.reduce((a, p) => a + roundWhole(p.c.installation || 0) * p.qty, 0) : 0;
+      const sub = per.reduce((a, p) => a + roundWhole((p.c.unit || 0) - (showInstall ? (p.c.installation || 0) : 0)) * p.qty, 0);
+      const discount = roundWhole(t.discount);
+      const taxable = Math.max(sub + install - discount, t.minApplied ? roundWhole(t.minOrder) : 0);
+      const tax = roundWhole(taxable * (Number(s.taxRate) || 0) / 100);
+      const total = taxable + tax;
       const pct = paymentPct(q.payment);
       const paid = roundWhole(total * pct);
       return el('div', { class: 'sum' }, [
         el('div', { class: 'sum-box' }, [
           el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money0(sub)])]),
-          t.discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money0(t.discount)])]) : null,
+          install ? el('div', { class: 'line' }, [el('span', {}, ['Installation']), el('span', {}, [money0(install)])]) : null,
+          discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money0(discount)])]) : null,
+          tax ? el('div', { class: 'line' }, [el('span', {}, [`Tax (${s.taxRate}%)`]), el('span', {}, [money0(tax)])]) : null,
           el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money0(total)])]),
           pct > 0 ? el('div', { class: 'line paid' }, [el('span', {}, ['Paid' + (pct < 1 ? ' (50%)' : '')]), el('span', {}, ['−' + money0(paid)])]) : null,
           pct > 0 && pct < 1 ? el('div', { class: 'line balance' }, [el('span', {}, ['Balance due']), el('span', {}, [money0(total - paid)])]) : null,
@@ -510,12 +518,13 @@ function clientTable(q, s) {
   const rows = q.items.map((l, i) => {
     const c = computeLine(l, s);
     const qty = Number(l.qty) || 1;
+    const shownUnit = (c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0);
     return el('tr', {}, [
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
       el('td', { class: 'desc' }, [describeLine(l, cfg)]),
-      el('td', { class: 'num' }, [money0(c.unit || 0)]),
-      el('td', { class: 'num strong' }, [money0(roundWhole(c.unit || 0) * qty)]),
+      el('td', { class: 'num' }, [money0(shownUnit)]),
+      el('td', { class: 'num strong' }, [money0(roundWhole(shownUnit) * qty)]),
     ]);
   });
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
