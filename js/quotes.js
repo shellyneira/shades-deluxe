@@ -156,6 +156,31 @@ function columns(o, tableNames) {
 
 const FRAC_OPTS = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
 
+// Hover help for each worksheet column header — says what it is and where in Settings/Lists it's set.
+const COL_HELP = {
+  table: 'Product line — sets the base price from Price Tables (Roller/Zebra #3/#5)',
+  qty: 'How many identical shades on this line',
+  location: 'Room/area (edit the list in Lists)',
+  wdNumber: 'Which window or door (edit in Lists)',
+  width: 'Width in inches', widthFrac: 'Width fraction — rounds up if over ½',
+  height: 'Height in inches', heightFrac: 'Height fraction — rounds up if over ½',
+  product: 'Product type — filtered by Roller/Zebra (edit in Lists)',
+  fabric: 'Fabric / description — filtered by Roller/Zebra (edit in Lists)',
+  color: 'Chain/cassette color, shared for both (edit in Lists)',
+  control: 'Chain or motor + side (RH/LH)',
+  system: 'Manual or motor — add its price in Lists → Systems',
+  style: 'Mount/operation (IB/OB/One-way) — price in Lists → Styles',
+  headrail: 'Headrail — price in Lists → Headrails',
+  bottomRail: 'Bottom rail — price in Lists → Headrails',
+  fascia: 'Add fascia (auto, per-foot rate in Settings → Rates)',
+  fasciaAmount: 'Override fascia $ — leave blank for the auto per-foot price',
+  sideChannel: 'Add side channels (auto, per-foot ×2 in Settings → Rates)',
+  sideChannelAmount: 'Override side channel $ — blank = auto',
+  installation: 'Installation/labor $ (default in Settings → Rates)',
+  brackets: 'Extra brackets $',
+  markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
+};
+
 function cell(col, item, onChange) {
   const style = `width:${col.w}px`;
   if (col.kind === 'check') {
@@ -262,8 +287,8 @@ function sheet(q, rerender) {
   };
 
   const head = el('tr', {}, [
-    ...cols.map((c) => el('th', { style: `min-width:${c.w}px` }, [c.label])),
-    el('th', { class: 'r' }, ['Unit $']),
+    ...cols.map((c) => el('th', { style: `min-width:${c.w}px`, title: COL_HELP[c.key] || '' }, [c.label])),
+    el('th', { class: 'r', title: 'Client price for ONE shade = table price + fascia + side channel + install + brackets + priced add-ons + extra. Line total = Unit × Qty.' }, ['Unit $']),
     el('th', {}, ['']),
   ]);
 
