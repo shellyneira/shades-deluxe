@@ -244,20 +244,23 @@ function sheet(q, rerender) {
     }
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
     // number is never a surprising $0 while a priced line sits in the draft row.
-    const rows = [...q.items, draft];
-    const priced = rows.map((it) => ({ c: computeLine(it, s), qty: Number(it.qty) || 1 }));
-    const sub = priced.reduce((sum, p) => sum + (p.c.unit || 0) * p.qty, 0);
-    const total = sub - (Number(q.discount) || 0);
-    totalsRefs.sub.textContent = money(sub);
-    totalsRefs.total.textContent = money(total);
-    // Internal only. Profit uses the ROUNDED revenue the client actually pays (whole
-    // dollars), so the round-up gain is captured as profit. Tax is excluded (pass-through).
-    const cost = priced.reduce((sum, p) => sum + (p.c.cost || 0) * p.qty, 0);
-    const roundedRev = priced.reduce((sum, p) => sum + roundWhole(p.c.unit || 0) * p.qty, 0) - roundWhole(Number(q.discount) || 0);
-    const profit = roundedRev - cost;
+    // Mirror the client invoice: whole-dollar amounts + tax, so the worksheet matches.
+    const priced = [...q.items, draft].map((it) => ({ c: computeLine(it, s), qty: Number(it.qty) || 1 }));
+    const sub = priced.reduce((a, p) => a + roundWhole(p.c.unit || 0) * p.qty, 0);
+    const taxable = sub - roundWhole(Number(q.discount) || 0);
+    const rate = Number(s.taxRate) || 0;
+    const tax = roundWhole(taxable * rate / 100);
+    totalsRefs.sub.textContent = money0(sub);
+    totalsRefs.tax.textContent = money0(tax);
+    totalsRefs.taxRow.style.display = rate > 0 ? '' : 'none';
+    totalsRefs.taxLbl.textContent = `Tax (${rate}%)`;
+    totalsRefs.total.textContent = money0(taxable + tax);
+    // Internal only — profit excludes tax (pass-through); uses the rounded revenue.
+    const cost = priced.reduce((a, p) => a + (p.c.cost || 0) * p.qty, 0);
+    const profit = taxable - cost;
     totalsRefs.cost.textContent = money(cost);
-    totalsRefs.profit.textContent = money(profit);
-    totalsRefs.margin.textContent = roundedRev > 0 ? Math.round((profit / roundedRev) * 100) + '% margin' : '';
+    totalsRefs.profit.textContent = money0(profit);
+    totalsRefs.margin.textContent = taxable > 0 ? Math.round((profit / taxable) * 100) + '% margin' : '';
   };
 
   const makeRow = (item, { draftRow } = {}) => {
@@ -269,7 +272,10 @@ function sheet(q, rerender) {
     const cells = cols.map((col) => cell(col, item, onChange));
     cells.push(priceTd);
     if (draftRow) {
-      cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Clear this row', onclick: () => { if (isRowEmpty(item) || confirmAction('Clear this row?')) { q._draft = blankLine(s); save(); rerender(); } } }, ['↺'])]));
+      cells.push(el('td', { style: 'white-space:nowrap' }, [
+        el('button', { class: 'icon', style: 'color:var(--accent);font-weight:800', title: 'Add this line', onclick: () => addLine() }, ['✓']),
+        el('button', { class: 'icon', title: 'Clear this row', onclick: () => { if (isRowEmpty(item) || confirmAction('Clear this row?')) { q._draft = blankLine(s); save(); rerender(); } } }, ['↺']),
+      ]));
       return el('tr', { class: 'draftrow' }, cells);
     }
     const idx = q.items.indexOf(item);
@@ -310,12 +316,16 @@ function sheet(q, rerender) {
   totalsRefs.cost = el('span', {}, ['—']);
   totalsRefs.profit = el('span', {}, ['—']);
   totalsRefs.margin = el('span', { class: 'muted', style: 'font-size:12px' }, ['']);
+  totalsRefs.tax = el('span', {}, ['—']);
+  totalsRefs.taxLbl = el('span', {}, ['Tax']);
+  totalsRefs.taxRow = el('div', { class: 'line', style: 'display:none' }, [totalsRefs.taxLbl, totalsRefs.tax]);
   const totals = el('div', { class: 'totals' }, [
     el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), totalsRefs.sub]),
     el('div', { class: 'line' }, [
       el('span', {}, ['Discount']),
       (() => { const i = el('input', { type: 'number', value: q.discount || 0, style: 'width:120px;padding:8px;border:1px solid var(--line-strong);border-radius:8px', oninput: (e) => { q.discount = Number(e.target.value) || 0; save(); recalc(); } }); return i; })(),
     ]),
+    totalsRefs.taxRow,
     el('div', { class: 'line grand' }, [el('span', {}, ['Total']), totalsRefs.total]),
     el('div', { class: 'profit-box' }, [
       el('div', { class: 'pb-head' }, ['Internal · not shown to client']),
