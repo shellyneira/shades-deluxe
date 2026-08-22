@@ -33,33 +33,35 @@ function documentsPanel(s) {
 // Pricing rates — the per-foot add-on charges and wholesale cost factor, all editable.
 function ratesPanel(s) {
   const r = s.rates;
+  const labelSpan = (text) => el('span', { style: 'display:block;min-height:28px' }, [text]);
   const num = (label, key, hint) => el('label', { class: 'field', style: 'flex:1 1 200px' }, [
-    label,
+    labelSpan(label),
     el('input', { type: 'number', min: '0', step: '0.01', value: r[key], oninput: (e) => { r[key] = Number(e.target.value) || 0; save(); } }),
     el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, [hint]),
   ]);
   const minOrder = el('label', { class: 'field', style: 'flex:1 1 200px' }, [
-    'Minimum order ($)',
+    labelSpan('Minimum order ($)'),
     el('input', { type: 'number', min: '0', step: '0.01', value: s.minimumOrder || 0, oninput: (e) => { s.minimumOrder = Number(e.target.value) || 0; save(); } }),
     el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['If a quote total is below this, it is raised to this amount. 0 = off.']),
   ]);
   const defInstall = el('label', { class: 'field', style: 'flex:1 1 200px' }, [
-    'Default installation / labor ($)',
+    labelSpan('Default installation / labor ($)'),
     el('input', { type: 'number', min: '0', step: '0.01', value: s.defaultInstallation || 0, oninput: (e) => { s.defaultInstallation = Number(e.target.value) || 0; save(); } }),
     el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['Pre-fills the “Ins” column on each new line. Change it on the line anytime.']),
   ]);
   return el('div', { class: 'panel' }, [
     el('h2', {}, ['Rates & minimums']),
-    el('p', { class: 'muted', style: 'margin-top:0' }, ['Fascia and side channels are charged per foot (from the All Blinds price list). Change a rate here and every quote recalculates.']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Fascia, cassette and side channels are charged per foot (from the All Blinds price list). Change a rate here and every quote recalculates.']),
     el('div', { class: 'row' }, [
       num('Fascia — $ / foot of width', 'fascia', 'Fascia cost = width ÷ 12 × this rate.'),
+      num('Cassette — $ / foot of width', 'cassette', 'Cassette cost = width ÷ 12 × this rate.'),
       num('Side channel — $ / foot (each side)', 'sideChannel', 'Side channels = height ÷ 12 × this rate × 2 sides.'),
       num('Wholesale cost factor', 'costFactor', 'Your material cost ≈ list price × this (All Blinds = 0.43). Used for profit on the dashboard.'),
       minOrder,
       defInstall,
       (() => {
         const tax = el('label', { class: 'field', style: 'flex:1 1 200px' }, [
-          'Sales tax (%)',
+          labelSpan('Sales tax (%)'),
           el('input', { type: 'number', min: '0', step: '0.001', value: s.taxRate ?? 0, oninput: (e) => { s.taxRate = Number(e.target.value) || 0; save(); } }),
           el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, ['Added on the client invoice. FL = 7. 0 = no tax.']),
         ]);
@@ -68,7 +70,7 @@ function ratesPanel(s) {
       (() => {
         const box = el('input', { type: 'checkbox', onchange: (e) => { s.showInstall = e.target.checked; save(); } });
         box.checked = s.showInstall !== false;
-        return el('label', { class: 'field', style: 'flex:1 1 200px' }, ['Installation on invoice', el('label', { class: 'field check', style: 'margin-top:6px' }, [box, 'Show installation as its own line (client invoice)'])]);
+        return el('label', { class: 'field', style: 'flex:1 1 200px' }, [labelSpan('Installation on invoice'), el('label', { class: 'field check', style: 'margin-top:6px' }, [box, 'Show installation as its own line (client invoice)'])]);
       })(),
     ]),
   ]);

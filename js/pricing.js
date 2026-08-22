@@ -12,7 +12,7 @@
 // (Values!O/P: 300/400/550/600). It is applied as a floor on the unit price
 // and is editable per-table in the Price Tables screen (set 0 to disable).
 
-const FALLBACK_RATES = { fascia: 4.5, sideChannel: 4.5, costFactor: 0.43 };
+const FALLBACK_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor: 0.43 };
 
 // Fields whose selected option can carry a flat add-on price (Lists editor). Product,
 // fabric, color, location, w/d and control are NOT here: their cost comes from the
@@ -61,12 +61,10 @@ export function computeLine(line, state) {
   const table = state.tables[line.table];
   const rates = { ...FALLBACK_RATES, ...(state.rates || {}) };
   const list = lookupListPrice(table, line.width, line.widthFrac, line.height, line.heightFrac);
-  // Fascia / side channel: a typed amount wins (manual); otherwise the checkbox uses the
-  // per-foot rate (auto). This gives "click for auto, or type your own price".
-  const fasciaOverride = line.fasciaAmount !== '' && line.fasciaAmount != null ? Number(line.fasciaAmount) : null;
-  const scOverride = line.sideChannelAmount !== '' && line.sideChannelAmount != null ? Number(line.sideChannelAmount) : null;
-  const fascia = fasciaOverride != null ? fasciaOverride : (line.fascia ? ((Number(line.width) || 0) / 12) * rates.fascia : 0);
-  const sideChannel = scOverride != null ? scOverride : (line.sideChannel ? ((Number(line.height) || 0) / 12) * rates.sideChannel * 2 : 0);
+  // Fascia / cassette / side channel: checkbox always uses the per-foot rate (auto).
+  const fascia = line.fascia ? ((Number(line.width) || 0) / 12) * rates.fascia : 0;
+  const cassette = line.cassette ? ((Number(line.width) || 0) / 12) * rates.cassette : 0;
+  const sideChannel = line.sideChannel ? ((Number(line.height) || 0) / 12) * rates.sideChannel * 2 : 0;
   const installation = Number(line.installation) || 0;
   const brackets = Number(line.brackets) || 0;
   const extras = optionExtras(line, state); // priced dropdown options
@@ -74,18 +72,24 @@ export function computeLine(line, state) {
   const markup = Number(line.markup) || 0; // extra profit the user adds on this line
   const motor = Number(line.motorPrice) || 0; // per-line motor charge
   const lineDisc = Number(line.discount) || 0; // per-item discount
-  const base = (list || 0) + fascia + sideChannel + installation + brackets + extras + markup + motor - lineDisc;
+  const base = (list || 0) + fascia + cassette + sideChannel + installation + brackets + extras + markup + motor - lineDisc;
   const unit = list == null ? null : Math.max(0, base);
   // True cost = wholesale material (list × factor) + labor + accessories billed at
   // cost (conservative: no margin claimed on pass-throughs). Keeps profit honest.
-  const cost = list == null ? null : round2((list || 0) * rates.costFactor + fascia + sideChannel + installation + brackets + extras);
+  const cost = list == null ? null : round2((list || 0) * rates.costFactor + fascia + cassette + sideChannel + installation + brackets + extras);
 
-  return { list, fascia, sideChannel, installation, brackets, extras, cost, unit: unit == null ? null : round2(unit) };
+  return { list, fascia, cassette, sideChannel, installation, brackets, extras, cost, unit: unit == null ? null : round2(unit) };
 }
 
 function controlText(ctrl) {
   if (!ctrl) return '';
-  let c = ctrl.startsWith('C') ? 'Chain Control' : /M/i.test(ctrl) ? 'Motor Control' : ctrl;
+  // Chain control just shows the side — "Chain Control" is redundant on the document.
+  if (ctrl.startsWith('C')) {
+    if (/RH/i.test(ctrl)) return `Right Hand (${ctrl})`;
+    if (/LH/i.test(ctrl)) return `Left Hand (${ctrl})`;
+    return '';
+  }
+  let c = /M/i.test(ctrl) ? 'Motor Control' : ctrl;
   if (/LH/i.test(ctrl)) c += ' - Left Hand';
   else if (/RH/i.test(ctrl)) c += ' - Right Hand';
   return c;
@@ -104,6 +108,7 @@ export const DESC_FIELDS = [
   { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : '') },
   { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : '') },
   { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
+  { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
   { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
   { key: 'brackets', label: 'Brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? 'with Brackets' : '') },
 ];

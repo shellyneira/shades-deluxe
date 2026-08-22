@@ -107,7 +107,7 @@ function blankLine(s) {
     table: Object.keys(s.tables)[0], qty: 1, location: '', wdNumber: '',
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
-    headrail: '', bottomRail: '', fascia: false, fasciaAmount: '', sideChannel: false, sideChannelAmount: '',
+    headrail: '', bottomRail: '', fascia: false, cassette: false, sideChannel: false,
     installation: s.defaultInstallation || '', brackets: '', discount: '', markup: '', motorPrice: '',
   };
 }
@@ -116,7 +116,7 @@ function blankLine(s) {
 function isRowEmpty(l) {
   return !l.width && !l.height && !l.location && !l.wdNumber && !l.product && !l.fabric &&
     !l.color && !l.control && !l.system && !l.style && !l.headrail && !l.bottomRail &&
-    !l.fascia && !l.sideChannel && !l.installation && !l.brackets;
+    !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets;
 }
 
 // A shade is Zebra or Roller based on its table. Products/fabrics are stored per
@@ -147,9 +147,8 @@ function columns(o, tableNames) {
     { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
-    { key: 'fasciaAmount', label: 'Fascia $', kind: 'num', w: 72, placeholder: 'auto' },
+    { key: 'cassette', label: 'Cassette', kind: 'check', w: 66 },
     { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
-    { key: 'sideChannelAmount', label: 'S/Ch $', kind: 'num', w: 72, placeholder: 'auto' },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
@@ -178,9 +177,8 @@ const COL_HELP = {
   headrail: 'Headrail — price in Lists → Headrails',
   bottomRail: 'Bottom rail — price in Lists → Headrails',
   fascia: 'Add fascia (auto, per-foot rate in Settings → Rates)',
-  fasciaAmount: 'Override fascia $ — leave blank for the auto per-foot price',
+  cassette: 'Add cassette (auto, per-foot rate in Settings → Rates)',
   sideChannel: 'Add side channels (auto, per-foot ×2 in Settings → Rates)',
-  sideChannelAmount: 'Override side channel $ — blank = auto',
   installation: 'Installation/labor $ (default in Settings → Rates)',
   brackets: 'Brackets $',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
@@ -265,7 +263,7 @@ function sheet(q, rerender) {
     // Internal breakdown — profit excludes tax (pass-through); revenue = rounded taxable.
     const cost = priced.reduce((a, p) => a + (p.c.cost || 0) * p.qty, 0);
     const labor = priced.reduce((a, p) => a + (p.c.installation || 0) * p.qty, 0);
-    const acc = priced.reduce((a, p) => a + ((p.c.fascia || 0) + (p.c.sideChannel || 0) + (p.c.brackets || 0) + (p.c.extras || 0)) * p.qty, 0);
+    const acc = priced.reduce((a, p) => a + ((p.c.fascia || 0) + (p.c.cassette || 0) + (p.c.sideChannel || 0) + (p.c.brackets || 0) + (p.c.extras || 0)) * p.qty, 0);
     const material = cost - labor - acc; // = list × cost factor
     const profit = taxable - cost;
     totalsRefs.revenue.textContent = money(taxable);

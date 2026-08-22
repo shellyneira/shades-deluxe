@@ -18,15 +18,15 @@ const DEFAULT_COMPANY = {
 // Which fields land in each document's Description column (Settings → Documents).
 const DEFAULT_DOC_CONFIG = {
   // Client quote: no dimensions, shown with prices.
-  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, fascia: true, sideChannel: true, brackets: true },
+  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true },
   // Work order: every build detail, dimensions shown, no prices.
-  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, sideChannel: true, brackets: true },
+  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true },
   // DYMO sticker: short — product shown separately, so description = fabric + control.
-  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, fascia: false, sideChannel: false, brackets: false },
+  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, fascia: false, cassette: false, sideChannel: false, brackets: false },
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
-const DEFAULT_RATES = { fascia: 4.5, sideChannel: 4.5, costFactor: 0.43 };
+const DEFAULT_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor: 0.43 };
 
 function freshState() {
   return normalize({
