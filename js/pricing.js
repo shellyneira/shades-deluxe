@@ -55,8 +55,112 @@ export function lookupListPrice(table, width, widthFrac, height, heightFrac) {
   return typeof price === 'number' ? price : null;
 }
 
+// Drapery pricing (ported from "Calculo de tela y precios.xlsx") — every number here
+// is a formula of a few real inputs (width, height, fabric $/yd, lining, fullness),
+// unlike Roller/Zebra's opaque per-width×height list price. So instead of baking a
+// static grid (which would mean a separate frozen grid per lining option per style,
+// going stale the moment a labor rate changes), each style is a small set of named
+// rate constants (editable in Price Tables) plus a shared compute function. Table
+// rows created with `kind: 'formula'` and a `style` key use this path in computeLine
+// below instead of the width×length grid lookup.
+//
+// Two bugs fixed from the original sheet: the two "Precio 2.5" cells (Cornice
+// 13"-24" and Swag & Jabot) multiplied the already-2x tier by 2.5 (=5x) instead of
+// the base cost by 2.5. Also, the sheet computed "with lining" labor but never
+// actually used it in the total — here the Lining field on the worksheet line
+// genuinely selects which labor rate applies. sellMultiplier below is a plain
+// editable number per style (Price Tables), not a fixed sheet formula — defaults
+// reflect the business's own re-check of these numbers, not the original sheet.
+export const DRAPERY_STYLES = {
+  heavyFabric: { label: 'Heavy Fabric', hasLining: true, hasTrack: true, rates: { fullness: 3, fabricWidth: 110, fabricTaxPct: 7, laborNoLining: 18, laborLining: 22, laborInterlining: 26, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.2, trackManualPerFoot: 1, trackManualMarkup: 1.25 } },
+  sheer: { label: 'Sheer', hasLining: false, hasTrack: true, rates: { fullness: 2.5, fabricWidth: 110, fabricTaxPct: 0, laborNoLining: 18, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.2, trackManualPerFoot: 1, trackManualMarkup: 1.25 } },
+  corniceSmall: { label: 'Cornice (up to 12")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 20.5, sellMultiplier: 1.5 } },
+  corniceLarge: { label: 'Cornice (13"-24")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 22, sellMultiplier: 1.5 } },
+  swagJabot: { label: 'Swag and Jabot', hasLining: false, hasTrack: false, rates: { laborPerFoot: 15, sellMultiplier: 1.5 } },
+  grommetPanel: { label: 'Grommet Panel', hasLining: true, hasTrack: false, rates: { fullness: 2.5, fabricWidth: 59, panelAllowanceIn: 8, fabricWasteFactor: 1.5, laborNoLining: 18, laborLining: 22, sellMultiplier: 1.5 } },
+};
+
+export const DRAPERY_RATE_LABELS = {
+  fullness: 'Fullness ratio (× width)',
+  fabricWidth: 'Fabric bolt width (in)',
+  fabricTaxPct: 'Fabric tax (%)',
+  laborNoLining: 'Labor — no lining ($/yd)',
+  laborLining: 'Labor — with lining ($/yd)',
+  laborInterlining: 'Labor — lining + interlining ($/yd)',
+  installPerFoot: 'Installation ($/ft of width)',
+  sellMultiplier: 'Sell price multiplier (×)',
+  laborPerFoot: 'Labor ($/ft of width)',
+  panelAllowanceIn: 'Panel allowance (in, added to half-width)',
+  fabricWasteFactor: 'Fabric waste factor (×)',
+  trackMotorPerFoot: 'Motorized track cost ($/ft of width)',
+  trackMotorMarkup: 'Motorized track sell markup (×)',
+  trackManualPerFoot: 'Manual track cost ($/ft of width)',
+  trackManualMarkup: 'Manual track sell markup (×)',
+};
+
+// Heavy Fabric / Sheer: fullness × width ÷ fabric width = panels, panels × (height + 12) ÷ 36 = yards.
+function computePanelDrapery(line, rates, hasLining) {
+  const w = Number(line.width) || 0, h = Number(line.height) || 0, price = Number(line.fabricPrice) || 0;
+  if (!w || !h || !price) return null;
+  const panels = Math.ceil((w * rates.fullness) / rates.fabricWidth);
+  const yards = Math.ceil((panels * (h + 12)) / 36);
+  const fabricCost = price * yards * (1 + (rates.fabricTaxPct || 0) / 100);
+  const laborRate = hasLining
+    ? (line.lining === 'Lining + Interlining' ? rates.laborInterlining : line.lining === 'Lining' ? rates.laborLining : rates.laborNoLining)
+    : rates.laborNoLining;
+  const labor = ((w + h) / 36) * laborRate;
+  const installation = (w / 12) * rates.installPerFoot;
+  const base = fabricCost + labor;
+  let unit = base * rates.sellMultiplier + installation;
+  let cost = base + installation;
+  if (line.track === 'Motorized') { unit += w * rates.trackMotorPerFoot * rates.trackMotorMarkup; cost += w * rates.trackMotorPerFoot; }
+  else if (line.track === 'Manual') { unit += w * rates.trackManualPerFoot * rates.trackManualMarkup; cost += w * rates.trackManualPerFoot; }
+  return { installation, unit, cost };
+}
+
+// Cornice / Swag & Jabot: yards = (width + drop) ÷ 36, labor = width ÷ 12 × rate.
+function computeLinearDrapery(line, rates) {
+  const w = Number(line.width) || 0, h = Number(line.height) || 0, price = Number(line.fabricPrice) || 0;
+  if (!w || !h || !price) return null;
+  const yards = (w + h) / 36;
+  const fabricCost = price * yards;
+  const labor = (w / 12) * rates.laborPerFoot;
+  const base = fabricCost + labor;
+  return { installation: 0, unit: base * rates.sellMultiplier, cost: base };
+}
+
+// Grommet Panel: its own panel-count formula (half-width + fixed allowance, per side).
+function computeGrommetDrapery(line, rates) {
+  const w = Number(line.width) || 0, h = Number(line.height) || 0, price = Number(line.fabricPrice) || 0;
+  if (!w || !h || !price) return null;
+  const panelsPerSide = ((w / 2 + rates.panelAllowanceIn) * rates.fullness) / rates.fabricWidth;
+  const panels = panelsPerSide * 2;
+  const yards = ((h + 12) * panels) / 36;
+  const fabricCost = price * rates.fabricWasteFactor * yards;
+  const laborRate = line.lining === 'Lining' ? rates.laborLining : rates.laborNoLining;
+  const labor = ((w + h) / 36) * laborRate;
+  const base = fabricCost + labor;
+  return { installation: 0, unit: base * rates.sellMultiplier, cost: base };
+}
+
+function computeDraperyLine(line, table, state) {
+  const def = DRAPERY_STYLES[table.style];
+  if (!def) return null;
+  const rates = { ...def.rates, ...(table.rates || {}) };
+  if (table.style === 'heavyFabric' || table.style === 'sheer') return computePanelDrapery(line, rates, def.hasLining);
+  if (table.style === 'grommetPanel') return computeGrommetDrapery(line, rates);
+  return computeLinearDrapery(line, rates); // Cornice (both sizes), Swag & Jabot
+}
+
 export function computeLine(line, state) {
   const table = state.tables[line.table];
+  if (table?.kind === 'formula') {
+    const d = computeDraperyLine(line, table, state);
+    const markup = Number(line.markup) || 0, motor = Number(line.motorPrice) || 0, lineDisc = Number(line.discount) || 0;
+    if (!d) return { list: null, fascia: 0, cassette: 0, sideChannel: 0, installation: 0, brackets: 0, extras: 0, cost: null, unit: null };
+    const unit = Math.max(0, round2(d.unit + markup + motor - lineDisc));
+    return { list: unit, fascia: 0, cassette: 0, sideChannel: 0, installation: round2(d.installation), brackets: 0, extras: 0, cost: round2(d.cost), unit };
+  }
   const rates = { ...FALLBACK_RATES, ...(state.rates || {}) };
   const list = lookupListPrice(table, line.width, line.widthFrac, line.height, line.heightFrac);
   // Fascia / cassette / side channel: checkbox always uses the per-foot rate (auto).
@@ -105,6 +209,8 @@ export const DESC_FIELDS = [
   { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
   // Wall vs. ceiling mount only matters to the maker — the client quote just says "with Brackets".
   { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.isWall ? 'WALL' : 'CEILING') : ''}` : '') },
+  { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
+  { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
 ];
 
 export function describeLine(line, cfg, isWork) {

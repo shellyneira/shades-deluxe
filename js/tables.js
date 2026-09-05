@@ -4,6 +4,7 @@
 // width×length grid.
 import { el, mount, toast, confirmAction } from './dom.js';
 import { getState, save, deletePriceTableCloudRow } from './store.js';
+import { DRAPERY_STYLES, DRAPERY_RATE_LABELS } from './pricing.js';
 
 let active = null;
 
@@ -52,7 +53,7 @@ export function renderTables() {
         el('div', {}, [el('h2', {}, ['Price Tables']), el('div', { class: 'hint' }, ['Each table keeps its own prices. Pick one, edit any cell — it saves as you type. Drag a chip onto another category to move it there.'])]),
       ]),
       groups,
-      active ? gridEditor(active) : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['📊']), 'No price tables yet. Click “＋ New table”.']),
+      active ? (s.tables[active].kind === 'formula' ? formulaEditor(active) : gridEditor(active)) : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['📊']), 'No price tables yet. Click “＋ New table”.']),
     ]),
   ]));
 }
@@ -145,6 +146,38 @@ function tableActions(name) {
       delete s.tables[name]; delete s.minPrice[name];
       save(); deletePriceTableCloudRow(name); active = null; renderTables(); toast('Deleted');
     } }, ['🗑 Delete']),
+  ]);
+}
+
+// Drapery tables aren't a width×length grid — they're priced by formula (see
+// pricing.js), so this edits the style's rate constants instead of grid cells.
+function formulaEditor(name) {
+  const s = getState();
+  const table = s.tables[name];
+  const def = DRAPERY_STYLES[table.style];
+  table.rates = table.rates || {};
+
+  const fields = Object.keys(def.rates).map((key) => el('label', { class: 'field', style: 'flex:1 1 220px' }, [
+    DRAPERY_RATE_LABELS[key] || key,
+    el('input', {
+      type: 'number', step: 'any', value: table.rates[key] ?? def.rates[key],
+      oninput: (e) => { table.rates[key] = e.target.value === '' ? null : Number(e.target.value); save(); },
+    }),
+  ]));
+
+  const priced = ['Width', 'Height', 'Fabric $/yd', def.hasLining && 'Lining', def.hasTrack && 'Track'].filter(Boolean).join(', ');
+
+  return el('div', { class: 'tbl-card', style: `--cat-color:${categoryColor(table.category)}` }, [
+    el('div', { class: 'section-head' }, [
+      el('h3', { style: 'margin:0;font-size:17px;color:var(--ink);text-transform:none;letter-spacing:0' }, [name]),
+      tableActions(name),
+    ]),
+    el('div', { class: 'tbl-summary' }, [
+      el('span', { class: 'type-badge', style: `--cat-color:${categoryColor(table.category)}` }, [table.category]),
+      el('span', { class: 'hint' }, [`Formula-based — ${def.label}`]),
+    ]),
+    el('div', { class: 'row', style: 'flex-wrap:wrap;gap:14px 20px;margin-top:6px' }, fields),
+    el('p', { class: 'hint', style: 'margin-top:16px' }, [`Priced from ${priced} on the worksheet — not a width×length grid.`]),
   ]);
 }
 

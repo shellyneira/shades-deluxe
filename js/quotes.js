@@ -109,6 +109,7 @@ function blankLine(s) {
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, cassette: false, sideChannel: false,
     installation: s.defaultInstallation || '', brackets: '', isWall: false, discount: '', markup: '', motorPrice: '',
+    fabricPrice: '', lining: '', track: '',
   };
 }
 
@@ -116,7 +117,7 @@ function blankLine(s) {
 function isRowEmpty(l) {
   return !l.width && !l.height && !l.location && !l.wdNumber && !l.product && !l.fabric &&
     !l.color && !l.control && !l.system && !l.style && !l.headrail && !l.bottomRail &&
-    !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets;
+    !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets && !l.fabricPrice;
 }
 
 // A shade's Product/Fabric options are filtered by its table's category (Roller,
@@ -153,6 +154,9 @@ function columns(o, tables) {
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
     { key: 'isWall', label: 'Is Wall', kind: 'check', w: 64 },
+    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0' },
+    { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130 },
+    { key: 'track', label: 'Track', kind: 'select', opts: opt(['Motorized', 'Manual']), w: 100 },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
@@ -184,6 +188,9 @@ const COL_HELP = {
   installation: 'Installation/labor $ (default in Settings → Rates)',
   brackets: 'Brackets $',
   isWall: 'Bracket mount — checked = Wall, unchecked = Ceiling',
+  fabricPrice: 'Fabric cost ($ per yard) — Drapery lines only, drives the whole price',
+  lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
+  track: 'Optional drapery track add-on, billed on top of the panel price',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
 };
 
