@@ -66,17 +66,18 @@ export function lookupListPrice(table, width, widthFrac, height, heightFrac) {
 //
 // Two bugs fixed from the original sheet: the two "Precio 2.5" cells (Cornice
 // 13"-24" and Swag & Jabot) multiplied the already-2x tier by 2.5 (=5x) instead of
-// the base cost by 2.5 — default sellMultiplier here is 2x for those styles instead
-// of reproducing the bug. Also, the sheet computed "with lining" labor but never
+// the base cost by 2.5. Also, the sheet computed "with lining" labor but never
 // actually used it in the total — here the Lining field on the worksheet line
-// genuinely selects which labor rate applies.
+// genuinely selects which labor rate applies. sellMultiplier below is a plain
+// editable number per style (Price Tables), not a fixed sheet formula — defaults
+// reflect the business's own re-check of these numbers, not the original sheet.
 export const DRAPERY_STYLES = {
-  heavyFabric: { label: 'Heavy Fabric', hasLining: true, hasTrack: true, rates: { fullness: 3, fabricWidth: 110, fabricTaxPct: 7, laborNoLining: 18, laborLining: 22, laborInterlining: 26, installPerFoot: 10, sellMultiplier: 1.5 } },
-  sheer: { label: 'Sheer', hasLining: false, hasTrack: true, rates: { fullness: 2.5, fabricWidth: 110, fabricTaxPct: 0, laborNoLining: 18, installPerFoot: 10, sellMultiplier: 1.5 } },
-  corniceSmall: { label: 'Cornice (up to 12")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 20.5, sellMultiplier: 2 } },
-  corniceLarge: { label: 'Cornice (13"-24")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 16, sellMultiplier: 2 } },
-  swagJabot: { label: 'Swag and Jabot', hasLining: false, hasTrack: false, rates: { laborPerFoot: 15, sellMultiplier: 2 } },
-  grommetPanel: { label: 'Grommet Panel', hasLining: true, hasTrack: false, rates: { fullness: 2.5, fabricWidth: 59, panelAllowanceIn: 8, fabricWasteFactor: 1.5, laborNoLining: 18, laborLining: 22, sellMultiplier: 2 } },
+  heavyFabric: { label: 'Heavy Fabric', hasLining: true, hasTrack: true, rates: { fullness: 3, fabricWidth: 110, fabricTaxPct: 7, laborNoLining: 18, laborLining: 22, laborInterlining: 26, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.2, trackManualPerFoot: 1, trackManualMarkup: 1.25 } },
+  sheer: { label: 'Sheer', hasLining: false, hasTrack: true, rates: { fullness: 2.5, fabricWidth: 110, fabricTaxPct: 0, laborNoLining: 18, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.2, trackManualPerFoot: 1, trackManualMarkup: 1.25 } },
+  corniceSmall: { label: 'Cornice (up to 12")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 20.5, sellMultiplier: 1.5 } },
+  corniceLarge: { label: 'Cornice (13"-24")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 22, sellMultiplier: 1.5 } },
+  swagJabot: { label: 'Swag and Jabot', hasLining: false, hasTrack: false, rates: { laborPerFoot: 15, sellMultiplier: 1.5 } },
+  grommetPanel: { label: 'Grommet Panel', hasLining: true, hasTrack: false, rates: { fullness: 2.5, fabricWidth: 59, panelAllowanceIn: 8, fabricWasteFactor: 1.5, laborNoLining: 18, laborLining: 22, sellMultiplier: 1.5 } },
 };
 
 export const DRAPERY_RATE_LABELS = {
@@ -91,6 +92,10 @@ export const DRAPERY_RATE_LABELS = {
   laborPerFoot: 'Labor ($/ft of width)',
   panelAllowanceIn: 'Panel allowance (in, added to half-width)',
   fabricWasteFactor: 'Fabric waste factor (×)',
+  trackMotorPerFoot: 'Motorized track cost ($/ft of width)',
+  trackMotorMarkup: 'Motorized track sell markup (×)',
+  trackManualPerFoot: 'Manual track cost ($/ft of width)',
+  trackManualMarkup: 'Manual track sell markup (×)',
 };
 
 // Heavy Fabric / Sheer: fullness × width ÷ fabric width = panels, panels × (height + 12) ÷ 36 = yards.
@@ -108,8 +113,8 @@ function computePanelDrapery(line, rates, hasLining) {
   const base = fabricCost + labor;
   let unit = base * rates.sellMultiplier + installation;
   let cost = base + installation;
-  if (line.track === 'Motorized') { unit += w * 2.5 * 1.2; cost += w * 2.5; }
-  else if (line.track === 'Manual') { unit += w * 1.25; cost += w; }
+  if (line.track === 'Motorized') { unit += w * rates.trackMotorPerFoot * rates.trackMotorMarkup; cost += w * rates.trackMotorPerFoot; }
+  else if (line.track === 'Manual') { unit += w * rates.trackManualPerFoot * rates.trackManualMarkup; cost += w * rates.trackManualPerFoot; }
   return { installation, unit, cost };
 }
 
