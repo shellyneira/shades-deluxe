@@ -8,7 +8,10 @@ import { DESC_FIELDS } from './pricing.js';
 function documentsPanel(s) {
   const col = (docKey, title, note) => {
     const cfg = s.docConfig[docKey];
-    const boxes = DESC_FIELDS.map((f) => {
+    // Labels always print the control's hand side next to the size — the Description
+    // toggle for it would just duplicate that, so it's not offered here.
+    const fields = docKey === 'label' ? DESC_FIELDS.filter((f) => f.key !== 'control') : DESC_FIELDS;
+    const boxes = fields.map((f) => {
       const box = el('input', { type: 'checkbox', onchange: (e) => { cfg[f.key] = e.target.checked; save(); } });
       box.checked = !!cfg[f.key];
       return el('label', { class: 'field check', style: 'margin:0' }, [box, f.label]);

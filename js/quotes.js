@@ -108,7 +108,7 @@ function blankLine(s) {
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, cassette: false, sideChannel: false,
-    installation: s.defaultInstallation || '', brackets: '', discount: '', markup: '', motorPrice: '',
+    installation: s.defaultInstallation || '', brackets: '', isWall: false, discount: '', markup: '', motorPrice: '',
   };
 }
 
@@ -151,6 +151,7 @@ function columns(o, tableNames) {
     { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
+    { key: 'isWall', label: 'Wall', kind: 'check', w: 50 },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
@@ -181,6 +182,7 @@ const COL_HELP = {
   sideChannel: 'Add side channels (auto, per-foot ×2 in Settings → Rates)',
   installation: 'Installation/labor $ (default in Settings → Rates)',
   brackets: 'Brackets $',
+  isWall: 'Bracket mount — checked = Wall, unchecked = Ceiling',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
 };
 
@@ -519,7 +521,9 @@ function invoice(q) {
 
 // DYMO 30252 stickers (1⅛" × 3½"), one per shade, for the LabelWriter 550.
 function labelsView(q, s) {
-  const cfg = s.docConfig.label;
+  // Control's hand side is always printed next to the size (dl-size below) — leaving it
+  // in the description too would print it twice on the same sticker.
+  const cfg = { ...s.docConfig.label, control: false };
   const labels = q.items.map((l) => {
     const card = el('div', { class: 'dymo-label' }, [
       el('div', { class: 'dl-text' }, [

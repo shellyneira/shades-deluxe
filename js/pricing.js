@@ -81,18 +81,13 @@ export function computeLine(line, state) {
   return { list, fascia, cassette, sideChannel, installation, brackets, extras, cost, unit: unit == null ? null : round2(unit) };
 }
 
+// Space-saving: the System field already says Manual/Motor Battery, so Control only
+// needs to convey the hand side — chain vs motor is redundant on the document.
 function controlText(ctrl) {
   if (!ctrl) return '';
-  // Chain control just shows the side — "Chain Control" is redundant on the document.
-  if (ctrl.startsWith('C')) {
-    if (/RH/i.test(ctrl)) return `Right Hand (${ctrl})`;
-    if (/LH/i.test(ctrl)) return `Left Hand (${ctrl})`;
-    return '';
-  }
-  let c = /M/i.test(ctrl) ? 'Motor Control' : ctrl;
-  if (/LH/i.test(ctrl)) c += ' - Left Hand';
-  else if (/RH/i.test(ctrl)) c += ' - Right Hand';
-  return c;
+  if (/RH/i.test(ctrl)) return 'C-RH';
+  if (/LH/i.test(ctrl)) return 'C-LH';
+  return '';
 }
 
 // Every field that can go into a document's Description, in display order.
@@ -110,7 +105,7 @@ export const DESC_FIELDS = [
   { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
   { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
   { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
-  { key: 'brackets', label: 'Brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? 'with Brackets' : '') },
+  { key: 'brackets', label: 'Brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? `with Brackets - ${l.isWall ? 'WALL' : 'CEILING'}` : '') },
 ];
 
 export function describeLine(line, cfg) {
