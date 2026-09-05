@@ -249,35 +249,30 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
   font-size: 13px; font-weight: 700; z-index: 50; box-shadow: var(--shadow-lg);
 }
 
-/* ---------- price tables (grouped by type) ---------- */
-.ptabs { --roller: #b9552f; --zebra: #3a6ea5; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 20px; }
-.ptab-group { display: inline-flex; align-items: center; gap: 6px; padding: 4px; background: var(--bg); border-radius: 999px; }
-.ptab-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; padding: 0 8px 0 10px; }
-.ptab-label.roller { color: var(--roller); }
-.ptab-label.zebra { color: var(--zebra); }
-.ptab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; border: 1px solid transparent; background: #fff; cursor: pointer; font-weight: 700; font-size: 13.5px; color: var(--ink-soft); }
-.ptab .dot { width: 8px; height: 8px; border-radius: 50%; }
-.ptab.roller .dot { background: var(--roller); }
-.ptab.zebra .dot { background: var(--zebra); }
+/* ---------- price tables (grouped by category, color set via --cat-color) ---------- */
+.ptabs { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 20px; }
+.ptab-group { display: inline-flex; align-items: center; gap: 6px; padding: 4px; background: var(--bg); border-radius: 999px; transition: outline-color .12s; outline: 2px solid transparent; outline-offset: 2px; }
+.ptab-group.dragover { outline-color: var(--cat-color, var(--brand)); }
+.ptab-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; padding: 0 8px 0 10px; color: var(--cat-color, var(--ink-soft)); }
+.ptab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; border: 1px solid transparent; background: #fff; cursor: grab; font-weight: 700; font-size: 13.5px; color: var(--ink-soft); }
+.ptab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cat-color, var(--brand)); }
 .ptab:hover { border-color: var(--line-strong); }
-.ptab.active.roller { background: var(--roller); color: #fff; }
-.ptab.active.zebra { background: var(--zebra); color: #fff; }
+.ptab.active { background: var(--cat-color, var(--brand)); color: #fff; }
 .ptab.active .dot { background: #fff; }
 .ptab.new { border: 1px dashed var(--line-strong); color: var(--muted); background: transparent; font-weight: 600; padding: 8px 14px; border-radius: 999px; cursor: pointer; }
 .ptab.new:hover { color: var(--brand); border-color: var(--brand); }
 
-.tbl-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
-.tbl-card.roller { border-top: 3px solid #b9552f; }
-.tbl-card.zebra { border-top: 3px solid #3a6ea5; }
+.tbl-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; border-top: 3px solid var(--cat-color, var(--brand)); }
 .tbl-summary { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; padding: 12px 0 18px; }
-.type-badge { padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: #fff; }
-.type-badge.roller { background: #b9552f; }
-.type-badge.zebra { background: #3a6ea5; }
+.type-badge { padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: #fff; background: var(--cat-color, var(--brand)); }
 .stat { display: flex; flex-direction: column; }
 .stat .sv { font-size: 17px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -.3px; }
 .stat .sl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 700; }
-table.grid.zebra thead th { background: #eaf1f8; }
-table.grid.zebra .rowhead input { background: #eaf1f8; }
+
+/* ---------- modal (new price table) ---------- */
+.modal-overlay { position: fixed; inset: 0; background: rgba(33,29,24,.45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-card { background: var(--panel); border-radius: var(--radius); padding: 22px; width: 340px; max-width: calc(100vw - 40px); box-shadow: var(--shadow-lg); }
+.modal-card select, .modal-card input { width: 100%; }
 
 .subtabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
 .subtab { padding: 8px 15px; border-radius: 999px; border: 1px solid var(--line-strong); background: #fff; cursor: pointer; font-weight: 700; font-size: 13.5px; transition: all .12s; }
@@ -354,15 +349,10 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 .login-err { color: var(--danger); font-size: 13px; font-weight: 600; margin-top: 12px; min-height: 18px; }
 
 /* ---------- lists (split roller/zebra) ---------- */
-.list-split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-@media (max-width: 720px) { .list-split { grid-template-columns: 1fr; } }
+.list-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
 .list-group { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; }
-.list-group-head { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 12px; }
-.list-group-head .dot { width: 9px; height: 9px; border-radius: 50%; }
-.list-group-head.roller { color: #b9552f; }
-.list-group-head.roller .dot { background: #b9552f; }
-.list-group-head.zebra { color: #3a6ea5; }
-.list-group-head.zebra .dot { background: #3a6ea5; }
+.list-group-head { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 12px; color: var(--cat-color, var(--ink-soft)); }
+.list-group-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cat-color, var(--ink-soft)); }
 .list-group-head .count { margin-left: auto; background: var(--bg); color: var(--muted); border-radius: 999px; padding: 1px 9px; font-size: 11px; }
 
 .hint { color: var(--muted); font-size: 13px; }

@@ -1,35 +1,55 @@
-// Price Tables editor — the pricing "database". Tables are grouped by type
-// (Roller / Zebra) so it's clear each product line carries its own values.
-// Create, rename, duplicate, delete tables and edit each width×length grid.
+// Price Tables editor — the pricing "database". Tables are grouped by an explicit
+// category (Roller, Zebra, or whatever you name) — drag a table's chip onto another
+// group to recategorize it. Create, rename, duplicate, delete tables and edit each
+// width×length grid.
 import { el, mount, toast, confirmAction } from './dom.js';
 import { getState, save, deletePriceTableCloudRow } from './store.js';
 
 let active = null;
-const isZebra = (name) => /zebra/i.test(name);
-const typeOf = (name) => (isZebra(name) ? 'zebra' : 'roller');
+
+// Deterministic color per category so new ones (Drapery, Outdoor, ...) just work
+// without editing CSS — index into a small fixed palette, not name-keyed classes.
+const PALETTE = ['#b9552f', '#3a6ea5', '#3f7d5f', '#8e44ad', '#c99a3f', '#c0392b', '#16a085', '#7f6a4a'];
+export function categoryColor(cat) {
+  const i = getState().categories.indexOf(cat);
+  return PALETTE[(i < 0 ? 0 : i) % PALETTE.length];
+}
 
 export function renderTables() {
   const s = getState();
   const names = Object.keys(s.tables);
   if (!active || !names.includes(active)) active = names[0] || null;
 
-  const chip = (n) => el('button', { class: 'ptab' + (n === active ? ' active' : '') + ' ' + typeOf(n), onclick: () => { active = n; renderTables(); } }, [
-    el('span', { class: 'dot' }, []), n,
-  ]);
-
-  const roller = names.filter((n) => !isZebra(n));
-  const zebra = names.filter((n) => isZebra(n));
+  const chip = (n) => el('button', {
+    class: 'ptab' + (n === active ? ' active' : ''),
+    style: `--cat-color:${categoryColor(s.tables[n].category)}`,
+    draggable: true,
+    ondragstart: (e) => e.dataTransfer.setData('text/plain', n),
+    onclick: () => { active = n; renderTables(); },
+  }, [el('span', { class: 'dot' }, []), n]);
 
   const groups = el('div', { class: 'ptabs' }, [
-    roller.length ? el('div', { class: 'ptab-group' }, [el('span', { class: 'ptab-label roller' }, ['Roller']), ...roller.map(chip)]) : null,
-    zebra.length ? el('div', { class: 'ptab-group' }, [el('span', { class: 'ptab-label zebra' }, ['Zebra']), ...zebra.map(chip)]) : null,
-    el('button', { class: 'ptab new', onclick: createTable }, ['＋ New table']),
+    ...s.categories.map((cat) => {
+      const group = el('div', {
+        class: 'ptab-group',
+        style: `--cat-color:${categoryColor(cat)}`,
+        ondragover: (e) => { e.preventDefault(); group.classList.add('dragover'); },
+        ondragleave: () => group.classList.remove('dragover'),
+        ondrop: (e) => {
+          group.classList.remove('dragover');
+          const n = e.dataTransfer.getData('text/plain');
+          if (s.tables[n] && s.tables[n].category !== cat) { s.tables[n].category = cat; save(); renderTables(); toast(`Moved to ${cat}`); }
+        },
+      }, [el('span', { class: 'ptab-label' }, [cat]), ...names.filter((n) => s.tables[n].category === cat).map(chip)]);
+      return group;
+    }),
+    el('button', { class: 'ptab new', onclick: openCreateModal }, ['＋ New table']),
   ]);
 
   mount(el('div', {}, [
     el('div', { class: 'panel' }, [
       el('div', { class: 'section-head' }, [
-        el('div', {}, [el('h2', {}, ['Price Tables']), el('div', { class: 'hint' }, ['Each table keeps its own prices. Pick one, edit any cell — it saves as you type.'])]),
+        el('div', {}, [el('h2', {}, ['Price Tables']), el('div', { class: 'hint' }, ['Each table keeps its own prices. Pick one, edit any cell — it saves as you type. Drag a chip onto another category to move it there.'])]),
       ]),
       groups,
       active ? gridEditor(active) : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['📊']), 'No price tables yet. Click “＋ New table”.']),
@@ -37,27 +57,64 @@ export function renderTables() {
   ]));
 }
 
-function createTable() {
+function openCreateModal() {
   const s = getState();
-  const name = prompt('Name the new price table.\nInclude the word “Zebra” for a zebra table, otherwise it is treated as Roller.\n\ne.g. "Roller #7" or "Zebra #7":');
-  if (!name) return;
-  if (s.tables[name]) return toast('A table with that name already exists');
-  s.tables[name] = { widths: [36, 48, 60, 72], rows: [30, 48, 60, 72, 84].map((l) => ({ length: l, prices: [null, null, null, null] })) };
-  s.minPrice[name] = 0;
-  save();
-  active = name;
-  renderTables();
-  toast('Table created');
+  let addingNew = false;
+
+  const nameInp = el('input', { type: 'text', placeholder: 'e.g. "Roller #7" or "Drapery"' });
+  const err = el('div', { style: 'color:var(--danger);font-size:13px;display:none' }, []);
+  const showErr = (msg) => { err.textContent = msg; err.style.display = ''; };
+
+  const newCatInp = el('input', { type: 'text', placeholder: 'New category name', style: 'display:none;margin-top:8px' });
+  const catSelect = el('select', {
+    onchange: (e) => { addingNew = e.target.value === '__new__'; newCatInp.style.display = addingNew ? '' : 'none'; },
+  }, [...s.categories.map((c) => el('option', { value: c }, [c])), el('option', { value: '__new__' }, ['+ Add new category…'])]);
+
+  const close = () => overlay.remove();
+  const create = () => {
+    err.style.display = 'none';
+    const name = nameInp.value.trim();
+    if (!name) return showErr('Enter a table name first');
+    if (s.tables[name]) return showErr('A table with that name already exists');
+    let cat = catSelect.value;
+    if (addingNew) {
+      cat = newCatInp.value.trim();
+      if (!cat) return showErr('Enter a category name');
+      if (!s.categories.includes(cat)) s.categories.push(cat);
+    }
+    s.tables[name] = { category: cat, widths: [36, 48, 60, 72], rows: [30, 48, 60, 72, 84].map((l) => ({ length: l, prices: [null, null, null, null] })) };
+    s.minPrice[name] = 0;
+    save();
+    active = name;
+    close();
+    renderTables();
+    toast('Table created');
+  };
+
+  const overlay = el('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) close(); } }, [
+    el('div', { class: 'modal-card' }, [
+      el('h3', { style: 'margin:0 0 14px' }, ['New price table']),
+      el('label', { class: 'field' }, ['Table name', nameInp]),
+      el('label', { class: 'field', style: 'margin-top:10px' }, ['Category', catSelect]),
+      newCatInp,
+      err,
+      el('div', { class: 'row', style: 'margin-top:16px;justify-content:flex-end;gap:8px' }, [
+        el('button', { class: 'btn small', onclick: close }, ['Cancel']),
+        el('button', { class: 'btn primary small', onclick: create }, ['Create']),
+      ]),
+    ]),
+  ]);
+  document.body.append(overlay);
+  nameInp.focus();
 }
 
 function summary(name, table) {
-  const s = getState();
   const nums = (a) => a.filter((x) => typeof x === 'number');
   const w = nums(table.widths), l = nums(table.rows.map((r) => r.length));
   const range = (a) => (a.length ? `${Math.min(...a)}–${Math.max(...a)}"` : '—');
   const stat = (label, val) => el('div', { class: 'stat' }, [el('span', { class: 'sv' }, [val]), el('span', { class: 'sl' }, [label])]);
   return el('div', { class: 'tbl-summary' }, [
-    el('span', { class: 'type-badge ' + typeOf(name) }, [typeOf(name)]),
+    el('span', { class: 'type-badge', style: `--cat-color:${categoryColor(table.category)}` }, [table.category]),
     stat('Widths', range(w)),
     stat('Lengths', range(l)),
     stat('Cells', String(w.length * l.length)),
@@ -116,14 +173,14 @@ function gridEditor(name) {
     return el('tr', {}, cells);
   });
 
-  const grid = el('table', { class: 'grid ' + typeOf(name) }, [el('thead', {}, [el('tr', {}, headCells)]), el('tbody', {}, bodyRows)]);
+  const grid = el('table', { class: 'grid' }, [el('thead', {}, [el('tr', {}, headCells)]), el('tbody', {}, bodyRows)]);
 
   const controls = el('div', { class: 'row', style: 'margin-top:16px;align-items:flex-end' }, [
     el('button', { class: 'btn small', onclick: () => { table.rows.push({ length: null, prices: table.widths.map(() => null) }); save(); renderTables(); } }, ['＋ Add length (row)']),
     el('button', { class: 'btn small', onclick: () => { table.widths.push(null); table.rows.forEach((r) => r.prices.push(null)); save(); renderTables(); } }, ['＋ Add width (column)']),
   ]);
 
-  return el('div', { class: 'tbl-card ' + typeOf(name) }, [
+  return el('div', { class: 'tbl-card', style: `--cat-color:${categoryColor(table.category)}` }, [
     el('div', { class: 'section-head' }, [
       el('h3', { style: 'margin:0;font-size:17px;color:var(--ink);text-transform:none;letter-spacing:0' }, [name]),
       tableActions(name),

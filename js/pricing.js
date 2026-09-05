@@ -22,16 +22,14 @@ const PRICED_FIELDS = [
   ['headrail', 'headrails'], ['bottomRail', 'headrails'],
 ];
 
-function optionPrice(state, listKey, name, table) {
+function optionPrice(state, listKey, name) {
   if (!name) return 0;
-  let arr = state.options[listKey];
-  if (listKey === 'products' || listKey === 'fabrics') arr = arr?.[/zebra/i.test(table || '') ? 'zebra' : 'roller'];
-  const found = (arr || []).find((o) => o && o.name === name);
+  const found = (state.options[listKey] || []).find((o) => o && o.name === name);
   return found ? Number(found.price) || 0 : 0;
 }
 
 function optionExtras(line, state) {
-  return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field], line.table), 0);
+  return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field]), 0);
 }
 
 export function effectiveDim(inches, fraction) {

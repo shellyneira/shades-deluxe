@@ -31,11 +31,11 @@ function metrics(s) {
   }
   const topProducts = Object.entries(prod).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value }));
 
-  // roller vs zebra revenue
+  // Roller vs. everything else, by the table's actual category (not a name guess).
   let roller = 0, zebra = 0;
   for (const r of rows) for (const it of r.q.items) {
     const u = computeLine(it, s).unit || 0;
-    if (/zebra/i.test(it.table || '')) zebra += u; else roller += u;
+    if ((s.tables[it.table]?.category || 'Roller') === 'Roller') roller += u; else zebra += u;
   }
 
   const statusCounts = ['draft', 'sent', 'won', 'lost'].map((st) => ({ label: st, value: by(st).length, amount: sum(by(st), 'total') }));

@@ -36,6 +36,7 @@ const DEFAULT_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor
 function freshState() {
   return normalize({
     company: { ...DEFAULT_COMPANY },
+    categories: ['Roller', 'Zebra'],
     tables: structuredClone(SEED.tables),
     minPrice: { ...SEED.minPrice },
     options: structuredClone(SEED.options),
@@ -57,20 +58,29 @@ function freshState() {
 const toPriced = (arr) => (arr || []).map((x) => (typeof x === 'string' ? { name: x, price: 0 } : { name: x.name, price: Number(x.price) || 0 }));
 const FLAT_PRICED_LISTS = ['locations', 'wdNumbers', 'colors', 'controls', 'systems', 'styles', 'headrails'];
 
-// Products and Fabrics are stored per shade type ({roller, zebra}) so membership is
-// explicit rather than guessed from the name. Migrate any legacy flat arrays.
+// Table category ("Roller"/"Zebra"/anything you name) used to be guessed from the
+// table's name; it's now an explicit field on the table, and Products/Fabrics are
+// stored per category so each one gets its own dropdown options.
 function normalize(state) {
+  state.categories = [...new Set(state.categories && state.categories.length ? state.categories : ['Roller', 'Zebra'])];
+  for (const [name, t] of Object.entries(state.tables || {})) {
+    if (!t.category) t.category = /zebra/i.test(name) ? 'Zebra' : 'Roller'; // one-time backfill for pre-category data
+    if (!state.categories.includes(t.category)) state.categories.push(t.category);
+  }
   for (const key of ['products', 'fabrics']) {
     const v = state.options[key];
+    const migrated = {};
     if (Array.isArray(v)) {
-      state.options[key] = { roller: v.filter((x) => !/zebra/i.test(typeof x === 'string' ? x : x.name)), zebra: v.filter((x) => /zebra/i.test(typeof x === 'string' ? x : x.name)) };
-    } else if (v && typeof v === 'object') {
-      v.roller = v.roller || []; v.zebra = v.zebra || [];
+      migrated.Roller = v.filter((x) => !/zebra/i.test(typeof x === 'string' ? x : x.name));
+      migrated.Zebra = v.filter((x) => /zebra/i.test(typeof x === 'string' ? x : x.name));
     } else {
-      state.options[key] = { roller: [], zebra: [] };
+      for (const [cat, arr] of Object.entries(v || {})) {
+        const name = cat === 'roller' ? 'Roller' : cat === 'zebra' ? 'Zebra' : cat; // old lowercase keys
+        migrated[name] = (migrated[name] || []).concat(arr || []);
+      }
     }
-    state.options[key].roller = toPriced(state.options[key].roller);
-    state.options[key].zebra = toPriced(state.options[key].zebra);
+    for (const cat of state.categories) migrated[cat] = toPriced(migrated[cat] || []);
+    state.options[key] = migrated;
   }
   for (const key of FLAT_PRICED_LISTS) state.options[key] = toPriced(state.options[key]);
   state.rates = { ...DEFAULT_RATES, ...(state.rates || {}) };

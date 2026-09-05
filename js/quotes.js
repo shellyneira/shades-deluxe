@@ -119,15 +119,16 @@ function isRowEmpty(l) {
     !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets;
 }
 
-// A shade is Zebra or Roller based on its table. Products/fabrics are stored per
-// type, so a Zebra line only offers Zebra options and a Roller line the Roller ones.
-export const isZebra = (table) => /zebra/i.test(table || '');
-export const groupKey = (table) => (isZebra(table) ? 'zebra' : 'roller');
+// A shade's Product/Fabric options are filtered by its table's category (Roller,
+// Zebra, or whatever category was assigned in Price Tables) — each category has
+// its own dropdown list.
+export const tableCategory = (table, tables) => tables[table]?.category || 'Roller';
 
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
-function columns(o, tableNames) {
+function columns(o, tables) {
   const opt = (arr) => ['', ...arr];
+  const tableNames = Object.keys(tables);
   return [
     { key: 'table', label: 'Table', kind: 'select', opts: tableNames, w: 108 },
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
@@ -137,8 +138,8 @@ function columns(o, tableNames) {
     { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'height', label: 'H', kind: 'num', w: 52 },
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[groupKey(it.table)] || []), w: 150 },
-    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[groupKey(it.table)] || []), w: 160 },
+    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
+    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
     { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
     { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108 },
@@ -161,14 +162,14 @@ const FRAC_OPTS = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
 
 // Hover help for each worksheet column header — says what it is and where in Settings/Lists it's set.
 const COL_HELP = {
-  table: 'Product line — sets the base price from Price Tables (Roller/Zebra #3/#5)',
+  table: 'Product line — sets the base price from Price Tables',
   qty: 'How many identical shades on this line',
   location: 'Room/area (edit the list in Lists)',
   wdNumber: 'Which window or door (edit in Lists)',
   width: 'Width in inches', widthFrac: 'Width fraction — rounds up if over ½',
   height: 'Height in inches', heightFrac: 'Height fraction — rounds up if over ½',
-  product: 'Product type — filtered by Roller/Zebra (edit in Lists)',
-  fabric: 'Fabric / description — filtered by Roller/Zebra (edit in Lists)',
+  product: "Product type — filtered by the table's category (edit in Lists)",
+  fabric: "Fabric / description — filtered by the table's category (edit in Lists)",
   color: 'Chain/cassette color, shared for both (edit in Lists)',
   control: 'Chain or motor + side (RH/LH)',
   system: 'Manual or motor — add its price in Lists → Systems',
@@ -230,7 +231,7 @@ function cell(col, item, onChange) {
 
 function sheet(q, rerender) {
   const s = getState();
-  const cols = columns(s.options, Object.keys(s.tables));
+  const cols = columns(s.options, s.tables);
   const draft = q._draft || (q._draft = blankLine(s));
 
   const priceCells = []; // {getItem, node}

@@ -1,14 +1,15 @@
-// Lists editor — the dropdown option lists. Products and Fabrics are stored per shade
-// type ({roller, zebra}) with their own Add box each, so membership is explicit.
+// Lists editor — the dropdown option lists. Products and Fabrics are stored per
+// table category (see Price Tables), each with its own Add box.
 import { el, mount, confirmAction, toast } from './dom.js';
 import { getState, save } from './store.js';
+import { categoryColor } from './tables.js';
 
 const LABELS = {
   locations: 'Locations', wdNumbers: 'Window / Door #', products: 'Products',
   fabrics: 'Fabrics / Descriptions', colors: 'Colors', controls: 'Controls',
   systems: 'Systems', styles: 'Styles', headrails: 'Headrails / Bottom rails',
 };
-const GROUPED = { products: true, fabrics: true }; // stored as {roller, zebra}
+const GROUPED = { products: true, fabrics: true }; // stored one array per category
 // Only these add-ons carry a price. Products/fabrics get their price from the Price
 // Tables; colors, locations, w/d and controls are plain labels.
 const PRICEABLE = { systems: true, styles: true, headrails: true };
@@ -49,8 +50,8 @@ export function renderLists() {
     ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i)))
     : el('div', { class: 'muted' }, ['(empty)']);
 
-  const groupCol = (arr, title, cls, priced) => el('div', { class: 'list-group' }, [
-    el('div', { class: 'list-group-head ' + cls }, [el('span', { class: 'dot' }, []), title, el('span', { class: 'count' }, [String(arr.length)])]),
+  const groupCol = (arr, title, priced) => el('div', { class: 'list-group' }, [
+    el('div', { class: 'list-group-head', style: `--cat-color:${categoryColor(title)}` }, [el('span', { class: 'dot' }, []), title, el('span', { class: 'count' }, [String(arr.length)])]),
     arr.length ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i))) : el('div', { class: 'muted', style: 'font-size:13px' }, ['(none)']),
     addBox(arr, title.toLowerCase(), priced),
   ]);
@@ -59,13 +60,13 @@ export function renderLists() {
     const val = s.options[key];
     const priced = !!PRICEABLE[key];
     const body = GROUPED[key]
-      ? el('div', { class: 'list-split' }, [groupCol(val.roller, 'Roller', 'roller', priced), groupCol(val.zebra, 'Zebra', 'zebra', priced)])
+      ? el('div', { class: 'list-split' }, s.categories.map((cat) => groupCol(val[cat] || (val[cat] = []), cat, priced)))
       : el('div', {}, [flatList(val), addBox(val, LABELS[key].toLowerCase(), priced)]);
 
     return el('div', { class: 'panel' }, [
       el('div', { class: 'section-head', style: 'margin-bottom:12px' }, [
         el('h3', { style: 'margin:0' }, [LABELS[key]]),
-        el('span', { class: 'hint' }, [PRICE_NOTE[key] || (GROUPED[key] ? 'Each type has its own list — add to the right column' : priced ? 'Add an optional $ to charge extra when selected' : '')]),
+        el('span', { class: 'hint' }, [PRICE_NOTE[key] || (GROUPED[key] ? 'Each category has its own list' : priced ? 'Add an optional $ to charge extra when selected' : '')]),
       ]),
       body,
     ]);
@@ -87,7 +88,7 @@ export function renderLists() {
   mount(el('div', {}, [
     el('div', { class: 'panel' }, [
       el('div', { class: 'section-head' }, [
-        el('div', {}, [el('h2', {}, ['Lists']), el('div', { class: 'hint' }, ['Fill the dropdowns in the quote form. Products & fabrics are per type (Roller / Zebra); colors are shared. Saves to the cloud.'])]),
+        el('div', {}, [el('h2', {}, ['Lists']), el('div', { class: 'hint' }, ['Fill the dropdowns in the quote form. Products & fabrics are per category (see Price Tables); colors are shared. Saves to the cloud.'])]),
         el('button', { class: 'btn', onclick: () => { const name = prompt('Name of the new list:'); if (!name) return; (s.customLists = s.customLists || []).push({ name, items: [] }); save(); renderLists(); toast('List created'); } }, ['＋ New list']),
       ]),
     ]),
