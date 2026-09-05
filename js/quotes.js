@@ -132,9 +132,7 @@ const draperyStyleOf = (it, tables) => (isDrapery(it, tables) ? DRAPERY_STYLES[t
 
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
-// `hideWhen(item)` greys a cell out for rows where the field is meaningless (e.g. Motor $
-// on a Drapery line, or Track on a Roller line) instead of leaving a control that looks
-// interactive but silently has no effect.
+// `hideWhen(item)` greys a cell out for rows where the field is meaningless.
 function columns(o, tables, categories) {
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
@@ -142,7 +140,6 @@ function columns(o, tables, categories) {
   // kind of table each one is, even though the table names themselves are plain.
   const tableGroups = categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) }));
   const forDrapery = (it) => isDrapery(it, tables);
-  const forRollerZebra = (it) => !isDrapery(it, tables);
   return [
     { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
@@ -155,21 +152,28 @@ function columns(o, tables, categories) {
     { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150, hideWhen: forDrapery },
     { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160, hideWhen: forDrapery },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
-    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86, hideWhen: forDrapery },
-    { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108, hideWhen: forDrapery },
-    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0', hideWhen: forDrapery },
-    { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96, hideWhen: forDrapery },
-    { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118, hideWhen: forDrapery },
-    { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118, hideWhen: forDrapery },
-    { key: 'fascia', label: 'Fascia', kind: 'check', w: 58, hideWhen: forDrapery },
-    { key: 'cassette', label: 'Cassette', kind: 'check', w: 66, hideWhen: forDrapery },
-    { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54, hideWhen: forDrapery },
-    { key: 'installation', label: 'Ins', kind: 'num', w: 58, hideWhen: forDrapery },
+    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
+    // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
+    // (Motorized/Manual) instead — the two concepts play the same role, so Track
+    // replaces System in place rather than sitting in its own separate column.
+    {
+      key: 'system', label: 'System / Track', kind: 'select', w: 108,
+      keyFor: (it) => (isDrapery(it, tables) ? 'track' : 'system'),
+      opts: (it) => (isDrapery(it, tables) ? opt(draperyStyleOf(it, tables)?.hasTrack ? ['Motorized', 'Manual'] : []) : opt(o.systems)),
+      hideWhen: (it) => isDrapery(it, tables) && !draperyStyleOf(it, tables)?.hasTrack,
+    },
+    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
+    { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
+    { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
+    { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
+    { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
+    { key: 'cassette', label: 'Cassette', kind: 'check', w: 66 },
+    { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
+    { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
     { key: 'mount', label: 'Mount', kind: 'select', opts: ['Ceiling', 'Wall'], w: 90 },
-    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0', hideWhen: forRollerZebra },
+    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0' },
     { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining },
-    { key: 'track', label: 'Track', kind: 'select', opts: opt(['Motorized', 'Manual']), w: 100, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasTrack },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
@@ -189,7 +193,7 @@ const COL_HELP = {
   fabric: "Fabric / description — filtered by the table's category (edit in Lists)",
   color: 'Chain/cassette color, shared for both (edit in Lists)',
   control: 'Chain or motor + side (RH/LH)',
-  system: 'Manual or motor — add its price in Lists → Systems',
+  system: 'Roller/Zebra: Manual or motor (Lists → Systems). Drapery: Track add-on (Motorized/Manual), priced in Settings → Rates.',
   motorPrice: 'Motor charge for this line ($). Adds to the price. Empty = 0.',
   discount: 'Discount for THIS shade ($). Subtracts from its price. The quote-level discount is separate.',
   style: 'Mount/operation (IB/OB/One-way) — price in Lists → Styles',
@@ -203,7 +207,6 @@ const COL_HELP = {
   mount: 'Where the brackets mount',
   fabricPrice: 'Fabric cost ($ per yard) — Drapery lines only, drives the whole price',
   lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
-  track: 'Optional drapery track add-on, billed on top of the panel price',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
 };
 
@@ -255,10 +258,12 @@ function cell(col, item, onChange) {
     return el('td', {}, [inp]);
   }
   // select — options may be plain strings, priced objects {name, price}, or a
-  // function of the row item (table-dependent product/fabric lists)
-  const sel = el('select', { style, onchange: (e) => onChange(col.key, e.target.value) });
+  // function of the row item (table-dependent product/fabric lists). `keyFor`
+  // lets one column write to different fields per row (System vs Track).
+  const key = col.keyFor ? col.keyFor(item) : col.key;
+  const sel = el('select', { style, onchange: (e) => onChange(key, e.target.value) });
   const options = (typeof col.opts === 'function' ? col.opts(item) : col.opts).map((o) => (typeof o === 'string' ? { name: o, price: 0 } : o));
-  const cur = String(item[col.key] ?? '');
+  const cur = String(item[key] ?? '');
   if (cur && !options.some((o) => o.name === cur)) options.push({ name: cur, price: 0 }); // keep a value not in the filtered set
   for (const opt of options) {
     const label = opt.price > 0 ? `${opt.name} (${money(opt.price)})` : opt.name;
