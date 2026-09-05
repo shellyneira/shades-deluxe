@@ -105,13 +105,14 @@ export const DESC_FIELDS = [
   { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
   { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
   { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
-  { key: 'brackets', label: 'Brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? `with Brackets - ${l.isWall ? 'WALL' : 'CEILING'}` : '') },
+  // Wall vs. ceiling mount only matters to the maker — the client quote just says "with Brackets".
+  { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.isWall ? 'WALL' : 'CEILING') : ''}` : '') },
 ];
 
-export function describeLine(line, cfg) {
+export function describeLine(line, cfg, isWork) {
   return DESC_FIELDS
     .filter((f) => !cfg || cfg[f.key])
-    .map((f) => f.fmt(line))
+    .map((f) => f.fmt(line, isWork))
     .filter(Boolean)
     .join(', ');
 }

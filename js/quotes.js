@@ -151,7 +151,7 @@ function columns(o, tableNames) {
     { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
     { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
-    { key: 'isWall', label: 'Wall', kind: 'check', w: 50 },
+    { key: 'isWall', label: 'Is Wall', kind: 'check', w: 64 },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
@@ -387,7 +387,7 @@ function docText(q, s, isWork) {
   const cfg = isWork ? s.docConfig.work : s.docConfig.client;
   const t = quoteTotals(q, s);
   const rows = q.items.map((l, i) => {
-    const desc = describeLine(l, cfg);
+    const desc = describeLine(l, cfg, isWork);
     const size = isWork ? ` [${sizeText(l)}]` : '';
     const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
     return `${i + 1}. ${l.location ? l.location + ' · ' : ''}${desc}${size}${price}`;
@@ -600,7 +600,7 @@ function workTable(q, s) {
     el('td', { class: 'num' }, [String(i + 1)]),
     el('td', { class: 'strong' }, [l.location]),
     el('td', { class: 'strong' }, [sizeText(l)]),
-    el('td', { class: 'desc' }, [describeLine(l, cfg)]),
+    el('td', { class: 'desc' }, [describeLine(l, cfg, true)]),
   ]));
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),

@@ -1,7 +1,12 @@
 // Single source of truth. State lives in localStorage (instant) and syncs to
 // Supabase when configured (survives device loss, shared across devices).
 import { SEED } from './seed-data.js';
-import { dbEnabled, pullState, pushState, pullQuotes, pushQuotes, deleteQuoteRow } from './db.js';
+import {
+  dbEnabled, pullState, pushState,
+  pullQuotes, pushQuotes, deleteQuoteRow,
+  pullTables, pushTables, deleteTableRow,
+  pullLists, pushLists,
+} from './db.js';
 
 const KEY = 'shades-deluxe-v1';
 
@@ -112,16 +117,41 @@ function load() {
 }
 
 let syncTimer;
-let lastPushed = {}; // id -> JSON snapshot, so we only push quotes THIS user changed
+// id -> JSON snapshot of what we last pushed, so a sync only sends rows THIS
+// device actually changed — another device's untouched rows are left alone.
+let lastPushedQuote = {};
+let lastPushedTable = {};
+let lastPushedList = {};
+
+// Price tables/minPrice and options/customLists are split into per-row payloads
+// ({id, data}) so each table/list is its own database row (see db.js).
+function tableRows(s) {
+  return Object.entries(s.tables).map(([id, grid]) => ({ id, data: { grid, minPrice: s.minPrice[id] ?? 0 } }));
+}
+function listRows(s) {
+  return [...Object.entries(s.options).map(([id, data]) => ({ id, data })), { id: 'customLists', data: s.customLists }];
+}
+
 function scheduleSync() {
   if (!dbEnabled()) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
-    const { quotes, ...config } = state;
-    // Only push quotes that actually changed here — never overwrite another user's quote.
-    const changed = quotes.filter((q) => JSON.stringify(q) !== lastPushed[q.id]);
-    Promise.all([pushState({ ...config, quotes: [] }), pushQuotes(changed)])
-      .then(() => changed.forEach((q) => { lastPushed[q.id] = JSON.stringify(q); }))
+    const { quotes, tables, minPrice, options, customLists, ...config } = state;
+    // Only push rows that actually changed here — never overwrite another user's work.
+    const changedQuotes = quotes.filter((q) => JSON.stringify(q) !== lastPushedQuote[q.id]);
+    const changedTables = tableRows(state).filter((r) => JSON.stringify(r.data) !== lastPushedTable[r.id]);
+    const changedLists = listRows(state).filter((r) => JSON.stringify(r.data) !== lastPushedList[r.id]);
+    Promise.all([
+      pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
+      pushQuotes(changedQuotes),
+      pushTables(changedTables),
+      pushLists(changedLists),
+    ])
+      .then(() => {
+        changedQuotes.forEach((q) => { lastPushedQuote[q.id] = JSON.stringify(q); });
+        changedTables.forEach((r) => { lastPushedTable[r.id] = JSON.stringify(r.data); });
+        changedLists.forEach((r) => { lastPushedList[r.id] = JSON.stringify(r.data); });
+      })
       .catch((e) => console.warn('cloud sync failed', e));
   }, 700);
 }
@@ -131,22 +161,50 @@ export function save() {
   scheduleSync();
 }
 
+// A price table was renamed or deleted locally — remove its old row so it doesn't
+// keep reappearing on the next pull.
+export function deletePriceTableCloudRow(name) {
+  deleteTableRow(name).catch((e) => console.warn('cloud delete failed', e));
+}
+
 // Pull the shared cloud copy at startup. Returns true if remote data replaced local.
 export async function initCloud() {
   if (!dbEnabled()) return false;
   try {
-    const [remote, remoteQuotes] = await Promise.all([pullState(), pullQuotes()]);
-    if (remote || (remoteQuotes && remoteQuotes.length)) {
-      // Prefer the quotes table; fall back to quotes embedded in the old blob (migration).
+    const [remote, remoteQuotes, remoteTables, remoteLists] = await Promise.all([pullState(), pullQuotes(), pullTables(), pullLists()]);
+    if (remote || (remoteQuotes && remoteQuotes.length) || (remoteTables && remoteTables.length) || (remoteLists && remoteLists.length)) {
+      // Prefer each row-based source; fall back to the old embedded blob (one-time migration).
       const quotes = (remoteQuotes && remoteQuotes.length) ? remoteQuotes : (remote?.quotes || []);
-      state = normalize({ ...freshState(), ...(remote || {}), quotes });
+      let tables = remote?.tables, minPrice = remote?.minPrice;
+      if (remoteTables && remoteTables.length) {
+        tables = {}; minPrice = {};
+        remoteTables.forEach((r) => { tables[r.id] = r.data.grid; minPrice[r.id] = r.data.minPrice || 0; });
+      }
+      let options = remote?.options, customLists = remote?.customLists;
+      if (remoteLists && remoteLists.length) {
+        options = {}; customLists = [];
+        remoteLists.forEach((r) => { if (r.id === 'customLists') customLists = r.data; else options[r.id] = r.data; });
+      }
+      state = normalize({
+        ...freshState(), ...(remote || {}), quotes,
+        ...(tables ? { tables } : {}), ...(minPrice ? { minPrice } : {}),
+        ...(options ? { options } : {}), ...(customLists ? { customLists } : {}),
+      });
       localStorage.setItem(KEY, JSON.stringify(state));
-      (remoteQuotes || []).forEach((q) => { lastPushed[q.id] = JSON.stringify(q); }); // table rows are already synced
-      scheduleSync(); // push only quotes migrated from the old blob
+      // These rows are already synced — don't re-push them as "changed" on the next save.
+      (remoteQuotes || []).forEach((q) => { lastPushedQuote[q.id] = JSON.stringify(q); });
+      (remoteTables || []).forEach((r) => { lastPushedTable[r.id] = JSON.stringify(r.data); });
+      (remoteLists || []).forEach((r) => { lastPushedList[r.id] = JSON.stringify(r.data); });
+      scheduleSync(); // push only whatever was migrated from the old blob
       return true;
     }
     const { quotes, ...config } = state;
-    await Promise.all([pushState({ ...config, quotes: [] }), pushQuotes(quotes)]); // seed cloud from local
+    await Promise.all([
+      pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
+      pushQuotes(quotes),
+      pushTables(tableRows(state)),
+      pushLists(listRows(state)),
+    ]); // seed cloud from local
   } catch (e) {
     console.warn('cloud init failed, using local data', e);
   }

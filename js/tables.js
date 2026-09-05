@@ -2,7 +2,7 @@
 // (Roller / Zebra) so it's clear each product line carries its own values.
 // Create, rename, duplicate, delete tables and edit each width×length grid.
 import { el, mount, toast, confirmAction } from './dom.js';
-import { getState, save } from './store.js';
+import { getState, save, deletePriceTableCloudRow } from './store.js';
 
 let active = null;
 const isZebra = (name) => /zebra/i.test(name);
@@ -74,7 +74,7 @@ function tableActions(name) {
       s.tables = Object.fromEntries(Object.entries(s.tables).map(([k, v]) => [k === name ? nn : k, v]));
       s.minPrice[nn] = s.minPrice[name]; delete s.minPrice[name];
       s.quotes.forEach((q) => q.items.forEach((it) => { if (it.table === name) it.table = nn; }));
-      save(); active = nn; renderTables(); toast('Renamed');
+      save(); deletePriceTableCloudRow(name); active = nn; renderTables(); toast('Renamed');
     } }, ['✎ Rename']),
     el('button', { class: 'btn small', onclick: () => {
       let nn = name + ' copy'; let i = 2;
@@ -86,7 +86,7 @@ function tableActions(name) {
     el('button', { class: 'btn small', style: 'color:var(--danger)', onclick: () => {
       if (!confirm(`Delete the "${name}" price table? Existing quotes keep their saved prices.`)) return;
       delete s.tables[name]; delete s.minPrice[name];
-      save(); active = null; renderTables(); toast('Deleted');
+      save(); deletePriceTableCloudRow(name); active = null; renderTables(); toast('Deleted');
     } }, ['🗑 Delete']),
   ]);
 }
