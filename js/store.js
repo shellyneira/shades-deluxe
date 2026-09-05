@@ -1,6 +1,7 @@
 // Single source of truth. State lives in localStorage (instant) and syncs to
 // Supabase when configured (survives device loss, shared across devices).
 import { SEED } from './seed-data.js';
+import { DRAPERY_STYLES } from './pricing.js';
 import {
   dbEnabled, pullState, pushState,
   pullQuotes, pushQuotes, deleteQuoteRow,
@@ -23,15 +24,36 @@ const DEFAULT_COMPANY = {
 // Which fields land in each document's Description column (Settings → Documents).
 const DEFAULT_DOC_CONFIG = {
   // Client quote: no dimensions, shown with prices.
-  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true },
+  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
   // Work order: every build detail, dimensions shown, no prices.
-  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true },
+  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
   // DYMO sticker: short — product shown separately, so description = fabric + control.
-  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, fascia: false, cassette: false, sideChannel: false, brackets: false },
+  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false },
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
 const DEFAULT_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor: 0.43 };
+
+// The six drapery styles ported from the client's Excel sheet — formula-priced (see
+// pricing.js), so each is just a name + which style's compute function to use, seeded
+// once and left alone after that (existing rate edits are never overwritten).
+const DRAPERY_TABLE_NAMES = {
+  heavyFabric: 'Drapery — Heavy Fabric',
+  sheer: 'Drapery — Sheer',
+  corniceSmall: 'Drapery — Cornice (up to 12")',
+  corniceLarge: 'Drapery — Cornice (13"-24")',
+  swagJabot: 'Drapery — Swag and Jabot',
+  grommetPanel: 'Drapery — Grommet Panel',
+};
+
+function seedDrapery(state) {
+  if (!state.categories.includes('Drapery')) state.categories.push('Drapery');
+  for (const [style, name] of Object.entries(DRAPERY_TABLE_NAMES)) {
+    if (state.tables[name]) continue;
+    state.tables[name] = { category: 'Drapery', kind: 'formula', style, rates: {} };
+    state.minPrice[name] = 0;
+  }
+}
 
 function freshState() {
   return normalize({
@@ -67,6 +89,7 @@ function normalize(state) {
     if (!t.category) t.category = /zebra/i.test(name) ? 'Zebra' : 'Roller'; // one-time backfill for pre-category data
     if (!state.categories.includes(t.category)) state.categories.push(t.category);
   }
+  seedDrapery(state);
   for (const key of ['products', 'fabrics']) {
     const v = state.options[key];
     const migrated = {};
