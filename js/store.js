@@ -38,17 +38,27 @@ const DEFAULT_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor
 // pricing.js), so each is just a name + which style's compute function to use, seeded
 // once and left alone after that (existing rate edits are never overwritten).
 const DRAPERY_TABLE_NAMES = {
-  heavyFabric: 'Drapery — Heavy Fabric',
-  sheer: 'Drapery — Sheer',
-  corniceSmall: 'Drapery — Cornice (up to 12")',
-  corniceLarge: 'Drapery — Cornice (13"-24")',
-  swagJabot: 'Drapery — Swag and Jabot',
-  grommetPanel: 'Drapery — Grommet Panel',
+  heavyFabric: 'Heavy Fabric',
+  sheer: 'Sheer',
+  corniceSmall: 'Cornice (up to 12")',
+  corniceLarge: 'Cornice (13"-24")',
+  swagJabot: 'Swag and Jabot',
+  grommetPanel: 'Grommet Panel',
 };
+const OLD_DRAPERY_PREFIX = 'Drapery — '; // dropped — the category chip already says "Drapery"
 
 function seedDrapery(state) {
   if (!state.categories.includes('Drapery')) state.categories.push('Drapery');
   for (const [style, name] of Object.entries(DRAPERY_TABLE_NAMES)) {
+    const oldName = OLD_DRAPERY_PREFIX + name;
+    if (!state.tables[name] && state.tables[oldName]) {
+      // One-time rename for tables already seeded under the old prefixed name.
+      state.tables[name] = state.tables[oldName]; delete state.tables[oldName];
+      state.minPrice[name] = state.minPrice[oldName]; delete state.minPrice[oldName];
+      (state.quotes || []).forEach((q) => q.items.forEach((it) => { if (it.table === oldName) it.table = name; }));
+      deleteTableRow(oldName).catch(() => {});
+      continue;
+    }
     if (state.tables[name]) continue;
     state.tables[name] = { category: 'Drapery', kind: 'formula', style, rates: {} };
     state.minPrice[name] = 0;

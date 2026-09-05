@@ -127,11 +127,14 @@ export const tableCategory = (table, tables) => tables[table]?.category || 'Roll
 
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
-function columns(o, tables) {
+function columns(o, tables, categories) {
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
+  // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
+  // kind of table each one is, even though the table names themselves are plain.
+  const tableGroups = categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) }));
   return [
-    { key: 'table', label: 'Table', kind: 'select', opts: tableNames, w: 108 },
+    { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
     { key: 'location', label: 'Location', kind: 'select', opts: opt(o.locations), w: 116 },
     { key: 'wdNumber', label: 'W/D #', kind: 'select', opts: opt(o.wdNumbers), w: 92 },
@@ -196,6 +199,23 @@ const COL_HELP = {
 
 function cell(col, item, onChange) {
   const style = `width:${col.w}px`;
+  if (col.kind === 'tablegroup') {
+    const sel = el('select', { style, onchange: (e) => onChange(col.key, e.target.value) });
+    const cur = String(item[col.key] ?? '');
+    let found = false;
+    for (const { label, names } of col.groups) {
+      if (!names.length) continue;
+      const group = el('optgroup', { label });
+      for (const name of names) {
+        const o = el('option', { value: name }, [name]);
+        if (name === cur) { o.selected = true; found = true; }
+        group.append(o);
+      }
+      sel.append(group);
+    }
+    if (cur && !found) sel.append(el('option', { value: cur, selected: true }, [cur])); // table renamed/deleted elsewhere — keep it visible
+    return el('td', {}, [sel]);
+  }
   if (col.kind === 'check') {
     const box = el('input', { type: 'checkbox', onchange: (e) => onChange(col.key, e.target.checked) });
     box.checked = !!item[col.key];
@@ -238,7 +258,7 @@ function cell(col, item, onChange) {
 
 function sheet(q, rerender) {
   const s = getState();
-  const cols = columns(s.options, s.tables);
+  const cols = columns(s.options, s.tables, s.categories);
   const draft = q._draft || (q._draft = blankLine(s));
 
   const priceCells = []; // {getItem, node}
