@@ -217,7 +217,7 @@ export const DESC_FIELDS = [
   { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
   { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
   // Wall vs. ceiling mount only matters to the maker — the client quote just says "with Brackets".
-  { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.isWall ? 'WALL' : 'CEILING') : ''}` : '') },
+  { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.mount === 'Wall' ? 'WALL' : 'CEILING') : ''}` : '') },
   { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
   { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
 ];

@@ -108,7 +108,7 @@ function blankLine(s) {
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', fascia: false, cassette: false, sideChannel: false,
-    installation: s.defaultInstallation || '', brackets: '', isWall: false, discount: '', markup: '', motorPrice: '',
+    installation: s.defaultInstallation || '', brackets: '', mount: 'Ceiling', discount: '', markup: '', motorPrice: '',
     fabricPrice: '', lining: '', track: '',
   };
 }
@@ -125,18 +125,24 @@ function isRowEmpty(l) {
 // its own dropdown list.
 export const tableCategory = (table, tables) => tables[table]?.category || 'Roller';
 
+const isDrapery = (it, tables) => tables[it.table]?.kind === 'formula';
 // Lining/Track only mean something for the Drapery styles that actually offer them
-// (e.g. Cornice has neither) — null here means "hide the options" for this row.
-const draperyStyleOf = (it, tables) => (tables[it.table]?.kind === 'formula' ? DRAPERY_STYLES[tables[it.table].style] : null);
+// (e.g. Cornice has neither) — null here means "hide the field" for this row.
+const draperyStyleOf = (it, tables) => (isDrapery(it, tables) ? DRAPERY_STYLES[tables[it.table].style] : null);
 
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
+// `hideWhen(item)` greys a cell out for rows where the field is meaningless (e.g. Motor $
+// on a Drapery line, or Track on a Roller line) instead of leaving a control that looks
+// interactive but silently has no effect.
 function columns(o, tables, categories) {
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
   // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
   // kind of table each one is, even though the table names themselves are plain.
   const tableGroups = categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) }));
+  const forDrapery = (it) => isDrapery(it, tables);
+  const forRollerZebra = (it) => !isDrapery(it, tables);
   return [
     { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
@@ -146,24 +152,24 @@ function columns(o, tables, categories) {
     { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'height', label: 'H', kind: 'num', w: 52 },
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
-    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
+    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150, hideWhen: forDrapery },
+    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160, hideWhen: forDrapery },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
-    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
-    { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108 },
-    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
-    { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
-    { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
-    { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
-    { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
-    { key: 'cassette', label: 'Cassette', kind: 'check', w: 66 },
-    { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
-    { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
+    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86, hideWhen: forDrapery },
+    { key: 'system', label: 'System', kind: 'select', opts: opt(o.systems), w: 108, hideWhen: forDrapery },
+    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0', hideWhen: forDrapery },
+    { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96, hideWhen: forDrapery },
+    { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118, hideWhen: forDrapery },
+    { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118, hideWhen: forDrapery },
+    { key: 'fascia', label: 'Fascia', kind: 'check', w: 58, hideWhen: forDrapery },
+    { key: 'cassette', label: 'Cassette', kind: 'check', w: 66, hideWhen: forDrapery },
+    { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54, hideWhen: forDrapery },
+    { key: 'installation', label: 'Ins', kind: 'num', w: 58, hideWhen: forDrapery },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
-    { key: 'isWall', label: 'Is Wall', kind: 'check', w: 64 },
-    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0' },
-    { key: 'lining', label: 'Lining', kind: 'select', opts: (it) => opt(draperyStyleOf(it, tables)?.hasLining ? ['Lining', 'Lining + Interlining'] : []), w: 130 },
-    { key: 'track', label: 'Track', kind: 'select', opts: (it) => opt(draperyStyleOf(it, tables)?.hasTrack ? ['Motorized', 'Manual'] : []), w: 100 },
+    { key: 'mount', label: 'Mount', kind: 'select', opts: ['Ceiling', 'Wall'], w: 90 },
+    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0', hideWhen: forRollerZebra },
+    { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining },
+    { key: 'track', label: 'Track', kind: 'select', opts: opt(['Motorized', 'Manual']), w: 100, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasTrack },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];
@@ -194,7 +200,7 @@ const COL_HELP = {
   sideChannel: 'Add side channels (auto, per-foot ×2 in Settings → Rates)',
   installation: 'Installation/labor $ (default in Settings → Rates)',
   brackets: 'Brackets $',
-  isWall: 'Bracket mount — checked = Wall, unchecked = Ceiling',
+  mount: 'Where the brackets mount',
   fabricPrice: 'Fabric cost ($ per yard) — Drapery lines only, drives the whole price',
   lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
   track: 'Optional drapery track add-on, billed on top of the panel price',
@@ -203,6 +209,9 @@ const COL_HELP = {
 
 function cell(col, item, onChange) {
   const style = `width:${col.w}px`;
+  if (col.hideWhen && col.hideWhen(item)) {
+    return el('td', { class: 'c', style, title: 'Not applicable to this line' }, [el('span', { class: 'muted' }, ['—'])]);
+  }
   if (col.kind === 'tablegroup') {
     const sel = el('select', { style, onchange: (e) => onChange(col.key, e.target.value) });
     const cur = String(item[col.key] ?? '');

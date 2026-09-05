@@ -151,6 +151,12 @@ function normalize(state) {
   state.nextInvoiceNumber = Number(state.nextInvoiceNumber) || 2001;
   // Migrate legacy status/payment into the single lifecycle stage.
   (state.quotes || []).forEach((q) => {
+    // Bracket mount used to be an "Is Wall" checkbox — now a plain Ceiling/Wall dropdown.
+    (q.items || []).forEach((it) => {
+      if (it.isWall !== undefined && it.mount === undefined) it.mount = it.isWall ? 'Wall' : 'Ceiling';
+      delete it.isWall;
+      if (it.mount === undefined) it.mount = 'Ceiling';
+    });
     if (!q.stage) {
       q.stage = q.payment === 'Paid' ? '100% Paid'
         : q.payment === '50% paid' ? '50% Paid'
