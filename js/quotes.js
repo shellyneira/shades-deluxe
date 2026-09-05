@@ -1,7 +1,7 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2 } from './pricing.js';
+import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -125,6 +125,10 @@ function isRowEmpty(l) {
 // its own dropdown list.
 export const tableCategory = (table, tables) => tables[table]?.category || 'Roller';
 
+// Lining/Track only mean something for the Drapery styles that actually offer them
+// (e.g. Cornice has neither) — null here means "hide the options" for this row.
+const draperyStyleOf = (it, tables) => (tables[it.table]?.kind === 'formula' ? DRAPERY_STYLES[tables[it.table].style] : null);
+
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
 function columns(o, tables, categories) {
@@ -158,8 +162,8 @@ function columns(o, tables, categories) {
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
     { key: 'isWall', label: 'Is Wall', kind: 'check', w: 64 },
     { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0' },
-    { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130 },
-    { key: 'track', label: 'Track', kind: 'select', opts: opt(['Motorized', 'Manual']), w: 100 },
+    { key: 'lining', label: 'Lining', kind: 'select', opts: (it) => opt(draperyStyleOf(it, tables)?.hasLining ? ['Lining', 'Lining + Interlining'] : []), w: 130 },
+    { key: 'track', label: 'Track', kind: 'select', opts: (it) => opt(draperyStyleOf(it, tables)?.hasTrack ? ['Motorized', 'Manual'] : []), w: 100 },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
   ];

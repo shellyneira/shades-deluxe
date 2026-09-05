@@ -72,8 +72,8 @@ export function lookupListPrice(table, width, widthFrac, height, heightFrac) {
 // editable number per style (Price Tables), not a fixed sheet formula — defaults
 // reflect the business's own re-check of these numbers, not the original sheet.
 export const DRAPERY_STYLES = {
-  heavyFabric: { label: 'Heavy Fabric', hasLining: true, hasTrack: true, rates: { fullness: 3, fabricWidth: 110, fabricTaxPct: 7, laborNoLining: 18, laborLining: 22, laborInterlining: 26, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.2, trackManualPerFoot: 1, trackManualMarkup: 1.25 } },
-  sheer: { label: 'Sheer', hasLining: false, hasTrack: true, rates: { fullness: 2.5, fabricWidth: 110, fabricTaxPct: 0, laborNoLining: 18, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.2, trackManualPerFoot: 1, trackManualMarkup: 1.25 } },
+  heavyFabric: { label: 'Heavy Fabric', hasLining: true, hasTrack: true, rates: { fullness: 3, fabricWidth: 110, fabricTaxPct: 7, laborNoLining: 18, laborLining: 22, laborInterlining: 26, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.3, trackManualPerFoot: 1, trackManualMarkup: 1.3 } },
+  sheer: { label: 'Sheer', hasLining: false, hasTrack: true, rates: { fullness: 2.5, fabricWidth: 110, fabricTaxPct: 0, laborNoLining: 18, installPerFoot: 10, sellMultiplier: 1.5, trackMotorPerFoot: 2.5, trackMotorMarkup: 1.3, trackManualPerFoot: 1, trackManualMarkup: 1.3 } },
   corniceSmall: { label: 'Cornice (up to 12")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 20.5, sellMultiplier: 1.5 } },
   corniceLarge: { label: 'Cornice (13"-24")', hasLining: false, hasTrack: false, rates: { laborPerFoot: 22, sellMultiplier: 1.5 } },
   swagJabot: { label: 'Swag and Jabot', hasLining: false, hasTrack: false, rates: { laborPerFoot: 15, sellMultiplier: 1.5 } },
