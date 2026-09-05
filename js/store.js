@@ -1,7 +1,7 @@
 // Single source of truth. State lives in localStorage (instant) and syncs to
 // Supabase when configured (survives device loss, shared across devices).
 import { SEED } from './seed-data.js';
-import { DRAPERY_STYLES } from './pricing.js';
+import { DRAPERY_STYLES, DEFAULT_TRACK_RATES } from './pricing.js';
 import {
   dbEnabled, pullState, pushState,
   pullQuotes, pushQuotes, deleteQuoteRow,
@@ -32,7 +32,9 @@ const DEFAULT_DOC_CONFIG = {
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
-const DEFAULT_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor: 0.43 };
+// Drapery track hardware (Motor/Manual) lives here too, not per drapery style —
+// it's the same physical part regardless of which style it's attached to.
+const DEFAULT_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor: 0.43, ...DEFAULT_TRACK_RATES };
 
 // The six drapery styles ported from the client's Excel sheet — formula-priced (see
 // pricing.js), so each is just a name + which style's compute function to use, seeded
@@ -46,6 +48,7 @@ const DRAPERY_TABLE_NAMES = {
   grommetPanel: 'Grommet Panel',
 };
 const OLD_DRAPERY_PREFIX = 'Drapery — '; // dropped — the category chip already says "Drapery"
+const round1 = (n) => Math.round(n * 10) / 10;
 
 function seedDrapery(state) {
   if (!state.categories.includes('Drapery')) state.categories.push('Drapery');
@@ -62,6 +65,24 @@ function seedDrapery(state) {
     if (state.tables[name]) continue;
     state.tables[name] = { category: 'Drapery', kind: 'formula', style, rates: {} };
     state.minPrice[name] = 0;
+  }
+  // One-time migrations for tables already created under older field names.
+  for (const table of Object.values(state.tables)) {
+    if (table.category !== 'Drapery' || !table.rates) continue;
+    if (table.rates.sellMultiplier != null) {
+      table.rates.markupPct = round1((table.rates.sellMultiplier - 1) * 100);
+      delete table.rates.sellMultiplier;
+    }
+    // Track used to live per-style; fold any customized value into the shared
+    // Settings rate (first one found wins) and drop the now-unused per-style copy.
+    for (const [oldKey, newKey, isMarkup] of [
+      ['trackMotorPerFoot', 'trackMotorPerFoot', false], ['trackMotorMarkup', 'trackMotorMarkupPct', true],
+      ['trackManualPerFoot', 'trackManualPerFoot', false], ['trackManualMarkup', 'trackManualMarkupPct', true],
+    ]) {
+      if (table.rates[oldKey] == null) continue;
+      if (state.rates[newKey] === DEFAULT_TRACK_RATES[newKey]) state.rates[newKey] = isMarkup ? round1((table.rates[oldKey] - 1) * 100) : table.rates[oldKey];
+      delete table.rates[oldKey];
+    }
   }
 }
 
@@ -99,7 +120,8 @@ function normalize(state) {
     if (!t.category) t.category = /zebra/i.test(name) ? 'Zebra' : 'Roller'; // one-time backfill for pre-category data
     if (!state.categories.includes(t.category)) state.categories.push(t.category);
   }
-  seedDrapery(state);
+  state.rates = { ...DEFAULT_RATES, ...(state.rates || {}) };
+  seedDrapery(state); // reads/writes state.rates for the track-rate migration below
   for (const key of ['products', 'fabrics']) {
     const v = state.options[key];
     const migrated = {};
@@ -116,7 +138,6 @@ function normalize(state) {
     state.options[key] = migrated;
   }
   for (const key of FLAT_PRICED_LISTS) state.options[key] = toPriced(state.options[key]);
-  state.rates = { ...DEFAULT_RATES, ...(state.rates || {}) };
   state.minimumOrder = Number(state.minimumOrder) || 0;
   state.defaultInstallation = Number(state.defaultInstallation) || 0;
   state.taxRate = state.taxRate == null ? 7 : Number(state.taxRate) || 0;

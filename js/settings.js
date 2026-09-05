@@ -2,7 +2,7 @@
 import { el, mount, input, toast, confirmAction } from './dom.js';
 import { getState, save, exportJSON, importJSON, resetToDefaults } from './store.js';
 import { dbEnabled } from './db.js';
-import { DESC_FIELDS } from './pricing.js';
+import { DESC_FIELDS, TRACK_RATE_LABELS } from './pricing.js';
 
 // Two checkbox columns controlling what each document's Description includes.
 function documentsPanel(s) {
@@ -75,6 +75,14 @@ function ratesPanel(s) {
         box.checked = s.showInstall !== false;
         return el('label', { class: 'field', style: 'flex:1 1 200px' }, [labelSpan('Installation on invoice'), el('label', { class: 'field check', style: 'margin-top:6px' }, [box, 'Show installation as its own line (client invoice)'])]);
       })(),
+    ]),
+    el('h3', { style: 'margin:20px 0 4px' }, ['Drapery track']),
+    el('p', { class: 'muted', style: 'margin:0 0 10px' }, ['Same Motorized/Manual track hardware regardless of drapery style, so it lives here once instead of on every style.']),
+    el('div', { class: 'row' }, [
+      num(TRACK_RATE_LABELS.trackMotorPerFoot, 'trackMotorPerFoot', 'Cost = width ÷ 12 × this rate.'),
+      num(TRACK_RATE_LABELS.trackMotorMarkupPct, 'trackMotorMarkupPct', 'Sell price = cost × (1 + this ÷ 100).'),
+      num(TRACK_RATE_LABELS.trackManualPerFoot, 'trackManualPerFoot', 'Cost = width ÷ 12 × this rate.'),
+      num(TRACK_RATE_LABELS.trackManualMarkupPct, 'trackManualMarkupPct', 'Sell price = cost × (1 + this ÷ 100).'),
     ]),
   ]);
 }
