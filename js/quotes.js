@@ -278,7 +278,9 @@ function sheet(q, rerender) {
 
   const makeRow = (item, { draftRow } = {}) => {
     // Changing the table refilters the Product/Description options, so rebuild the row.
-    const onChange = (key, val) => { item[key] = val; if (!draftRow) save(); recalc(); if (key === 'table') rerender(); };
+    // Save on every keystroke, draft row included — otherwise a refresh (or a browser
+    // that never gets to "Add line") silently loses whatever was typed into it.
+    const onChange = (key, val) => { item[key] = val; save(); recalc(); if (key === 'table') rerender(); };
     const priceNode = el('strong', {}, ['—']);
     const priceTd = el('td', { class: 'r price' }, [priceNode]);
     const clientNode = el('span', {}, ['—']);
