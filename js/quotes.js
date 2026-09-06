@@ -80,6 +80,7 @@ function editor(q) {
       input('Address', q.client.address, (v) => set(() => (q.client.address = v)), { class: 'grow' }),
       input('Quote date', q.date, (v) => set(() => (q.date = v)), { type: 'date' }),
       input('Install date', q.installDate, (v) => set(() => (q.installDate = v)), { type: 'date' }),
+      input('Delivery date', q.deliveryDate, (v) => set(() => (q.deliveryDate = v)), { type: 'date' }),
       select('Stage', STAGES, q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
     ]),
   ]);
@@ -449,7 +450,7 @@ function docText(q, s, isWork) {
   const cfg = isWork ? s.docConfig.work : s.docConfig.client;
   const t = quoteTotals(q, s);
   const rows = q.items.map((l, i) => {
-    const desc = describeLine(l, cfg, isWork);
+    const desc = describeLine(l, cfg, isWork, false, s.tables);
     const size = isWork ? ` [${sizeText(l)}]` : '';
     const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
     return `${i + 1}. ${l.location ? l.location + ' · ' : ''}${desc}${size}${price}`;
@@ -530,9 +531,15 @@ function invoice(q) {
         meta(isWork ? 'Order #' : (isInvoiceStage(q.stage) ? 'Invoice #' : 'Quote #'), String(isInvoiceStage(q.stage) && q.invoiceNumber ? q.invoiceNumber : q.number)),
         meta('Date', q.date || '—'),
         q.installDate ? meta('Install', q.installDate) : null,
+        q.deliveryDate ? meta('Delivery', q.deliveryDate) : null,
       ]),
     ]),
   ]);
+
+  // The maker needs this to jump out at a glance — a small meta row isn't enough.
+  const deliveryBanner = isWork && q.deliveryDate
+    ? el('div', { class: 'delivery-banner' }, [el('span', {}, ['DELIVERY DATE: ']), el('strong', {}, [q.deliveryDate])])
+    : null;
 
   const bill = el('div', { class: 'parties' }, [
     el('div', { class: 'bill' }, [
@@ -549,7 +556,7 @@ function invoice(q) {
   const table = el('div', { class: 'inv-scroll' }, [isWork ? workTable(q, s) : clientTable(q, s)]);
 
   const doc = el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
-    head, bill, table,
+    head, deliveryBanner, bill, table,
     isWork ? null : (() => {
       // Whole-dollar, adds up: products (install broken out if enabled) + install + tax.
       const showInstall = s.showInstall !== false;
@@ -591,7 +598,7 @@ function labelsView(q, s) {
       el('div', { class: 'dl-text' }, [
         el('div', { class: 'dl-name' }, [q.client.name || '']),
         el('div', { class: 'dl-loc' }, [l.location || '']),
-        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true)].filter(Boolean).join(' — ')]),
+        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true, s.tables)].filter(Boolean).join(' — ')]),
         el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
       ]),
       el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),
@@ -641,7 +648,7 @@ function clientTable(q, s) {
     return el('tr', {}, [
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
-      el('td', { class: 'desc' }, [describeLine(l, cfg)]),
+      el('td', { class: 'desc' }, [describeLine(l, cfg, false, false, s.tables)]),
       el('td', { class: 'num' }, [money0(shownUnit)]),
       el('td', { class: 'num strong' }, [money0(roundWhole(shownUnit) * qty)]),
     ]);
@@ -662,7 +669,7 @@ function workTable(q, s) {
     el('td', { class: 'num' }, [String(i + 1)]),
     el('td', { class: 'strong' }, [l.location]),
     el('td', { class: 'strong' }, [sizeText(l)]),
-    el('td', { class: 'desc' }, [describeLine(l, cfg, true)]),
+    el('td', { class: 'desc' }, [describeLine(l, cfg, true, false, s.tables)]),
   ]));
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),

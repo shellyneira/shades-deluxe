@@ -307,6 +307,7 @@ export function newQuote() {
     number: state.nextQuoteNumber++,
     date: new Date().toISOString().slice(0, 10),
     installDate: '',
+    deliveryDate: '',
     client: { name: '', address: '', phone: '', email: '' },
     discount: 0,
     stage: 'Quote',      // Quote → Sent → Accepted → Deposit Paid → Paid

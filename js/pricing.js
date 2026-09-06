@@ -219,7 +219,11 @@ function controlText(ctrl) {
 // Every field that can go into a document's Description, in display order.
 // Settings → Documents lets the user toggle each per document (Client vs Work order).
 export const DESC_FIELDS = [
-  { key: 'table', label: 'Shade type', fmt: (l) => l.table },
+  // Roller/Zebra: the table name (Roller #3, Zebra #5...) is an internal price-tier
+  // label, not something to print — Product/Fabric already say what it is. Drapery has
+  // neither of those fields, so its table name (the style, e.g. "Heavy Fabric") is the
+  // only thing that says what the line even is — keep it there.
+  { key: 'table', label: 'Shade type', fmt: (l, isWork, compact, tables) => (tables?.[l.table]?.kind === 'formula' ? l.table : '') },
   { key: 'product', label: 'Product', fmt: (l) => l.product },
   { key: 'fabric', label: 'Fabric', fmt: (l) => l.fabric },
   { key: 'color', label: 'Color', fmt: (l) => l.color },
@@ -242,10 +246,10 @@ export const DESC_FIELDS = [
   { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
 ];
 
-export function describeLine(line, cfg, isWork, compact) {
+export function describeLine(line, cfg, isWork, compact, tables) {
   return DESC_FIELDS
     .filter((f) => !cfg || cfg[f.key])
-    .map((f) => f.fmt(line, isWork, compact))
+    .map((f) => f.fmt(line, isWork, compact, tables))
     .filter(Boolean)
     .join(', ');
 }
