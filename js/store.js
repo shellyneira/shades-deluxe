@@ -25,8 +25,11 @@ const DEFAULT_COMPANY = {
 const DEFAULT_DOC_CONFIG = {
   // Client quote: no dimensions, shown with prices.
   client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
-  // Work order: every build detail, dimensions shown, no prices.
-  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
+  // Work order: every build detail, dimensions shown, no prices. Shade Type off —
+  // that's an internal price-tier name, not something to reveal (Product/Fabric
+  // already say what it is, and the client shouldn't be able to shop the exact tier
+  // elsewhere).
+  work: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
   // DYMO sticker: short — product shown separately, so description = fabric + control.
   label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false },
 };
@@ -147,6 +150,9 @@ function normalize(state) {
   for (const doc of ['client', 'work', 'label']) {
     state.docConfig[doc] = { ...DEFAULT_DOC_CONFIG[doc], ...(state.docConfig[doc] || {}) };
   }
+  state.docConfig.work.table = false; // one-time: Shade Type briefly defaulted on for Work Order — turn it back off
+
+
   state.customLists = (state.customLists || []).map((l) => ({ name: l.name, items: toPriced(l.items) }));
   state.nextInvoiceNumber = Number(state.nextInvoiceNumber) || 2001;
   // Migrate legacy status/payment into the single lifecycle stage.

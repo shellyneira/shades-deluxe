@@ -150,8 +150,8 @@ function columns(o, tables, categories) {
     { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'height', label: 'H', kind: 'num', w: 52 },
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150, hideWhen: forDrapery },
-    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160, hideWhen: forDrapery },
+    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
+    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
     // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
     // (Motorized/Manual) instead — the two concepts play the same role, so Track
@@ -163,7 +163,7 @@ function columns(o, tables, categories) {
       hideWhen: (it) => isDrapery(it, tables) && !draperyStyleOf(it, tables)?.hasTrack,
     },
     { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
-    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0', hideWhen: forDrapery }, // Track (above) + Extra +$ already cover this for Drapery
+    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
     { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
     { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
@@ -450,7 +450,7 @@ function docText(q, s, isWork) {
   const cfg = isWork ? s.docConfig.work : s.docConfig.client;
   const t = quoteTotals(q, s);
   const rows = q.items.map((l, i) => {
-    const desc = describeLine(l, cfg, isWork, false, s.tables);
+    const desc = describeLine(l, cfg, isWork);
     const size = isWork ? ` [${sizeText(l)}]` : '';
     const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
     return `${i + 1}. ${l.location ? l.location + ' · ' : ''}${desc}${size}${price}`;
@@ -598,7 +598,7 @@ function labelsView(q, s) {
       el('div', { class: 'dl-text' }, [
         el('div', { class: 'dl-name' }, [q.client.name || '']),
         el('div', { class: 'dl-loc' }, [l.location || '']),
-        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true, s.tables)].filter(Boolean).join(' — ')]),
+        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true)].filter(Boolean).join(' — ')]),
         el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
       ]),
       el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),
@@ -648,7 +648,7 @@ function clientTable(q, s) {
     return el('tr', {}, [
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
-      el('td', { class: 'desc' }, [describeLine(l, cfg, false, false, s.tables)]),
+      el('td', { class: 'desc' }, [describeLine(l, cfg)]),
       el('td', { class: 'num' }, [money0(shownUnit)]),
       el('td', { class: 'num strong' }, [money0(roundWhole(shownUnit) * qty)]),
     ]);
@@ -669,7 +669,7 @@ function workTable(q, s) {
     el('td', { class: 'num' }, [String(i + 1)]),
     el('td', { class: 'strong' }, [l.location]),
     el('td', { class: 'strong' }, [sizeText(l)]),
-    el('td', { class: 'desc' }, [describeLine(l, cfg, true, false, s.tables)]),
+    el('td', { class: 'desc' }, [describeLine(l, cfg, true)]),
   ]));
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),
