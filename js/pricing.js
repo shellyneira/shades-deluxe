@@ -105,10 +105,21 @@ export const TRACK_RATE_LABELS = {
   trackManualMarkupPct: 'Manual track markup (%)',
 };
 
+// Installation for Heavy Fabric/Sheer scales with width, so unlike Roller's flat
+// Settings default, its "auto" value has to be computed from the line — exposed here
+// so the worksheet can preview it as a placeholder before anyone overrides it.
+export function draperyAutoInstall(line, table) {
+  const def = DRAPERY_STYLES[table?.style];
+  if (!def || (table.style !== 'heavyFabric' && table.style !== 'sheer')) return 0;
+  const rates = { ...def.rates, ...(table.rates || {}) };
+  return round2(((Number(line.width) || 0) / 12) * rates.installPerFoot);
+}
+
 // Heavy Fabric / Sheer: fullness × width ÷ fabric width = panels, panels × (height + 12) ÷ 36 = yards.
 // `track` (global, Settings → Rates) covers the Motorized/Manual track add-on — same
-// physical hardware regardless of style, so it isn't duplicated into `rates`.
-function computePanelDrapery(line, rates, hasLining, track) {
+// physical hardware regardless of style, so it isn't duplicated into `rates`. Installation
+// auto-computes like Roller's default, but — also like Roller — a typed value overrides it.
+function computePanelDrapery(line, rates, hasLining, track, table) {
   const w = Number(line.width) || 0, h = Number(line.height) || 0, price = Number(line.fabricPrice) || 0;
   if (!w || !h || !price) return null;
   const panels = Math.ceil((w * rates.fullness) / rates.fabricWidth);
@@ -118,7 +129,7 @@ function computePanelDrapery(line, rates, hasLining, track) {
     ? (line.lining === 'Lining + Interlining' ? rates.laborInterlining : line.lining === 'Lining' ? rates.laborLining : rates.laborNoLining)
     : rates.laborNoLining;
   const labor = ((w + h) / 36) * laborRate;
-  const installation = (w / 12) * rates.installPerFoot;
+  const installation = line.installation !== '' && line.installation != null ? Number(line.installation) : draperyAutoInstall(line, table);
   const base = fabricCost + labor;
   let unit = base * (1 + rates.markupPct / 100) + installation;
   let cost = base + installation;
@@ -127,15 +138,18 @@ function computePanelDrapery(line, rates, hasLining, track) {
   return { installation, unit, cost };
 }
 
-// Cornice / Swag & Jabot: yards = (width + drop) ÷ 36, labor = width ÷ 12 × rate.
+// Cornice / Swag & Jabot: yards = (width + drop) ÷ 36, labor = width ÷ 12 × rate. No install
+// formula exists for these (none in the original sheet) — Ins works like Brackets: pure
+// manual entry, $0 unless typed.
 function computeLinearDrapery(line, rates) {
   const w = Number(line.width) || 0, h = Number(line.height) || 0, price = Number(line.fabricPrice) || 0;
   if (!w || !h || !price) return null;
   const yards = (w + h) / 36;
   const fabricCost = price * yards;
   const labor = (w / 12) * rates.laborPerFoot;
+  const installation = Number(line.installation) || 0;
   const base = fabricCost + labor;
-  return { installation: 0, unit: base * (1 + rates.markupPct / 100), cost: base };
+  return { installation, unit: base * (1 + rates.markupPct / 100) + installation, cost: base + installation };
 }
 
 // Grommet Panel: its own panel-count formula (half-width + fixed allowance, per side).
@@ -148,15 +162,16 @@ function computeGrommetDrapery(line, rates) {
   const fabricCost = price * rates.fabricWasteFactor * yards;
   const laborRate = line.lining === 'Lining' ? rates.laborLining : rates.laborNoLining;
   const labor = ((w + h) / 36) * laborRate;
+  const installation = Number(line.installation) || 0;
   const base = fabricCost + labor;
-  return { installation: 0, unit: base * (1 + rates.markupPct / 100), cost: base };
+  return { installation, unit: base * (1 + rates.markupPct / 100) + installation, cost: base + installation };
 }
 
 function computeDraperyLine(line, table, state) {
   const def = DRAPERY_STYLES[table.style];
   if (!def) return null;
   const rates = { ...def.rates, ...(table.rates || {}) };
-  if (table.style === 'heavyFabric' || table.style === 'sheer') return computePanelDrapery(line, rates, def.hasLining, { ...DEFAULT_TRACK_RATES, ...(state.rates || {}) });
+  if (table.style === 'heavyFabric' || table.style === 'sheer') return computePanelDrapery(line, rates, def.hasLining, { ...DEFAULT_TRACK_RATES, ...(state.rates || {}) }, table);
   if (table.style === 'grommetPanel') return computeGrommetDrapery(line, rates);
   return computeLinearDrapery(line, rates); // Cornice (both sizes), Swag & Jabot
 }
@@ -208,8 +223,11 @@ export const DESC_FIELDS = [
   { key: 'product', label: 'Product', fmt: (l) => l.product },
   { key: 'fabric', label: 'Fabric', fmt: (l) => l.fabric },
   { key: 'color', label: 'Color', fmt: (l) => l.color },
-  { key: 'control', label: 'Control', fmt: (l) => controlText(l.control) },
+  // System/Track share the worksheet's merged column, so they sit together here too,
+  // ahead of Control — matches that column's position (left of Ctrl) on the worksheet.
   { key: 'system', label: 'System', fmt: (l) => (l.system ? l.system.replace('Batt.', 'Battery') : '') },
+  { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
+  { key: 'control', label: 'Control', fmt: (l) => controlText(l.control) },
   { key: 'style', label: 'Style', fmt: (l) => l.style },
   { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : '') },
   { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : '') },
@@ -219,7 +237,6 @@ export const DESC_FIELDS = [
   // Wall vs. ceiling mount only matters to the maker — the client quote just says "with Brackets".
   { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.mount === 'Wall' ? 'WALL' : 'CEILING') : ''}` : '') },
   { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
-  { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
 ];
 
 export function describeLine(line, cfg, isWork) {

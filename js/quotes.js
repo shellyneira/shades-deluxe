@@ -1,7 +1,7 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES } from './pricing.js';
+import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -152,7 +152,6 @@ function columns(o, tables, categories) {
     { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150, hideWhen: forDrapery },
     { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160, hideWhen: forDrapery },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
-    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
     // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
     // (Motorized/Manual) instead — the two concepts play the same role, so Track
     // replaces System in place rather than sitting in its own separate column.
@@ -162,14 +161,19 @@ function columns(o, tables, categories) {
       opts: (it) => (isDrapery(it, tables) ? opt(draperyStyleOf(it, tables)?.hasTrack ? ['Motorized', 'Manual'] : []) : opt(o.systems)),
       hideWhen: (it) => isDrapery(it, tables) && !draperyStyleOf(it, tables)?.hasTrack,
     },
-    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
+    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
+    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0', hideWhen: forDrapery }, // Track (above) + Extra +$ already cover this for Drapery
     { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
     { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
     { key: 'cassette', label: 'Cassette', kind: 'check', w: 66 },
     { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
-    { key: 'installation', label: 'Ins', kind: 'num', w: 58 },
+    // Roller: pre-filled from Settings' default, then a plain override from then on.
+    // Drapery Heavy/Sheer: same idea, but the "default" is a live formula (scales with
+    // width) shown as a placeholder — leave it blank to use it, type a number to override.
+    // Drapery Cornice/Swag/Grommet: no formula exists, so it behaves exactly like Brackets.
+    { key: 'installation', label: 'Ins', kind: 'num', w: 58, placeholder: (it) => String(draperyAutoInstall(it, tables[it.table]) || '0') },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
     { key: 'mount', label: 'Mount', kind: 'select', opts: ['Ceiling', 'Wall'], w: 90 },
     { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0' },
@@ -247,13 +251,15 @@ function cell(col, item, onChange) {
     return el('td', {}, [sel]);
   }
   if (col.kind === 'num') {
+    const placeholder = typeof col.placeholder === 'function' ? col.placeholder(item) : (col.placeholder || '');
     const inp = el('input', {
-      type: 'number', value: item[col.key] ?? '', style, class: 'r', min: '0', step: 'any', placeholder: col.placeholder || '',
+      type: 'number', value: item[col.key] ?? '', style, class: 'r', min: '0', step: 'any', placeholder,
       oninput: (e) => {
         if (e.target.value !== '' && Number(e.target.value) < 0) e.target.value = '0'; // no negative sizes/costs
         onChange(col.key, e.target.value);
       },
     });
+    if (col.placeholder && typeof col.placeholder === 'function') inp.dataset.liveInsPlaceholder = col.key; // recalc() refreshes this as width changes
     if (col.prefix) return el('td', {}, [el('div', { style: 'display:flex;align-items:center;gap:2px' }, [el('span', { style: 'color:var(--danger);font-weight:800' }, [col.prefix]), inp])]);
     return el('td', {}, [inp]);
   }
@@ -280,9 +286,11 @@ function sheet(q, rerender) {
   const draft = q._draft || (q._draft = blankLine(s));
 
   const priceCells = []; // {getItem, node}
+  const insCells = []; // {item, input} — Drapery's live "auto install" placeholder
   const totalsRefs = {};
 
   const recalc = () => {
+    for (const { item, input } of insCells) input.placeholder = String(draperyAutoInstall(item, s.tables[item.table]) || '0');
     for (const p of priceCells) {
       const c = computeLine(p.item, s);
       const hasDims = p.item.width && p.item.height;
@@ -333,6 +341,8 @@ function sheet(q, rerender) {
     const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
     priceCells.push({ item, node: priceNode, td: priceTd, client: clientNode });
     const cells = cols.map((col) => cell(col, item, onChange));
+    const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
+    if (insInput) insCells.push({ item, input: insInput });
     cells.push(priceTd);
     cells.push(clientTd);
     if (draftRow) {
