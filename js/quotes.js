@@ -591,7 +591,7 @@ function labelsView(q, s) {
       el('div', { class: 'dl-text' }, [
         el('div', { class: 'dl-name' }, [q.client.name || '']),
         el('div', { class: 'dl-loc' }, [l.location || '']),
-        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg)].filter(Boolean).join(' — ')]),
+        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true)].filter(Boolean).join(' — ')]),
         el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
       ]),
       el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),

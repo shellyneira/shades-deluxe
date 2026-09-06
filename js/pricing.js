@@ -234,16 +234,18 @@ export const DESC_FIELDS = [
   { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : '') },
   { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
   { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
-  { key: 'sideChannel', label: 'Side channels', fmt: (l) => (l.sideChannel ? 'with Side Channels' : '') },
+  // `compact` is only set for DYMO labels — the sticker is tiny, so this one gets an
+  // abbreviation there while Client Quote/Work Order keep the full word.
+  { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with S/CH' : 'with Side Channels') : '') },
   // Wall vs. ceiling mount only matters to the maker — the client quote just says "with Brackets".
   { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.mount === 'Wall' ? 'WALL' : 'CEILING') : ''}` : '') },
   { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
 ];
 
-export function describeLine(line, cfg, isWork) {
+export function describeLine(line, cfg, isWork, compact) {
   return DESC_FIELDS
     .filter((f) => !cfg || cfg[f.key])
-    .map((f) => f.fmt(line, isWork))
+    .map((f) => f.fmt(line, isWork, compact))
     .filter(Boolean)
     .join(', ');
 }
