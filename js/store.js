@@ -24,11 +24,11 @@ const DEFAULT_COMPANY = {
 // Which fields land in each document's Description column (Settings → Documents).
 const DEFAULT_DOC_CONFIG = {
   // Client quote: no dimensions, shown with prices.
-  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
+  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
   // Work order: every build detail, dimensions shown, no prices.
-  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
+  work: { table: true, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
   // DYMO sticker: short — product shown separately, so description = fabric + control.
-  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false },
+  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false },
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.

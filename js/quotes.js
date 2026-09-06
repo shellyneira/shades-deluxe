@@ -107,7 +107,7 @@ function blankLine(s) {
     table: Object.keys(s.tables)[0], qty: 1, location: '', wdNumber: '',
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
-    headrail: '', bottomRail: '', fascia: false, cassette: false, sideChannel: false,
+    headrail: '', bottomRail: '', reverse: false, fascia: false, cassette: false, sideChannel: false,
     installation: s.defaultInstallation || '', brackets: '', mount: 'Ceiling', discount: '', markup: '', motorPrice: '',
     fabricPrice: '', lining: '', track: '',
   };
@@ -116,7 +116,7 @@ function blankLine(s) {
 // A draft row is "empty" if nothing but the default table is set (so clearing needs no confirm).
 function isRowEmpty(l) {
   return !l.width && !l.height && !l.location && !l.wdNumber && !l.product && !l.fabric &&
-    !l.color && !l.control && !l.system && !l.style && !l.headrail && !l.bottomRail &&
+    !l.color && !l.control && !l.system && !l.style && !l.headrail && !l.bottomRail && !l.reverse &&
     !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets && !l.fabricPrice;
 }
 
@@ -166,6 +166,9 @@ function columns(o, tables, categories) {
     { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
     { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
     { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
+    // Reverse roll: the fabric comes off the back of the tube instead of the front.
+    // A Roller/Zebra build detail only — no such thing on Drapery.
+    { key: 'reverse', label: 'Reverse', kind: 'check', w: 66, hideWhen: forDrapery },
     { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
     { key: 'cassette', label: 'Cassette', kind: 'check', w: 66 },
     { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
@@ -203,6 +206,7 @@ const COL_HELP = {
   style: 'Mount/operation (IB/OB/One-way) — price in Lists → Styles',
   headrail: 'Headrail — price in Lists → Headrails',
   bottomRail: 'Bottom rail — price in Lists → Headrails',
+  reverse: 'Reverse roll — fabric comes off the back of the tube instead of the front',
   fascia: 'Add fascia (auto, per-foot rate in Settings → Rates)',
   cassette: 'Add cassette (auto, per-foot rate in Settings → Rates)',
   sideChannel: 'Add side channels (auto, per-foot ×2 in Settings → Rates)',
