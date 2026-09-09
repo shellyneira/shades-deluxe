@@ -387,6 +387,19 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
   user-select: none;
 }
 .presence-bar .avatar + .avatar { margin-left: -8px; }
+
+/* The "someone is here" signal: a halo that swells and fades out of the avatar,
+   about the pace of a calm breath. Live sync needs no words when it is working. */
+.avatar.breathing { animation: avatar-breathe 3s ease-in-out infinite; }
+@keyframes avatar-breathe {
+  0%, 100% { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px color-mix(in srgb, var(--who) 55%, transparent); }
+  50%      { box-shadow: 0 0 0 2px var(--panel), 0 0 0 8px color-mix(in srgb, var(--who) 0%, transparent); }
+}
+/* Stacked avatars would clip each other's halo without a stacking context. */
+.presence-bar .avatar { position: relative; }
+@media (prefers-reduced-motion: reduce) {
+  .avatar.breathing { animation: none; box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px color-mix(in srgb, var(--who) 55%, transparent); }
+}
 .avatar.more { width: 26px; height: 26px; font-size: 10px; background: var(--line-strong); color: var(--ink-soft); }
 
 .sync-pill {
