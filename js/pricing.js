@@ -221,6 +221,62 @@ export function computeLine(line, state) {
   return { list, fascia, cassette, sideChannel, installation, brackets, extras, cost, unit: unit == null ? null : round2(unit) };
 }
 
+// Show the working. Every charge on a line, with the arithmetic that produced it,
+// so a price can be checked or defended without anyone reading this file.
+//
+// Returns { steps: [{ label, detail, amount, kind }], unit, cost, qty, lineTotal }
+// where kind is 'add' | 'sub' | 'base' | 'note'. Amounts are already rounded the way
+// they are charged, so the steps add up to exactly what the client is billed.
+export function explainLine(line, state) {
+  const table = state.tables[line.table];
+  const c = computeLine(line, state);
+  const qty = Number(line.qty) || 1;
+  const steps = [];
+  const rates = { ...FALLBACK_RATES, ...(state.rates || {}) };
+  const w = Number(line.width) || 0;
+  const h = Number(line.height) || 0;
+
+  if (table?.kind === 'formula') {
+    // Drapery is computed from a formula per style rather than a grid; report what
+    // it produced plus everything added on top of it.
+    steps.push({ kind: 'base', label: `${line.table} (formula)`, detail: 'Priced from the style\u2019s rates in Price Tables, not a size grid', amount: round2((c.unit || 0) - (Number(line.markup) || 0) - (Number(line.motorPrice) || 0) + (Number(line.discount) || 0)) });
+  } else {
+    const ew = effectiveDim(line.width, line.widthFrac);
+    const eh = effectiveDim(line.height, line.heightFrac);
+    const fw = Number(line.widthFrac) || 0;
+    const fh = Number(line.heightFrac) || 0;
+    if (fw > 0 || fh > 0) {
+      steps.push({ kind: 'note', label: 'Size used', detail: `${w}${fw ? ' + ' + FRACTION_TEXT[fw] : ''}" \u00d7 ${h}${fh ? ' + ' + FRACTION_TEXT[fh] : ''}" \u2192 ${ew}" \u00d7 ${eh}" (over \u00bd rounds up, otherwise stays)` });
+    }
+    if (c.list == null) {
+      steps.push({ kind: 'note', label: 'No price', detail: `${ew}" \u00d7 ${eh}" is off the ${line.table} chart \u2014 this line has no price at all` });
+    } else {
+      const col = table.widths.find((x) => Number(x) >= ew);
+      const rowIdx = table.rows.findIndex((r) => Number(r.length) >= eh);
+      const row = rowIdx >= 0 ? table.rows[rowIdx].length : '?';
+      steps.push({ kind: 'base', label: 'List price', detail: `${line.table} \u2192 first width \u2265 ${ew}" is ${col}", first length \u2265 ${eh}" is ${row}"`, amount: c.list });
+    }
+    if (c.fascia) steps.push({ kind: 'add', label: 'Fascia', detail: `${w}" \u00f7 12 \u00d7 ${money(rates.fascia)} per foot`, amount: round2(c.fascia) });
+    if (c.cassette) steps.push({ kind: 'add', label: 'Cassette', detail: `${w}" \u00f7 12 \u00d7 ${money(rates.cassette)} per foot`, amount: round2(c.cassette) });
+    if (c.sideChannel) steps.push({ kind: 'add', label: 'Side channel', detail: `${h}" \u00f7 12 \u00d7 ${money(rates.sideChannel)} per foot \u00d7 2 sides`, amount: round2(c.sideChannel) });
+    for (const [field, key] of PRICED_FIELDS) {
+      const price = optionPrice(state, key, line[field]);
+      if (price) steps.push({ kind: 'add', label: FIELD_LABEL[field] || field, detail: `\u201c${line[field]}\u201d is priced in Lists`, amount: round2(price) });
+    }
+  }
+
+  if (c.installation) steps.push({ kind: 'add', label: 'Installation', detail: 'Typed on the line', amount: round2(c.installation) });
+  if (c.brackets) steps.push({ kind: 'add', label: 'Brackets', detail: 'Typed on the line', amount: round2(c.brackets) });
+  if (Number(line.motorPrice)) steps.push({ kind: 'add', label: 'Motor', detail: 'Typed on the line', amount: round2(Number(line.motorPrice)) });
+  if (Number(line.markup)) steps.push({ kind: 'add', label: 'Markup', detail: 'Extra added on this line', amount: round2(Number(line.markup)) });
+  if (Number(line.discount)) steps.push({ kind: 'sub', label: 'Line discount', detail: 'Taken off this line', amount: round2(Number(line.discount)) });
+
+  return { steps, unit: c.unit, cost: c.cost, qty, lineTotal: c.unit == null ? null : round2(c.unit * qty), offChart: c.list == null };
+}
+
+const FRACTION_TEXT = { 0.125: '1/8', 0.25: '1/4', 0.375: '3/8', 0.5: '1/2', 0.625: '5/8', 0.75: '3/4', 0.875: '7/8' };
+const FIELD_LABEL = { system: 'System', style: 'Style', headrail: 'Headrail', bottomRail: 'Bottom rail' };
+
 // Space-saving: the System field already says Manual/Motor Battery, so Control only
 // needs to convey the hand side — chain vs motor is redundant on the document.
 function controlText(ctrl) {
