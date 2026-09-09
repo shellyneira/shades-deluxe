@@ -98,10 +98,13 @@ export const DRAPERY_RATE_LABELS = {
 // Track hardware (Settings → Rates) — same physical product no matter which
 // drapery style it's attached to, so it isn't duplicated per style.
 export const DEFAULT_TRACK_RATES = { trackMotorPerFoot: 2.5, trackMotorMarkupPct: 30, trackManualPerFoot: 1, trackManualMarkupPct: 30 };
+// Named *PerFoot for historical reasons, but the rate is actually $ per INCH of width
+// (matches the sheet exactly: Track Precio = width_inches × rate, e.g. 120" × $1 = $120)
+// — no ÷12 anywhere. Only the label below needed fixing; the math was always right.
 export const TRACK_RATE_LABELS = {
-  trackMotorPerFoot: 'Motorized track cost ($/ft of width)',
+  trackMotorPerFoot: 'Motorized track cost ($/in of width)',
   trackMotorMarkupPct: 'Motorized track markup (%)',
-  trackManualPerFoot: 'Manual track cost ($/ft of width)',
+  trackManualPerFoot: 'Manual track cost ($/in of width)',
   trackManualMarkupPct: 'Manual track markup (%)',
 };
 
