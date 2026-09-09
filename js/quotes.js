@@ -1,7 +1,7 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall } from './pricing.js';
+import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -109,6 +109,49 @@ function editor(q) {
   const reRender = () => dynamic.replaceChildren(sheet(q, reRender));
   reRender();
   return el('div', {}, [toolbar, client, dynamic]);
+}
+
+/* ---------------- price breakdown ----------------
+   The worksheet shows what a line costs; this shows why. Every component, with the
+   formula and the numbers that went into it, adding up to exactly what is billed. */
+function showBreakdown(item, s) {
+  const x = explainLine(item, s);
+  const row = (label, detail, amount, cls = '') => el('div', { class: 'bd-row ' + cls }, [
+    el('div', {}, [el('div', { class: 'bd-label' }, [label]), detail ? el('div', { class: 'bd-detail' }, [detail]) : null]),
+    el('div', { class: 'bd-amt' }, [amount == null ? '' : amount]),
+  ]);
+
+  const body = el('div', { class: 'bd-body' }, [
+    ...x.steps.map((st) => row(
+      st.label,
+      st.detail,
+      st.amount == null ? null : (st.kind === 'sub' ? '−' : st.kind === 'add' ? '+' : '') + money(st.amount),
+      st.kind === 'note' ? 'note' : '',
+    )),
+    x.unit == null ? null : row('Price per shade', null, money(x.unit), 'sum'),
+    x.qty > 1 ? row(`Line total (${x.qty} shades)`, `${money(x.unit)} × ${x.qty}`, money(x.lineTotal), 'grand') : null,
+    x.cost == null ? null : el('div', { class: 'bd-cost' }, [
+      el('div', { class: 'bd-cost-head' }, ['Internal — not shown to the client']),
+      row('Your cost', `Material at ${Math.round((Number(s.rates?.costFactor) || 0.43) * 100)}% of list, plus everything billed at cost`, money(x.cost)),
+      row('Profit on this shade', null, money(round2((x.unit || 0) - x.cost)), 'sum'),
+    ]),
+  ].filter(Boolean));
+
+  const close = () => wrap.remove();
+  const wrap = el('div', { class: 'bd-wrap no-print', onclick: (e) => { if (e.target === wrap) close(); } }, [
+    el('div', { class: 'bd-card' }, [
+      el('div', { class: 'bd-head' }, [
+        el('div', {}, [
+          el('h3', { style: 'margin:0' }, ['How this price is calculated']),
+          el('div', { class: 'bd-sub' }, [[item.location, item.table, sizeText(item)].filter(Boolean).join(' · ')]),
+        ]),
+        el('button', { class: 'icon', onclick: close, title: 'Close' }, ['✕']),
+      ]),
+      body,
+    ]),
+  ]);
+  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+  document.body.append(wrap);
 }
 
 // If the bottom "add" row was filled in but never committed, keep it so the user
@@ -377,8 +420,10 @@ function sheet(q, rerender) {
     // Save on every keystroke, draft row included — otherwise a refresh (or a browser
     // that never gets to "Add line") silently loses whatever was typed into it.
     const onChange = (key, val) => { item[key] = val; save(); recalc(); if (key === 'table') rerender(); };
-    const priceNode = el('strong', {}, ['—']);
-    const priceTd = el('td', { class: 'r price' }, [priceNode]);
+    // Every charge should be checkable without trusting the app: click the price and
+    // it shows the arithmetic that produced it.
+    const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
+    const priceTd = el('td', { class: 'r price', onclick: () => showBreakdown(item, getState()) }, [priceNode]);
     const clientNode = el('span', {}, ['—']);
     const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
     priceCells.push({ item, node: priceNode, td: priceTd, client: clientNode });
