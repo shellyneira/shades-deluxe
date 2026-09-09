@@ -16,8 +16,14 @@ import { accessToken, ensureSession, getSession } from './auth.js';
 const TOPIC = 'realtime:shades-deluxe';
 const TABLES = ['app_state', 'quotes', 'price_tables', 'option_lists'];
 
-// Stable per-tab identity: two tabs of the same person are two cursors.
+// Two identities, and the difference matters.
+//   CLIENT_ID — this tab. Used to ignore the echo of our own broadcasts.
+//   userKey() — this person. Used for the presence key and the colour, so a reload
+//     replaces that person's entry instead of adding a second one, and so Sarkis is
+//     the same colour on every screen. Keying presence on a per-tab random id was
+//     what produced ghost avatars ("SH SH SA") and a new colour on every refresh.
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
+const userKey = () => getSession()?.user?.id || getSession()?.user?.email || CLIENT_ID;
 
 const COLORS = ['#3a6ea5', '#b9552f', '#3f7d5f', '#8e44ad', '#c99a3f', '#c0392b', '#16a085', '#d9713c'];
 // Same person -> same color on every screen, so "the blue one is Maria" holds.
@@ -37,20 +43,23 @@ let attempts = 0;
 let status = 'offline';       // offline | connecting | live
 let myMeta = {};
 let peers = [];               // [{ id, email, name, color, view, quoteId, field, self }]
-const handlers = { patch: [], db: [], presence: [], status: [] };
+const handlers = { patch: [], db: [], presence: [], status: [], live: [] };
 
 const nextRef = () => String(++ref);
 const emit = (kind, arg) => handlers[kind].forEach((fn) => { try { fn(arg); } catch (e) { console.warn(e); } });
 
 export function realtimeStatus() { return status; }
 export function clientId() { return CLIENT_ID; }
-export function myColor() { return colorFor(CLIENT_ID); }
+export function myColor() { return colorFor(userKey()); }
 export function getPeers() { return peers.filter((p) => !p.self); }
 
 export function onPatch(fn) { handlers.patch.push(fn); }
 export function onDbChange(fn) { handlers.db.push(fn); }
 export function onPresence(fn) { handlers.presence.push(fn); }
 export function onStatus(fn) { handlers.status.push(fn); fn(status); }
+// Pointer moves and typing pings — everything that says "this person is doing
+// something right now", which is what the avatars and cursors are drawn from.
+export function onLive(fn) { handlers.live.push(fn); }
 
 function setStatus(s) {
   if (s === status) return;
@@ -83,7 +92,7 @@ export function connectRealtime() {
       config: {
         private: true,
         broadcast: { self: false, ack: false },
-        presence: { key: CLIENT_ID },
+        presence: { key: userKey() },
         postgres_changes: TABLES.map((table) => ({ event: '*', schema: 'public', table })),
       },
       access_token: accessToken(),
@@ -119,7 +128,11 @@ export function connectRealtime() {
       }
       return;
     }
-    if (event === 'broadcast') emit('patch', payload?.payload ?? payload);
+    if (event === 'broadcast') {
+      const body = payload?.payload ?? payload;
+      if (payload?.event === 'live') { if (body.from !== CLIENT_ID) emit('live', body); }
+      else emit('patch', body);
+    }
     else if (event === 'postgres_changes') emit('db', payload?.data);
     else if (event === 'presence_state') { peers = fromState(payload); emit('presence', getPeers()); }
     else if (event === 'presence_diff') { peers = applyDiff(peers, payload); emit('presence', getPeers()); }
@@ -152,7 +165,7 @@ function metaToPeer(key, meta) {
     field: meta.field || null,
     label: meta.label || '',
     at: meta.at || 0,
-    self: key === CLIENT_ID,
+    self: key === userKey(),
   };
 }
 
@@ -176,10 +189,21 @@ export function trackPresence(meta) {
   send('presence', { type: 'presence', event: 'track', payload: myMeta });
 }
 
+// Presence state can end up lopsided — one screen shows both people, the other
+// shows one — when a join diff is missed. Re-announcing on a slow beat makes the
+// two sides converge on their own instead of waiting for someone to click something.
+setInterval(() => { if (joined) trackPresence(myMeta); }, 20_000);
+
 /* ---------------- broadcast ---------------- */
 
 // Returns false when the socket is not up, so the caller can keep the change queued
 // instead of assuming it went out.
 export function broadcastPatch(payload) {
   return joined && send('broadcast', { type: 'broadcast', event: 'patch', payload: { from: CLIENT_ID, ...payload } });
+}
+
+// Cursor position and typing pings. Deliberately not presence: presence is state
+// worth reconciling, this is a firehose that is worthless a second later.
+export function broadcastLive(payload) {
+  return joined && send('broadcast', { type: 'broadcast', event: 'live', payload: { from: CLIENT_ID, user: userKey(), ...payload } });
 }

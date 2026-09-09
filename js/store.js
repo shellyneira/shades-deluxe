@@ -7,7 +7,7 @@ import {
   dbEnabled, pullState, pushState,
   pullQuotes, pushQuotes, deleteQuoteRow,
   pullTables, pushTables, deleteTableRow,
-  pullLists, pushLists,
+  pullLists, pushLists, NotSignedIn,
 } from './db.js';
 import { connectRealtime, broadcastPatch, onPatch, onDbChange, onStatus, clientId } from './realtime.js';
 import { ensureSession } from './auth.js';
@@ -207,6 +207,15 @@ function load() {
 
 let syncTimer;
 let broadcastTimer;
+// Retries are bounded and then STOP. A timer that keeps firing forever is how a
+// failing client turns into a denial of service against its own backend — and it
+// never fixed anything a later real event would not have fixed anyway. Nothing is
+// lost when we give up: the rows stay marked unsent, the pill stays red, and the
+// next genuine event (an edit, the tab being refocused, the network returning, the
+// live channel reconnecting) picks them straight back up.
+const MAX_RETRIES = 4;
+let retryDelay = 5000;
+let retriesLeft = MAX_RETRIES;
 let applyingRemote = false;
 // id -> JSON snapshot of what we last pushed/broadcast, so a sync only sends rows
 // THIS device actually changed.
@@ -280,14 +289,18 @@ function scheduleSync() {
         changedTables.forEach((r) => { lastPushedTable[r.id] = JSON.stringify(r.data); });
         changedLists.forEach((r) => { lastPushedList[r.id] = JSON.stringify(r.data); });
         setSyncState('saved');
+        retryDelay = 5000;
+        retriesLeft = MAX_RETRIES;
       })
       .catch((e) => {
-        // Nothing is lost — the rows stay marked as unsent and go up on the next
-        // attempt — but the user has to know it has not landed yet.
         setSyncState('error');
         console.warn('cloud sync failed', e);
         clearTimeout(syncTimer);
-        syncTimer = setTimeout(scheduleSync, 5000);
+        // A signed-out browser gets no retries at all — asking again cannot help.
+        if (e instanceof NotSignedIn || retriesLeft <= 0) { retriesLeft = 0; return; }
+        retriesLeft--;
+        retryDelay = Math.min(retryDelay * 2, 40_000);
+        syncTimer = setTimeout(scheduleSync, retryDelay);
       });
   }, 600);
 }
@@ -311,9 +324,20 @@ function scheduleBroadcast() {
   }, 120);
 }
 
+// Something changed for the better — a new edit, the tab coming back, the network
+// returning. Any of those earns a fresh attempt (and a fresh budget); none of them
+// is a timer.
+function resumeSync() {
+  retriesLeft = MAX_RETRIES;
+  retryDelay = 5000;
+  scheduleSync();
+}
+
 export function save() {
   localStorage.setItem(KEY, JSON.stringify(state));
   if (!applyingRemote) {
+    retriesLeft = MAX_RETRIES;
+    retryDelay = 5000;
     // One change scan per save, shared by both outbound channels. It also stamps
     // each touched quote so an inbound copy of a row being typed into right now is
     // held back rather than overwriting the caret.
@@ -489,12 +513,12 @@ export function startLiveSync() {
   if (!dbEnabled()) return;
   onPatch(applyRemotePatch);
   onDbChange(applyDbChange);
-  onStatus((s) => { if (s === 'live') pullAll().catch(() => {}); });
+  onStatus((s) => { if (s === 'live') { resumeSync(); pullAll().catch(() => {}); } });
   connectRealtime();
   // Belt and braces: a tab that was in the background (phone locked, laptop asleep)
   // can miss live messages entirely — reconcile the moment it comes back.
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pullAll().catch(() => {}); });
-  window.addEventListener('online', () => { connectRealtime(); pullAll().catch(() => {}); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { resumeSync(); pullAll().catch(() => {}); } });
+  window.addEventListener('online', () => { connectRealtime(); resumeSync(); pullAll().catch(() => {}); });
   setInterval(() => { if (!document.hidden) pullAll().catch(() => {}); }, 60_000);
 }
 
