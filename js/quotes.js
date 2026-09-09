@@ -343,9 +343,16 @@ function sheet(q, rerender) {
     // Mirror the client invoice: whole-dollar amounts + tax, so the worksheet matches.
     const priced = [...q.items, draft].map((it) => ({ c: computeLine(it, s), qty: Number(it.qty) || 1 }));
     const sub = priced.reduce((a, p) => a + roundWhole(p.c.unit || 0) * p.qty, 0);
-    const taxable = sub - roundWhole(Number(q.discount) || 0);
+    const afterDiscount = sub - roundWhole(Number(q.discount) || 0);
+    // The worksheet used to ignore the minimum order entirely, so the screen showed
+    // one total and the printed invoice another for the same quote.
+    const minOrder = roundWhole(Number(s.minimumOrder) || 0);
+    const minApplied = q.items.length > 0 && minOrder > 0 && afterDiscount < minOrder;
+    const taxable = minApplied ? minOrder : afterDiscount;
     const rate = Number(s.taxRate) || 0;
     const tax = roundWhole(taxable * rate / 100);
+    totalsRefs.minRow.style.display = minApplied ? '' : 'none';
+    if (minApplied) totalsRefs.min.textContent = '+' + money0(minOrder - afterDiscount);
     totalsRefs.sub.textContent = money0(sub);
     totalsRefs.tax.textContent = money0(tax);
     totalsRefs.taxRow.style.display = rate > 0 ? '' : 'none';
@@ -429,6 +436,8 @@ function sheet(q, rerender) {
   totalsRefs.tax = el('span', {}, ['—']);
   totalsRefs.taxLbl = el('span', {}, ['Tax']);
   totalsRefs.taxRow = el('div', { class: 'line', style: 'display:none' }, [totalsRefs.taxLbl, totalsRefs.tax]);
+  totalsRefs.min = el('span', {}, ['—']);
+  totalsRefs.minRow = el('div', { class: 'line', style: 'display:none' }, [el('span', {}, ['Minimum order']), totalsRefs.min]);
   totalsRefs.revenue = el('span', {}, ['—']);
   totalsRefs.material = el('span', {}, ['—']);
   totalsRefs.labor = el('span', {}, ['—']);
@@ -439,6 +448,7 @@ function sheet(q, rerender) {
       el('span', {}, ['Discount']),
       (() => { const i = el('input', { type: 'number', value: q.discount || 0, style: 'width:120px;padding:8px;border:1px solid var(--line-strong);border-radius:8px', oninput: (e) => { q.discount = Number(e.target.value) || 0; save(); recalc(); } }); return i; })(),
     ]),
+    totalsRefs.minRow,
     totalsRefs.taxRow,
     el('div', { class: 'line grand' }, [el('span', {}, ['Total']), totalsRefs.total]),
     el('div', { class: 'profit-box' }, [
@@ -594,7 +604,9 @@ function invoice(q) {
       const install = showInstall ? per.reduce((a, p) => a + roundWhole(p.c.installation || 0) * p.qty, 0) : 0;
       const sub = per.reduce((a, p) => a + roundWhole((p.c.unit || 0) - (showInstall ? (p.c.installation || 0) : 0)) * p.qty, 0);
       const discount = roundWhole(t.discount);
-      const taxable = Math.max(sub + install - discount, t.minApplied ? roundWhole(t.minOrder) : 0);
+      const afterDiscount = sub + install - discount;
+      const minTopUp = t.minApplied ? Math.max(0, roundWhole(t.minOrder) - afterDiscount) : 0;
+      const taxable = afterDiscount + minTopUp;
       const tax = roundWhole(taxable * (Number(s.taxRate) || 0) / 100);
       const total = taxable + tax;
       const pct = stagePct(q.stage);
@@ -604,6 +616,9 @@ function invoice(q) {
           el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), el('span', {}, [money0(sub)])]),
           install ? el('div', { class: 'line' }, [el('span', {}, ['Installation']), el('span', {}, [money0(install)])]) : null,
           discount ? el('div', { class: 'line' }, [el('span', {}, ['Discount']), el('span', {}, ['−' + money0(discount)])]) : null,
+          // Without this line the client sees a Total that does not equal the numbers
+          // printed above it, and no explanation for the gap.
+          minTopUp ? el('div', { class: 'line' }, [el('span', {}, ['Minimum order']), el('span', {}, ['+' + money0(minTopUp)])]) : null,
           tax ? el('div', { class: 'line' }, [el('span', {}, [`Tax (${s.taxRate}%)`]), el('span', {}, [money0(tax)])]) : null,
           el('div', { class: 'line grand' }, [el('span', {}, ['Total']), el('span', {}, [money0(total)])]),
           pct > 0 ? el('div', { class: 'line paid' }, [el('span', {}, ['Paid' + (pct < 1 ? ' (50%)' : '')]), el('span', {}, ['−' + money0(paid)])]) : null,
