@@ -143,16 +143,22 @@ function appBox() {
   return app ? app.getBoundingClientRect() : null;
 }
 
-// Cursor traffic is gated on somebody actually being there to see it. Alone in the
-// app — which is most of the time — this sends nothing at all, which matters on a
-// metered Realtime quota: an ungated 20 messages a second would spend a month's
-// allowance in a couple of days of two people working.
+// Cursor traffic is gated on somebody being on this exact screen to see it, because
+// that is the only case where a cursor is ever drawn. Alone in the app, or both of
+// you on different quotes, this sends nothing at all.
+//
+// That gate is what makes the feature affordable: Realtime is metered, and streaming
+// a pointer whenever the other person merely happened to be online worked out at
+// roughly twice the whole monthly allowance. Gated to a shared screen it is a small
+// fraction of it, and it is exactly when a cursor is worth seeing.
+const watchedHere = () => peers.some((p) => p.scope && p.scope === ctx.scope);
+
 let lastSent = 0;
 let lastPt = { x: -1, y: -1 };
 function sendCursor(e) {
-  if (!peers.length) return;
+  if (!watchedHere()) return;
   const now = Date.now();
-  if (now - lastSent < 60) return;
+  if (now - lastSent < 100) return;
   const box = appBox();
   if (!box || !box.width || !box.height) return;
   const x = (e.clientX - box.left) / box.width;
@@ -165,7 +171,7 @@ function sendCursor(e) {
 
 let lastPing = 0;
 function sendTypingPing() {
-  if (!peers.length) return;
+  if (!peers.length) return; // a typing ping is one small message, worth it app-wide
   const now = Date.now();
   if (now - lastPing < 500) return;
   lastPing = now;
@@ -288,7 +294,7 @@ export function initPresence() {
   document.addEventListener('pointermove', (e) => { activity.set('me', Date.now()); sendCursor(e); }, { passive: true });
   document.addEventListener('input', () => { activity.set('me', Date.now()); sendTypingPing(); scheduleStatus(); });
   // Leaving the window should take the cursor with you, not strand it mid-screen.
-  document.addEventListener('mouseleave', () => { if (peers.length) broadcastLive({ scope: ctx.scope, gone: true }); });
+  document.addEventListener('mouseleave', () => { if (watchedHere()) broadcastLive({ scope: ctx.scope, gone: true }); });
   // Halos have to switch themselves off when someone goes quiet; nothing else
   // would fire once the messages stop.
   setInterval(() => { renderStatus(); scheduleDecorate(); }, 1500);

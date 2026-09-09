@@ -85,22 +85,53 @@ export function onAfterMount(fn) { afterMount.push(fn); }
 // A field the local user is typing in must survive a re-render caused by someone
 // else's edit — otherwise every keystroke of theirs would kick the caret out of this
 // user's box. Same path, same caret, same scroll.
+// Scroll positions live on the elements themselves, so replaceChildren throws them
+// away. The worksheet scrolls sideways, and losing that on someone else's unrelated
+// edit yanks the sheet back to the first column mid-keystroke — the caret ends up
+// off-screen and the row appears to lurch left and right. Every scrolled container
+// is recorded by path and put back, not just the window.
+function captureScroll(root) {
+  const out = [];
+  const walk = (n) => {
+    for (const c of n.children) {
+      if (c.scrollLeft || c.scrollTop) out.push({ path: nodePath(c, root), left: c.scrollLeft, top: c.scrollTop });
+      walk(c);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+function restoreScroll(root, list) {
+  for (const s of list) {
+    const n = s.path && nodeAtPath(s.path, root);
+    if (!n) continue;
+    n.scrollLeft = s.left;
+    n.scrollTop = s.top;
+  }
+}
+
 function captureFocus(root) {
+  const scroll = captureScroll(root);
+  const page = { x: window.scrollX, y: window.scrollY };
   const a = document.activeElement;
-  if (!a || !root.contains(a) || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return null;
+  if (!a || !root.contains(a) || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return { scroll, page };
   const path = nodePath(a, root);
-  if (!path) return null;
+  if (!path) return { scroll, page };
   const sel = /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'number' && a.type !== 'date' && a.type !== 'checkbox';
-  return { path, tag: a.tagName, start: sel ? a.selectionStart : null, end: sel ? a.selectionEnd : null, y: window.scrollY };
+  return { scroll, page, path, tag: a.tagName, start: sel ? a.selectionStart : null, end: sel ? a.selectionEnd : null };
 }
 
 function restoreFocus(root, f) {
   if (!f) return;
-  const n = nodeAtPath(f.path, root);
-  if (!n || n.tagName !== f.tag) return;
-  n.focus({ preventScroll: true });
-  if (f.start != null) { try { n.setSelectionRange(f.start, f.end); } catch { /* type has no selection */ } }
-  window.scrollTo(0, f.y);
+  restoreScroll(root, f.scroll);
+  const n = f.path && nodeAtPath(f.path, root);
+  if (n && n.tagName === f.tag) {
+    n.focus({ preventScroll: true });
+    if (f.start != null) { try { n.setSelectionRange(f.start, f.end); } catch { /* type has no selection */ } }
+  }
+  // Both axes: restoring only Y silently snapped the page back to the left edge.
+  window.scrollTo(f.page.x, f.page.y);
 }
 
 export function mount(node) {
