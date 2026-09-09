@@ -136,7 +136,7 @@ function renderStatus() {
    leaves the viewport, which is the honest answer. */
 
 const cursors = new Map(); // user -> { x, y, scope, at, typing }
-const CURSOR_TTL = 10_000;
+const CURSOR_TTL = 5000; // backstop only — a departure is normally seen via presence
 
 function appBox() {
   const app = document.getElementById('app');
@@ -300,6 +300,14 @@ export function initPresence() {
   setInterval(() => { renderStatus(); scheduleDecorate(); }, 1500);
   onPresence((list) => {
     peers = list;
+    // Somebody who has moved to another screen must not leave their pointer behind
+    // on this one. Their presence says where they are the moment they navigate, so
+    // a stale cursor is dropped straight away rather than lingering until it times
+    // out — and it costs nothing extra, since that presence update is already sent.
+    for (const [id, c] of cursors) {
+      const still = list.find((p) => p.id === id);
+      if (!still || still.scope !== c.scope) cursors.delete(id);
+    }
     renderBar();
     scheduleDecorate();
   });
