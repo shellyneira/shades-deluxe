@@ -28,7 +28,7 @@ const stagePct = (st) => (st === '100% Paid' ? 1 : st === '50% Paid' ? 0.5 : 0);
 const isInvoiceStage = (st) => st === 'Accepted' || st === '50% Paid' || st === '100% Paid';
 const STAGE_CLASS = { Quote: 'quote', Accepted: 'accepted', '50% Paid': 'half', '100% Paid': 'paid' };
 const stageClass = (st) => STAGE_CLASS[st] || 'quote';
-let filter = 'all';
+let filter = 'All';
 
 function list() {
   const s = getState();
@@ -37,10 +37,10 @@ function list() {
     el('button', { class: 'btn primary', onclick: () => open(newQuote().id) }, ['＋ New Quote']),
   ]);
 
-  const filters = el('div', { class: 'subtabs' }, ['all', ...STAGES].map((f) =>
+  const filters = el('div', { class: 'subtabs' }, ['All', ...STAGES].map((f) =>
     el('button', { class: 'subtab' + (f === filter ? ' active' : ''), onclick: () => { filter = f; renderQuotes(); } }, [f])));
 
-  const shown = s.quotes.filter((q) => filter === 'all' || (q.stage || 'Quote') === filter);
+  const shown = s.quotes.filter((q) => filter === 'All' || (q.stage || 'Quote') === filter);
   const body = shown.length
     ? el('div', { class: 'cards' }, shown.map((q) => {
       const t = quoteTotals(q, s);
