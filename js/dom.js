@@ -155,3 +155,16 @@ export const FRACTION_LABEL = {
   0: '—', 0.125: '1/8', 0.25: '1/4', 0.375: '3/8',
   0.5: '1/2', 0.625: '5/8', 0.75: '3/4', 0.875: '7/8',
 };
+
+// Scrolling must never change what a quote says.
+//
+// A focused <select> or number input treats the mouse wheel as "next option" or
+// "increment", so scrolling the worksheet — which scrolls both ways and is full of
+// both — silently rewrote fabrics, fractions and widths on lines nobody had touched.
+// Dropping focus hands the wheel back to the page: it scrolls, and the value stays
+// exactly where it was left.
+document.addEventListener('wheel', (e) => {
+  const t = document.activeElement;
+  if (!t || t !== e.target) return;
+  if (t.tagName === 'SELECT' || (t.tagName === 'INPUT' && t.type === 'number')) t.blur();
+}, { passive: true, capture: true });
