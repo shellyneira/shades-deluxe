@@ -110,7 +110,7 @@ function blankLine(s) {
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', reverse: false, fascia: false, cassette: false, sideChannel: false,
     installation: s.defaultInstallation || '', brackets: '', mount: 'Ceiling', discount: '', markup: '', motorPrice: '',
-    fabricPrice: '', lining: '', track: '',
+    fabricPrice: '', lining: '', track: '', notes: '',
   };
 }
 
@@ -184,6 +184,9 @@ function columns(o, tables, categories) {
     { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
+    // Free-text, per-line — only printed on the Work Order (its own column there), never
+    // on Client Quote or Labels.
+    { key: 'notes', label: 'Notes', kind: 'text', w: 160, placeholder: 'Work order only' },
   ];
 }
 
@@ -217,6 +220,7 @@ const COL_HELP = {
   fabricPrice: 'Fabric cost ($ per yard) — Drapery lines only, drives the whole price',
   lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
+  notes: 'Free-text note for the maker — prints only on the Work Order, its own column',
 };
 
 function cell(col, item, onChange) {
@@ -254,6 +258,13 @@ function cell(col, item, onChange) {
       sel.append(o);
     });
     return el('td', {}, [sel]);
+  }
+  if (col.kind === 'text') {
+    const inp = el('input', {
+      type: 'text', value: item[col.key] ?? '', style, placeholder: col.placeholder || '',
+      oninput: (e) => onChange(col.key, e.target.value),
+    });
+    return el('td', {}, [inp]);
   }
   if (col.kind === 'num') {
     const placeholder = typeof col.placeholder === 'function' ? col.placeholder(item) : (col.placeholder || '');
@@ -664,12 +675,13 @@ function clientTable(q, s) {
 // NO prices. Few columns so it always fits a page / PDF.
 function workTable(q, s) {
   const cfg = s.docConfig.work;
-  const cols = ['#', 'Location', 'Size (W×H)', 'Description'];
+  const cols = ['#', 'Location', 'Size (W×H)', 'Description', 'Notes'];
   const rows = q.items.map((l, i) => el('tr', {}, [
     el('td', { class: 'num' }, [String(i + 1)]),
     el('td', { class: 'strong' }, [l.location]),
     el('td', { class: 'strong' }, [sizeText(l)]),
     el('td', { class: 'desc' }, [describeLine(l, cfg, true)]),
+    el('td', { class: 'desc' }, [l.notes || '']),
   ]));
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),
