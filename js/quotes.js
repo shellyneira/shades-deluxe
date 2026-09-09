@@ -493,7 +493,10 @@ function docText(q, s, isWork) {
     const desc = describeLine(l, cfg, isWork);
     const size = isWork ? ` [${sizeText(l)}]` : '';
     const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
-    return `${i + 1}. ${l.location ? l.location + ' · ' : ''}${desc}${size}${price}`;
+    const qty = Number(l.qty) || 1;
+    const count = qty > 1 ? `${qty}× ` : '';
+    const notes = isWork && l.notes ? ` — ${l.notes}` : '';
+    return `${i + 1}. ${count}${l.location ? l.location + ' · ' : ''}${desc}${size}${price}${notes}`;
   });
   if (isWork) {
     return `${s.company.name} — WORK ORDER #${q.number}${q.date ? ' · ' + q.date : ''}\n\n${rows.join('\n')}`;
@@ -638,11 +641,17 @@ function labelsView(q, s) {
   // Control's hand side is always printed next to the size (dl-size below) — leaving it
   // in the description too would print it twice on the same sticker.
   const cfg = { ...s.docConfig.label, control: false };
-  const labels = q.items.map((l) => {
+  // One sticker per shade. This mapped over lines, so a line of six produced a
+  // single label and five shades went out unlabelled.
+  const perShade = q.items.flatMap((l) => {
+    const n = Math.max(1, Number(l.qty) || 1);
+    return Array.from({ length: n }, (_, k) => ({ l, k, n }));
+  });
+  const labels = perShade.map(({ l, k, n }) => {
     const card = el('div', { class: 'dymo-label' }, [
       el('div', { class: 'dl-text' }, [
         el('div', { class: 'dl-name' }, [q.client.name || '']),
-        el('div', { class: 'dl-loc' }, [l.location || '']),
+        el('div', { class: 'dl-loc' }, [(l.location || '') + (n > 1 ? ` (${k + 1} of ${n})` : '')]),
         el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true)].filter(Boolean).join(' — ')]),
         el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
       ]),
@@ -709,9 +718,12 @@ function clientTable(q, s) {
 // NO prices. Few columns so it always fits a page / PDF.
 function workTable(q, s) {
   const cfg = s.docConfig.work;
-  const cols = ['#', 'Location', 'Size (W×H)', 'Description', 'Notes'];
+  // Qty was missing entirely: a line reading "Living room x 6" printed as one row
+  // with no quantity, and the shop built one shade.
+  const cols = ['#', 'Qty', 'Location', 'Size (W×H)', 'Description', 'Notes'];
   const rows = q.items.map((l, i) => el('tr', {}, [
     el('td', { class: 'num' }, [String(i + 1)]),
+    el('td', { class: 'num strong' }, [String(Number(l.qty) || 1)]),
     el('td', { class: 'strong' }, [l.location]),
     el('td', { class: 'strong' }, [sizeText(l)]),
     el('td', { class: 'desc' }, [describeLine(l, cfg, true)]),
