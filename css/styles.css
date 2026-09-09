@@ -402,6 +402,9 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 }
 .avatar.more { width: 26px; height: 26px; font-size: 10px; background: var(--line-strong); color: var(--ink-soft); }
 
+/* An explicit display: value beats the browser's [hidden] rule, so the healthy
+   state would stay on screen without this. */
+.sync-pill[hidden] { display: none; }
 .sync-pill {
   display: inline-flex; align-items: center; gap: 6px; margin-left: 6px;
   padding: 3px 10px 3px 8px; border-radius: 999px;
