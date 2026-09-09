@@ -1,5 +1,6 @@
-// Single source of truth. State lives in localStorage (instant) and syncs to
-// Supabase when configured (survives device loss, shared across devices).
+// Single source of truth. State lives in localStorage (instant), syncs to Supabase
+// (durable, shared across devices) and is kept live over a Realtime channel so a
+// change made on one screen shows up on every other screen within a second.
 import { SEED } from './seed-data.js';
 import { DRAPERY_STYLES, DEFAULT_TRACK_RATES } from './pricing.js';
 import {
@@ -8,6 +9,8 @@ import {
   pullTables, pushTables, deleteTableRow,
   pullLists, pushLists,
 } from './db.js';
+import { connectRealtime, broadcastPatch, onPatch, onDbChange, onStatus, clientId } from './realtime.js';
+import { ensureSession } from './auth.js';
 
 const KEY = 'shades-deluxe-v1';
 
@@ -192,12 +195,41 @@ function load() {
   }
 }
 
+/* ---------------- sync engine ----------------
+   Local writes are the fast path: localStorage first, then two outbound channels.
+     1. broadcast  — fires immediately, so the other screen updates in well under a
+                     second (this is what makes it feel like a shared document).
+     2. Postgres   — debounced, the durable copy that survives a closed tab.
+   Inbound, either channel can deliver a row; both funnel through applyRows(), which
+   is idempotent, so a broadcast and its postgres_changes echo cost nothing.
+   Only rows THIS device changed are ever sent — another user's untouched rows are
+   never rewritten, so nobody's work gets clobbered by someone else pressing save. */
+
 let syncTimer;
-// id -> JSON snapshot of what we last pushed, so a sync only sends rows THIS
-// device actually changed — another device's untouched rows are left alone.
+let broadcastTimer;
+let applyingRemote = false;
+// id -> JSON snapshot of what we last pushed/broadcast, so a sync only sends rows
+// THIS device actually changed.
 let lastPushedQuote = {};
 let lastPushedTable = {};
 let lastPushedList = {};
+let lastSentQuote = {};
+let lastSentTable = {};
+let lastSentList = {};
+let lastSentConfig = '';
+// Quote id -> when this device last touched it. A remote copy of a quote someone is
+// actively typing into is held back for a moment instead of yanking the row out from
+// under them; once they pause, the newest write wins and both screens converge.
+const localTouch = {};
+const EDIT_GRACE = 1500;
+const pendingRemote = new Map();
+let pendingTimer;
+
+const listeners = [];
+// reason: 'local' | 'remote' — views re-render on either, but only a remote change
+// needs the focus-preserving path.
+export function onStateChange(fn) { listeners.push(fn); }
+function notify(reason) { listeners.forEach((fn) => { try { fn(reason); } catch (e) { console.warn(e); } }); }
 
 // Price tables/minPrice and options/customLists are split into per-row payloads
 // ({id, data}) so each table/list is its own database row (see db.js).
@@ -207,16 +239,23 @@ function tableRows(s) {
 function listRows(s) {
   return [...Object.entries(s.options).map(([id, data]) => ({ id, data })), { id: 'customLists', data: s.customLists }];
 }
+function configOf(s) {
+  const { quotes, tables, minPrice, options, customLists, ...config } = s;
+  return config;
+}
+
+function changedSince(seen, rows, key = (r) => r.id, val = (r) => r.data) {
+  return rows.filter((r) => JSON.stringify(val(r)) !== seen[key(r)]);
+}
 
 function scheduleSync() {
   if (!dbEnabled()) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
-    const { quotes, tables, minPrice, options, customLists, ...config } = state;
-    // Only push rows that actually changed here — never overwrite another user's work.
-    const changedQuotes = quotes.filter((q) => JSON.stringify(q) !== lastPushedQuote[q.id]);
-    const changedTables = tableRows(state).filter((r) => JSON.stringify(r.data) !== lastPushedTable[r.id]);
-    const changedLists = listRows(state).filter((r) => JSON.stringify(r.data) !== lastPushedList[r.id]);
+    const config = configOf(state);
+    const changedQuotes = state.quotes.filter((q) => JSON.stringify(q) !== lastPushedQuote[q.id]);
+    const changedTables = changedSince(lastPushedTable, tableRows(state));
+    const changedLists = changedSince(lastPushedList, listRows(state));
     Promise.all([
       pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
       pushQuotes(changedQuotes),
@@ -229,51 +268,176 @@ function scheduleSync() {
         changedLists.forEach((r) => { lastPushedList[r.id] = JSON.stringify(r.data); });
       })
       .catch((e) => console.warn('cloud sync failed', e));
-  }, 700);
+  }, 600);
+}
+
+// The instant path. Coalesced over one frame-ish window so a burst of keystrokes is
+// one message on the wire, not one per character. Nothing is marked as sent unless
+// the socket actually took it — otherwise an edit made while offline would be
+// skipped as "already broadcast" once the connection came back.
+let pendingBroadcast = null;
+function scheduleBroadcast() {
+  if (!dbEnabled() || !pendingBroadcast) return;
+  clearTimeout(broadcastTimer);
+  broadcastTimer = setTimeout(() => {
+    const patch = pendingBroadcast;
+    pendingBroadcast = null;
+    if (!broadcastPatch(patch)) return;
+    patch.quotes.forEach((q) => { lastSentQuote[q.id] = JSON.stringify(q); });
+    patch.tables.forEach((r) => { lastSentTable[r.id] = JSON.stringify(r.data); });
+    patch.lists.forEach((r) => { lastSentList[r.id] = JSON.stringify(r.data); });
+    if (patch.config) lastSentConfig = JSON.stringify(configOf(state));
+  }, 120);
 }
 
 export function save() {
   localStorage.setItem(KEY, JSON.stringify(state));
-  scheduleSync();
+  if (!applyingRemote) {
+    // One change scan per save, shared by both outbound channels. It also stamps
+    // each touched quote so an inbound copy of a row being typed into right now is
+    // held back rather than overwriting the caret.
+    const now = Date.now();
+    const quotes = state.quotes.filter((q) => JSON.stringify(q) !== lastSentQuote[q.id]);
+    quotes.forEach((q) => { localTouch[q.id] = now; });
+    const config = configOf(state);
+    const configChanged = JSON.stringify(config) !== lastSentConfig;
+    pendingBroadcast = {
+      quotes,
+      tables: changedSince(lastSentTable, tableRows(state)),
+      lists: changedSince(lastSentList, listRows(state)),
+      config: configChanged ? { ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] } : null,
+    };
+    if (quotes.length || pendingBroadcast.tables.length || pendingBroadcast.lists.length || configChanged) scheduleBroadcast();
+    else pendingBroadcast = null;
+    scheduleSync();
+  }
+  notify(applyingRemote ? 'remote' : 'local');
 }
 
-// A price table was renamed or deleted locally — remove its old row so it doesn't
-// keep reappearing on the next pull.
+/* ---------------- inbound ---------------- */
+
+// Merge rows that arrived from someone else. Everything inbound goes through here,
+// whichever channel carried it.
+function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], config = null }) {
+  let changed = false;
+  const now = Date.now();
+
+  for (const q of quotes) {
+    if (!q?.id) continue;
+    const mine = state.quotes.find((x) => x.id === q.id);
+    if (mine && JSON.stringify(mine) === JSON.stringify(q)) continue;
+    if (now - (localTouch[q.id] || 0) < EDIT_GRACE) { hold(q.id, q); continue; }
+    if (mine) Object.assign(mine, q);
+    else state.quotes.unshift(q);
+    changed = true;
+  }
+  for (const id of deletedQuotes) {
+    if (!state.quotes.some((q) => q.id === id)) continue;
+    state.quotes = state.quotes.filter((q) => q.id !== id);
+    changed = true;
+  }
+  for (const r of tables) {
+    if (!r?.id || !r.data) continue;
+    if (JSON.stringify({ grid: state.tables[r.id], minPrice: state.minPrice[r.id] ?? 0 }) === JSON.stringify(r.data)) continue;
+    state.tables[r.id] = r.data.grid;
+    state.minPrice[r.id] = r.data.minPrice || 0;
+    changed = true;
+  }
+  for (const r of lists) {
+    if (!r?.id || r.data == null) continue;
+    const current = r.id === 'customLists' ? state.customLists : state.options[r.id];
+    if (JSON.stringify(current) === JSON.stringify(r.data)) continue;
+    if (r.id === 'customLists') state.customLists = r.data; else state.options[r.id] = r.data;
+    changed = true;
+  }
+  if (config) {
+    const { quotes: _q, tables: _t, minPrice: _m, options: _o, customLists: _c, ...rest } = config;
+    if (JSON.stringify(configOf(state)) !== JSON.stringify(rest)) { Object.assign(state, rest); changed = true; }
+  }
+  if (!changed) return;
+
+  // Mark everything we just took as already-known, so the merge doesn't bounce
+  // straight back out as a "local change".
+  quotes.forEach((q) => { lastSentQuote[q.id] = lastPushedQuote[q.id] = JSON.stringify(q); });
+  tables.forEach((r) => { lastSentTable[r.id] = lastPushedTable[r.id] = JSON.stringify(r.data); });
+  lists.forEach((r) => { lastSentList[r.id] = lastPushedList[r.id] = JSON.stringify(r.data); });
+
+  applyingRemote = true;
+  try { state = normalize(state); save(); } finally { applyingRemote = false; }
+}
+
+// Someone else's version of a quote arrived while it was being typed into here.
+// Park it and retry once this device goes quiet.
+function hold(id, quote) {
+  pendingRemote.set(id, quote);
+  clearTimeout(pendingTimer);
+  pendingTimer = setTimeout(() => {
+    const rows = [...pendingRemote.values()];
+    pendingRemote.clear();
+    if (rows.length) applyRows({ quotes: rows });
+  }, EDIT_GRACE + 100);
+}
+
+// A patch broadcast by another tab — the fast path, arrives before the DB write.
+export function applyRemotePatch(p) {
+  if (!p || p.from === clientId()) return;
+  applyRows(p);
+}
+
+// A postgres_changes row — the durable net (covers anything the broadcast missed).
+export function applyDbChange(ev) {
+  if (!ev?.table) return;
+  const row = ev.record || ev.old_record || {};
+  const del = ev.type === 'DELETE';
+  if (ev.table === 'quotes') applyRows(del ? { deletedQuotes: [row.id] } : { quotes: [row.data] });
+  else if (ev.table === 'price_tables') applyRows(del ? {} : { tables: [{ id: row.id, data: row.data }] });
+  else if (ev.table === 'option_lists') applyRows(del ? {} : { lists: [{ id: row.id, data: row.data }] });
+  else if (ev.table === 'app_state' && !del) applyRows({ config: row.data });
+}
+
+/* ---------------- pull ---------------- */
+
 export function deletePriceTableCloudRow(name) {
   deleteTableRow(name).catch((e) => console.warn('cloud delete failed', e));
 }
 
-// Pull the shared cloud copy at startup. Returns true if remote data replaced local.
+// Full refresh from the cloud. Runs at startup and again whenever the connection
+// comes back or the tab is refocused, so a device that was asleep catches up even
+// if it missed every live message.
+export async function pullAll() {
+  if (!dbEnabled()) return false;
+  // An expired token turns every request into a silent 401, which looks exactly
+  // like "sync just stopped working". Refresh first, always.
+  if (!(await ensureSession())) return false;
+  const [remote, remoteQuotes, remoteTables, remoteLists] = await Promise.all([pullState(), pullQuotes(), pullTables(), pullLists()]);
+  const hasRemote = remote || remoteQuotes?.length || remoteTables?.length || remoteLists?.length;
+  if (!hasRemote) return false;
+
+  // Prefer each row-based source; fall back to the old embedded blob (one-time migration).
+  const quotes = (remoteQuotes && remoteQuotes.length) ? remoteQuotes : (remote?.quotes || []);
+  const tables = (remoteTables || []).map((r) => ({ id: r.id, data: r.data }));
+  const lists = (remoteLists || []).map((r) => ({ id: r.id, data: r.data }));
+  if (!tables.length && remote?.tables) {
+    for (const [id, grid] of Object.entries(remote.tables)) tables.push({ id, data: { grid, minPrice: remote.minPrice?.[id] || 0 } });
+  }
+  if (!lists.length && remote?.options) {
+    for (const [id, data] of Object.entries(remote.options)) lists.push({ id, data });
+    if (remote.customLists) lists.push({ id: 'customLists', data: remote.customLists });
+  }
+  // A quote missing from the cloud was deleted by someone else — drop it here too,
+  // unless it was created on this device and has not been pushed yet.
+  const cloudIds = new Set(quotes.map((q) => q.id));
+  const deletedQuotes = state.quotes.filter((q) => !cloudIds.has(q.id) && lastPushedQuote[q.id]).map((q) => q.id);
+  applyRows({ quotes, tables, lists, deletedQuotes, config: remote });
+  return true;
+}
+
+// Startup: adopt the shared cloud copy, or seed the cloud from this device if it is
+// still empty. Returns true if remote data landed.
 export async function initCloud() {
   if (!dbEnabled()) return false;
   try {
-    const [remote, remoteQuotes, remoteTables, remoteLists] = await Promise.all([pullState(), pullQuotes(), pullTables(), pullLists()]);
-    if (remote || (remoteQuotes && remoteQuotes.length) || (remoteTables && remoteTables.length) || (remoteLists && remoteLists.length)) {
-      // Prefer each row-based source; fall back to the old embedded blob (one-time migration).
-      const quotes = (remoteQuotes && remoteQuotes.length) ? remoteQuotes : (remote?.quotes || []);
-      let tables = remote?.tables, minPrice = remote?.minPrice;
-      if (remoteTables && remoteTables.length) {
-        tables = {}; minPrice = {};
-        remoteTables.forEach((r) => { tables[r.id] = r.data.grid; minPrice[r.id] = r.data.minPrice || 0; });
-      }
-      let options = remote?.options, customLists = remote?.customLists;
-      if (remoteLists && remoteLists.length) {
-        options = {}; customLists = [];
-        remoteLists.forEach((r) => { if (r.id === 'customLists') customLists = r.data; else options[r.id] = r.data; });
-      }
-      state = normalize({
-        ...freshState(), ...(remote || {}), quotes,
-        ...(tables ? { tables } : {}), ...(minPrice ? { minPrice } : {}),
-        ...(options ? { options } : {}), ...(customLists ? { customLists } : {}),
-      });
-      localStorage.setItem(KEY, JSON.stringify(state));
-      // These rows are already synced — don't re-push them as "changed" on the next save.
-      (remoteQuotes || []).forEach((q) => { lastPushedQuote[q.id] = JSON.stringify(q); });
-      (remoteTables || []).forEach((r) => { lastPushedTable[r.id] = JSON.stringify(r.data); });
-      (remoteLists || []).forEach((r) => { lastPushedList[r.id] = JSON.stringify(r.data); });
-      scheduleSync(); // push only whatever was migrated from the old blob
-      return true;
-    }
+    if (await pullAll()) return true;
     const { quotes, ...config } = state;
     await Promise.all([
       pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
@@ -285,6 +449,21 @@ export async function initCloud() {
     console.warn('cloud init failed, using local data', e);
   }
   return false;
+}
+
+// Wire the live channel into the store. Safe to call once at startup; it is a no-op
+// without a configured Supabase project.
+export function startLiveSync() {
+  if (!dbEnabled()) return;
+  onPatch(applyRemotePatch);
+  onDbChange(applyDbChange);
+  onStatus((s) => { if (s === 'live') pullAll().catch(() => {}); });
+  connectRealtime();
+  // Belt and braces: a tab that was in the background (phone locked, laptop asleep)
+  // can miss live messages entirely — reconcile the moment it comes back.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pullAll().catch(() => {}); });
+  window.addEventListener('online', () => { connectRealtime(); pullAll().catch(() => {}); });
+  setInterval(() => { if (!document.hidden) pullAll().catch(() => {}); }, 60_000);
 }
 
 export function getState() {

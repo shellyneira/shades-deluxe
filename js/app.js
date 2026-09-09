@@ -1,20 +1,34 @@
 // Bootstrap + tab router + login gate.
 import { el } from './dom.js';
-import { initCloud } from './store.js';
+import { initCloud, startLiveSync, onStateChange } from './store.js';
 import { authRequired, ensureSession, login, logout, userEmail } from './auth.js';
 import { renderDashboard } from './dashboard.js';
 import { renderQuotes } from './quotes.js';
 import { renderTables } from './tables.js';
 import { renderLists } from './lists.js';
 import { renderSettings } from './settings.js';
+import { initPresence } from './presence.js';
 
 const VIEWS = { dashboard: renderDashboard, quotes: renderQuotes, tables: renderTables, lists: renderLists, settings: renderSettings };
 
+let current = 'dashboard';
+
 function go(view) {
   if (!VIEWS[view]) view = 'dashboard';
+  current = view;
   location.hash = view;
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
   VIEWS[view]();
+}
+
+// Someone else's edit landed. Redraw whatever is on screen — every view reads
+// straight from the store, and mount() puts the caret and scroll back where they
+// were, so a redraw is invisible to whoever is typing here.
+let redrawPending = false;
+function redraw() {
+  if (redrawPending) return;
+  redrawPending = true;
+  requestAnimationFrame(() => { redrawPending = false; VIEWS[current](); });
 }
 
 function renderLogin() {
@@ -47,7 +61,7 @@ function addLogout() {
   if (!authRequired() || document.querySelector('.logout-btn')) return;
   const bar = document.querySelector('.topbar');
   bar.append(el('button', {
-    class: 'btn ghost small logout-btn', style: 'margin-left:auto', title: userEmail(),
+    class: 'btn ghost small logout-btn', style: 'margin-left:12px', title: userEmail(),
     onclick: logout,
   }, ['Log out']));
 }
@@ -56,8 +70,10 @@ function startApp() {
   addLogout();
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
   window.addEventListener('hashchange', () => go(location.hash.slice(1)));
+  onStateChange((reason) => { if (reason === 'remote') redraw(); });
   go(location.hash.slice(1) || 'dashboard');
-  initCloud().then((replaced) => { if (replaced) go(location.hash.slice(1) || 'dashboard'); });
+  initPresence();
+  initCloud().then(() => { startLiveSync(); redraw(); });
 }
 
 async function boot() {

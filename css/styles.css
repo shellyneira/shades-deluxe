@@ -376,3 +376,58 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
   @page inv { margin: 0; }
   @page { margin: 12mm; }
 }
+
+/* ---------- live collaboration ---------- */
+.presence-bar { display: flex; align-items: center; gap: 8px; }
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; color: #fff; font-weight: 800; letter-spacing: .3px;
+  background: var(--who, var(--muted));
+  box-shadow: 0 0 0 2px var(--panel), 0 1px 3px rgba(40, 30, 20, .18);
+  user-select: none;
+}
+.presence-bar .avatar + .avatar { margin-left: -8px; }
+.avatar.more { width: 26px; height: 26px; font-size: 10px; background: var(--line-strong); color: var(--ink-soft); }
+
+.sync-pill {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 6px;
+  padding: 3px 10px 3px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .2px;
+  background: var(--line); color: var(--muted);
+}
+.sync-pill.live { background: #eaf3ed; color: var(--accent-dark); }
+.sync-pill.connecting { background: #f7efe0; color: #8a6b25; }
+.sync-pill.offline { background: #f7e5e0; color: var(--danger); }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sync-pill.live .live-dot { animation: live-pulse 2s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* Rings are drawn in a fixed overlay so a re-render never disturbs them and they
+   never change the layout of the field they point at. */
+.presence-layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+.peer-ring {
+  position: fixed; border: 2px solid var(--who); border-radius: 8px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--who) 16%, transparent);
+  transition: left .12s ease, top .12s ease, width .12s ease, height .12s ease;
+}
+.peer-ring.soft { border-style: dashed; border-radius: var(--radius); box-shadow: none; }
+.peer-tag {
+  /* right-hand side: the label above a field lives on the left, and covering it
+     would hide the very thing the ring is pointing at */
+  position: absolute; right: -2px; top: -19px; white-space: nowrap;
+  padding: 1px 7px; border-radius: 6px 6px 0 6px;
+  background: var(--who); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .2px;
+}
+
+.peer-banner {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 999px;
+  background: color-mix(in srgb, var(--who) 12%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--who) 40%, transparent);
+  box-shadow: var(--shadow);
+  color: var(--ink-soft); font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.peer-banner .live-dot { background: var(--who); animation: live-pulse 2s ease-in-out infinite; }
+
+@media print { .presence-layer, .presence-bar, .peer-banner { display: none !important; } }
