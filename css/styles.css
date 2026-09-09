@@ -398,6 +398,7 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 .sync-pill.live { background: #eaf3ed; color: var(--accent-dark); }
 .sync-pill.connecting { background: #f7efe0; color: #8a6b25; }
 .sync-pill.offline { background: #f7e5e0; color: var(--danger); }
+.sync-pill.error { background: var(--danger); color: #fff; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .sync-pill.live .live-dot { animation: live-pulse 2s ease-in-out infinite; }
 @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
