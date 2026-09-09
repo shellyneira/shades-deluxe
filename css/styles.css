@@ -390,7 +390,9 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 
 /* The "someone is here" signal: a halo that swells and fades out of the avatar,
    about the pace of a calm breath. Live sync needs no words when it is working. */
-.avatar.breathing { animation: avatar-breathe 3s ease-in-out infinite; }
+.avatar.breathing { animation: avatar-breathe 2.4s ease-in-out infinite; }
+/* Present but not doing anything: a quiet ring, no motion. */
+.avatar.idle { box-shadow: 0 0 0 2px var(--panel), 0 0 0 2px color-mix(in srgb, var(--who) 30%, transparent); }
 @keyframes avatar-breathe {
   0%, 100% { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px color-mix(in srgb, var(--who) 55%, transparent); }
   50%      { box-shadow: 0 0 0 2px var(--panel), 0 0 0 8px color-mix(in srgb, var(--who) 0%, transparent); }
@@ -447,4 +449,15 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 }
 .peer-banner .live-dot { background: var(--who); animation: live-pulse 2s ease-in-out infinite; }
 
-@media print { .presence-layer, .presence-bar, .peer-banner { display: none !important; } }
+/* Live cursors — same colour as that person's avatar, so the pointer on screen and
+   the circle in the top bar are obviously the same human. */
+.peer-cursor { position: fixed; pointer-events: none; z-index: 61; transition: left .08s linear, top .08s linear; }
+.cursor-arrow { display: block; filter: drop-shadow(0 1px 2px rgba(40, 30, 20, .3)); }
+.cursor-name {
+  position: absolute; left: 14px; top: 18px; white-space: nowrap;
+  padding: 2px 7px; border-radius: 4px 8px 8px 8px;
+  background: var(--who); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .2px;
+  box-shadow: 0 1px 3px rgba(40, 30, 20, .25);
+}
+
+@media print { .presence-layer, .presence-bar, .peer-banner, .peer-cursor { display: none !important; } }

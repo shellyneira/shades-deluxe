@@ -5,7 +5,7 @@
 //     focused — the same path trick that keeps our own caret alive across renders
 //   • per-quote markers in the list and a banner inside a shared quote
 import { el, nodePath, nodeAtPath, onAfterMount } from './dom.js';
-import { trackPresence, onPresence, onStatus, getPeers, myColor } from './realtime.js';
+import { trackPresence, onPresence, onStatus, onLive, broadcastLive, getPeers, myColor } from './realtime.js';
 import { onSyncState } from './store.js';
 import { userEmail, displayName, refreshUser } from './auth.js';
 import { currentQuoteRef } from './quotes.js';
@@ -77,9 +77,11 @@ function setField(f, label) {
 /* ---------------- top bar ---------------- */
 
 let roster = [];
+const activity = new Map(); // user id -> last time they did something
 function avatar(p, size = 28, extraClass = '') {
   return el('span', {
     class: 'avatar ' + extraClass,
+    'data-who': p.id || 'me',
     style: `--who:${p.color};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.4)}px`,
     title: `${p.name} · ${p.label || ''}${p.fieldLabel ? ' · editing ' + p.fieldLabel : ''}`,
   }, [labelInitials(p.name, roster)]);
@@ -87,7 +89,7 @@ function avatar(p, size = 28, extraClass = '') {
 
 function renderBar() {
   if (!bar) return;
-  const me = { name: displayName(), color: myColor(), label: 'You', email: userEmail() };
+  const me = { id: 'me', name: displayName(), color: myColor(), label: 'You', email: userEmail() };
   roster = [...peers.map((p) => p.name), me.name];
   // replaceChildren() turns a null into a literal "null" text node — filter first.
   bar.replaceChildren(...[
@@ -107,15 +109,89 @@ const STATUS_TEXT = { live: 'Live', connecting: 'Connecting…', offline: 'Offli
 // disconnected, or a write that has not landed.
 let connection = 'connecting';
 let saving = 'saved';
+const ACTIVE_FOR = 4000;
+const isActive = (id) => Date.now() - (activity.get(id) || 0) < ACTIVE_FOR;
+
 function renderStatus() {
   const bad = saving === 'error';
   const healthy = connection === 'live' && !bad;
-  if (bar) bar.querySelectorAll('.avatar').forEach((a) => a.classList.toggle('breathing', healthy));
+  // The halo marks a person who is *doing* something right now — moving, typing,
+  // saving. A halo that simply meant "connected" was on permanently and therefore
+  // told you nothing.
+  if (bar) bar.querySelectorAll('.avatar').forEach((a) => {
+    a.classList.toggle('breathing', healthy && isActive(a.dataset.who));
+    a.classList.toggle('idle', healthy && !isActive(a.dataset.who));
+  });
   if (!pill) return;
   pill.hidden = healthy;
   pill.className = 'sync-pill ' + (bad ? 'error' : connection);
   pill.title = bad ? 'Could not save to the cloud — retrying. Do not close this tab.' : 'Live sync status';
   pill.lastChild.textContent = bad ? 'Not saved' : STATUS_TEXT[connection] || connection;
+}
+
+/* ---------------- live cursors ----------------
+   Positions travel as fractions of the #app box, not pixels: the two screens are
+   rarely the same size, and a fraction lands on the same *element* on both. The
+   layer is fixed, so a cursor pointing at something you have scrolled past simply
+   leaves the viewport, which is the honest answer. */
+
+const cursors = new Map(); // user -> { x, y, scope, at, typing }
+const CURSOR_TTL = 10_000;
+
+function appBox() {
+  const app = document.getElementById('app');
+  return app ? app.getBoundingClientRect() : null;
+}
+
+// Cursor traffic is gated on somebody actually being there to see it. Alone in the
+// app — which is most of the time — this sends nothing at all, which matters on a
+// metered Realtime quota: an ungated 20 messages a second would spend a month's
+// allowance in a couple of days of two people working.
+let lastSent = 0;
+let lastPt = { x: -1, y: -1 };
+function sendCursor(e) {
+  if (!peers.length) return;
+  const now = Date.now();
+  if (now - lastSent < 60) return;
+  const box = appBox();
+  if (!box || !box.width || !box.height) return;
+  const x = (e.clientX - box.left) / box.width;
+  const y = (e.clientY - box.top) / box.height;
+  if (Math.abs(x - lastPt.x) < 0.002 && Math.abs(y - lastPt.y) < 0.002) return;
+  lastSent = now;
+  lastPt = { x, y };
+  broadcastLive({ scope: ctx.scope, x, y });
+}
+
+let lastPing = 0;
+function sendTypingPing() {
+  if (!peers.length) return;
+  const now = Date.now();
+  if (now - lastPing < 500) return;
+  lastPing = now;
+  broadcastLive({ scope: ctx.scope, typing: true });
+}
+
+// The pointer itself, drawn rather than imported — an SVG arrow with the person's
+// name tucked under its tip, in the same colour as their avatar.
+function cursorNode(peer, pt) {
+  return el('div', { class: 'peer-cursor', style: `--who:${peer.color};left:${pt.left}px;top:${pt.top}px` }, [
+    el('span', { class: 'cursor-arrow', html: '<svg width="18" height="20" viewBox="0 0 18 20"><path d="M2 1.5 15.5 11 9.4 12.1 6.6 18.2Z" fill="var(--who)" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>' }, []),
+    el('span', { class: 'cursor-name' }, [peer.name]),
+  ]);
+}
+
+function cursorMarks() {
+  const box = appBox();
+  if (!box) return [];
+  const now = Date.now();
+  const out = [];
+  for (const p of peers) {
+    const c = cursors.get(p.id);
+    if (!c || now - c.at > CURSOR_TTL || c.scope !== ctx.scope) continue;
+    out.push(cursorNode(p, { left: box.left + c.x * box.width, top: box.top + c.y * box.height }));
+  }
+  return out;
 }
 
 /* ---------------- field rings ---------------- */
@@ -150,7 +226,7 @@ function decorate() {
     ]));
   }
 
-  layer.replaceChildren(...[...marks, banner(here)].filter(Boolean));
+  layer.replaceChildren(...[...marks, ...cursorMarks(), banner(here)].filter(Boolean));
 }
 
 // Two people on the same screen: say so plainly, since the rings are easy to miss
@@ -164,6 +240,13 @@ function banner(here) {
   const what = ctx.quoteId ? 'this quote' : 'this page';
   const text = names.length === 1 ? `${names[0]} is on ${what} right now` : `${names.join(', ')} are on ${what} right now`;
   return el('div', { class: 'peer-banner', style: `--who:${here[0].color}` }, [el('span', { class: 'live-dot' }, []), el('span', {}, [text])]);
+}
+
+let statusPending = false;
+function scheduleStatus() {
+  if (statusPending) return;
+  statusPending = true;
+  requestAnimationFrame(() => { statusPending = false; renderStatus(); });
 }
 
 let rafPending = false;
@@ -187,7 +270,28 @@ export function initPresence() {
   if (logout) topbar.insertBefore(bar, logout); else topbar.append(bar);
 
   onStatus((s) => { connection = s; renderStatus(); });
-  onSyncState((s) => { saving = s; renderStatus(); });
+  onSyncState((s) => {
+    saving = s;
+    if (s === 'saving') { activity.set('me', Date.now()); scheduleStatus(); }
+    renderStatus();
+  });
+
+  // Somebody else moved or typed.
+  onLive((m) => {
+    if (m.gone) cursors.delete(m.user);
+    else if (m.x != null) cursors.set(m.user, { x: m.x, y: m.y, scope: m.scope, at: Date.now() });
+    activity.set(m.user, Date.now());
+    scheduleDecorate();
+    renderStatus();
+  });
+
+  document.addEventListener('pointermove', (e) => { activity.set('me', Date.now()); sendCursor(e); }, { passive: true });
+  document.addEventListener('input', () => { activity.set('me', Date.now()); sendTypingPing(); scheduleStatus(); });
+  // Leaving the window should take the cursor with you, not strand it mid-screen.
+  document.addEventListener('mouseleave', () => { if (peers.length) broadcastLive({ scope: ctx.scope, gone: true }); });
+  // Halos have to switch themselves off when someone goes quiet; nothing else
+  // would fire once the messages stop.
+  setInterval(() => { renderStatus(); scheduleDecorate(); }, 1500);
   onPresence((list) => {
     peers = list;
     renderBar();
