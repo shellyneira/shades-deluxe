@@ -8,6 +8,9 @@ import { DRAPERY_STYLES, DRAPERY_RATE_LABELS } from './pricing.js';
 
 let active = null;
 
+// Which price table is open — read by presence.js.
+export const activeTable = () => active;
+
 // Deterministic color per category so new ones (Drapery, Outdoor, ...) just work
 // without editing CSS — index into a small fixed palette, not name-keyed classes.
 const PALETTE = ['#b9552f', '#3a6ea5', '#3f7d5f', '#8e44ad', '#c99a3f', '#c0392b', '#16a085', '#7f6a4a'];

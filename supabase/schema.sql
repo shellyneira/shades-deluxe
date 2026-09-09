@@ -70,3 +70,35 @@ create policy "authed read"   on option_lists for select to authenticated using 
 create policy "authed insert" on option_lists for insert to authenticated with check (true);
 create policy "authed update" on option_lists for update to authenticated using (true) with check (true);
 create policy "authed delete" on option_lists for delete to authenticated using (true);
+
+-- ---------------------------------------------------------------------------
+-- Live collaboration (Realtime). Without this block the app still syncs, but only
+-- by polling — changes take up to a minute instead of showing up as they happen,
+-- and you will not see who else is in the app.
+-- ---------------------------------------------------------------------------
+
+-- 1. Stream row changes for the four tables to connected clients.
+do $$
+declare t text;
+begin
+  foreach t in array array['app_state', 'quotes', 'price_tables', 'option_lists'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
+-- 2. DELETEs must carry enough of the old row for clients to know what vanished.
+alter table quotes        replica identity full;
+alter table price_tables  replica identity full;
+alter table option_lists  replica identity full;
+
+-- 3. The app's channel is private, so joining it (presence + the instant patches
+--    that make edits appear as they are typed) requires a logged-in user.
+drop policy if exists "authed realtime read"  on realtime.messages;
+drop policy if exists "authed realtime write" on realtime.messages;
+create policy "authed realtime read"  on realtime.messages for select to authenticated using (true);
+create policy "authed realtime write" on realtime.messages for insert to authenticated with check (true);

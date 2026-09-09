@@ -51,9 +51,64 @@ export function confirmAction(message) {
   return window.confirm(message);
 }
 
+/* ---- element paths ----
+   The index of an element among its ancestors' element-children, from #app down
+   ("3.1.0.2"). Two people looking at the same screen build the same DOM from the
+   same state, so the path of a field is the same string on both machines — which is
+   what lets one screen point at "the box the other person is typing in" without
+   every input having to be given an id. It is also how focus survives a re-render. */
+export function nodePath(node, root = document.getElementById('app')) {
+  const parts = [];
+  let n = node;
+  while (n && n !== root) {
+    const parent = n.parentElement;
+    if (!parent) return null;
+    parts.unshift([...parent.children].indexOf(n));
+    n = parent;
+  }
+  return n === root ? parts.join('.') : null;
+}
+
+export function nodeAtPath(path, root = document.getElementById('app')) {
+  if (path == null || path === '') return null;
+  let n = root;
+  for (const i of String(path).split('.')) {
+    n = n?.children?.[Number(i)];
+    if (!n) return null;
+  }
+  return n;
+}
+
+const afterMount = [];
+export function onAfterMount(fn) { afterMount.push(fn); }
+
+// A field the local user is typing in must survive a re-render caused by someone
+// else's edit — otherwise every keystroke of theirs would kick the caret out of this
+// user's box. Same path, same caret, same scroll.
+function captureFocus(root) {
+  const a = document.activeElement;
+  if (!a || !root.contains(a) || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return null;
+  const path = nodePath(a, root);
+  if (!path) return null;
+  const sel = /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'number' && a.type !== 'date' && a.type !== 'checkbox';
+  return { path, tag: a.tagName, start: sel ? a.selectionStart : null, end: sel ? a.selectionEnd : null, y: window.scrollY };
+}
+
+function restoreFocus(root, f) {
+  if (!f) return;
+  const n = nodeAtPath(f.path, root);
+  if (!n || n.tagName !== f.tag) return;
+  n.focus({ preventScroll: true });
+  if (f.start != null) { try { n.setSelectionRange(f.start, f.end); } catch { /* type has no selection */ } }
+  window.scrollTo(0, f.y);
+}
+
 export function mount(node) {
   const app = document.getElementById('app');
+  const focus = captureFocus(app);
   app.replaceChildren(node);
+  restoreFocus(app, focus);
+  afterMount.forEach((fn) => { try { fn(); } catch (e) { console.warn(e); } });
 }
 
 let toastTimer;

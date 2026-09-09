@@ -6,6 +6,9 @@ import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
 
+// Which quote this screen is on — read by presence.js to tell everyone else.
+export const currentQuoteRef = () => sub;
+
 export function renderQuotes() {
   if (sub.view === 'edit' && getQuote(sub.quoteId)) return mount(editor(getQuote(sub.quoteId)));
   if (sub.view === 'invoice' && getQuote(sub.quoteId)) return mount(invoice(getQuote(sub.quoteId)));
@@ -43,7 +46,7 @@ function list() {
       const t = quoteTotals(q, s);
       const st = q.stage || 'Quote';
       const num = isInvoiceStage(st) && q.invoiceNumber ? 'INV #' + q.invoiceNumber : 'Q #' + q.number;
-      return el('div', { class: 'card', onclick: () => open(q.id) }, [
+      return el('div', { class: 'card', 'data-quote-id': q.id, onclick: () => open(q.id) }, [
         el('div', { class: 'status' }, [el('span', { class: 'badge ' + stageClass(st) }, [st])]),
         el('div', { class: 'muted' }, [num + ' · ' + (q.date || '')]),
         el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
