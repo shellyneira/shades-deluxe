@@ -71,6 +71,16 @@ function metrics(s) {
 
   const recent = [...rows].sort((a, b) => (b.q.date || '').localeCompare(a.q.date || '')).slice(0, 6);
 
+  // A line whose size falls outside its price table has no price at all, and every
+  // total treats that as zero — so a quote can go out with a shade on it nobody
+  // charged for. The worksheet shows a dash, but the document the client sees
+  // prints $0.00, which is easy to miss and expensive to miss.
+  const unpriced = [];
+  for (const r of rows) {
+    const n = r.q.items.filter((it) => computeLine(it, s).unit == null).length;
+    if (n) unpriced.push({ number: r.q.number, name: r.q.client?.name || 'Untitled client', lines: n });
+  }
+
   return {
     pipeline: sum(open, 'total'), invoiced: invoicedTotal,
     collected, outstanding: invoicedTotal - collected,
@@ -78,7 +88,7 @@ function metrics(s) {
     margin: invoicedTotal ? Math.round((sum(invoiced, 'profit') / invoicedTotal) * 100) : 0,
     conversion: rows.length ? Math.round((invoiced.length / rows.length) * 100) : 0,
     count: rows.length, openCount: open.length, invoicedCount: invoiced.length,
-    monthly, topProducts, mix, byStage, recent,
+    monthly, topProducts, mix, byStage, recent, unpriced,
   };
 }
 
@@ -189,12 +199,15 @@ function donut(mix) {
 
 // How much of what has been invoiced is actually in the bank.
 function collection(m) {
-  const pct = m.invoiced ? (m.collected / m.invoiced) * 100 : 0;
+  // With nothing invoiced there is nothing owed either — the proportional reading
+  // would otherwise announce "100% still owed" over a balance of zero.
+  if (!m.invoiced) return el('div', { class: 'empty-sm' }, ['Nothing invoiced yet']);
+  const pct = (m.collected / m.invoiced) * 100;
   return el('div', {}, [
-    el('div', { class: 'stack tall' }, m.invoiced ? [
+    el('div', { class: 'stack tall' }, [
       el('div', { class: 'stack-seg', style: `width:${pct}%;background:#5e8c6a`, title: 'Collected ' + money(m.collected) }, []),
       el('div', { class: 'stack-seg', style: `width:${100 - pct}%;background:#e0d6c6`, title: 'Outstanding ' + money(m.outstanding) }, []),
-    ] : [el('div', { class: 'stack-seg empty', style: 'width:100%' }, [])]),
+    ]),
     el('div', { class: 'legend-rows' }, [
       legendRow('#5e8c6a', 'Collected', Math.round(pct) + '%', money(m.collected)),
       legendRow('#e0d6c6', 'Still owed', Math.round(100 - pct) + '%', money(m.outstanding)),
@@ -210,6 +223,20 @@ function recentList(recent) {
     el('span', { class: 'recent-date' }, [r.q.date || '—']),
     el('span', { class: 'recent-amt' }, [money(r.total)]),
   ])));
+}
+
+// The one thing on this board worth interrupting someone for.
+function unpricedWarning(unpriced) {
+  if (!unpriced.length) return null;
+  const lines = unpriced.reduce((a, u) => a + u.lines, 0);
+  const who = unpriced.slice(0, 4).map((u) => `#${u.number} ${u.name}`).join(', ');
+  return el('div', { class: 'alert' }, [
+    el('span', { class: 'alert-mark' }, ['!']),
+    el('div', {}, [
+      el('strong', {}, [`${lines} line${lines > 1 ? 's' : ''} on ${unpriced.length} quote${unpriced.length > 1 ? 's' : ''} ${lines > 1 ? 'have' : 'has'} no price`]),
+      el('div', { class: 'alert-sub' }, [`The size falls outside its price table, so it counts as $0 here — and prints as $0.00 on the client's quote. ${who}${unpriced.length > 4 ? '…' : ''}`]),
+    ]),
+  ]);
 }
 
 const card = (title, note, body, wide) => el('div', { class: 'panel dash-card' + (wide ? ' wide' : '') }, [
@@ -228,6 +255,7 @@ export function renderDashboard() {
         el('div', { class: 'hint' }, [`${m.count} quote(s) · ${m.openCount} open · ${m.invoicedCount} invoiced · profit uses your cost factor (Settings → Rates)`]),
       ]),
     ]),
+    unpricedWarning(m.unpriced),
     el('div', { class: 'kpi-row' }, [
       tile('Open pipeline', money(m.pipeline), `${m.openCount} not yet accepted`, '#4a6d8c'),
       tile('Invoiced', money(m.invoiced), `Est. profit ${money(m.profit)} · ${m.margin}% margin`, '#5e8c6a'),
@@ -236,7 +264,7 @@ export function renderDashboard() {
     ]),
     el('div', { class: 'dash-grid' }, [
       card('Where the money sits', 'by stage', stageBar(m.byStage), true),
-      card('Revenue by month', 'last 6', monthChart(m.monthly), true),
+      card('Revenue by month', 'by quote date · last 6', monthChart(m.monthly), true),
       card('Collection', 'of invoiced', collection(m)),
       card('Top products', 'by value', ranked(m.topProducts, (i) => money(i.value))),
       card('Product mix', 'by category', donut(m.mix)),
