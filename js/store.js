@@ -229,6 +229,18 @@ const listeners = [];
 // reason: 'local' | 'remote' — views re-render on either, but only a remote change
 // needs the focus-preserving path.
 export function onStateChange(fn) { listeners.push(fn); }
+
+// 'saved' | 'saving' | 'error'. A write that does not reach the database has to be
+// visible on screen — silently keeping it in localStorage is what let a whole day's
+// quotes disappear.
+let syncState = 'saved';
+const syncListeners = [];
+export function onSyncState(fn) { syncListeners.push(fn); fn(syncState); }
+function setSyncState(s) {
+  if (s === syncState) return;
+  syncState = s;
+  syncListeners.forEach((fn) => { try { fn(s); } catch (e) { console.warn(e); } });
+}
 function notify(reason) { listeners.forEach((fn) => { try { fn(reason); } catch (e) { console.warn(e); } }); }
 
 // Price tables/minPrice and options/customLists are split into per-row payloads
@@ -256,6 +268,7 @@ function scheduleSync() {
     const changedQuotes = state.quotes.filter((q) => JSON.stringify(q) !== lastPushedQuote[q.id]);
     const changedTables = changedSince(lastPushedTable, tableRows(state));
     const changedLists = changedSince(lastPushedList, listRows(state));
+    setSyncState('saving');
     Promise.all([
       pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
       pushQuotes(changedQuotes),
@@ -266,8 +279,16 @@ function scheduleSync() {
         changedQuotes.forEach((q) => { lastPushedQuote[q.id] = JSON.stringify(q); });
         changedTables.forEach((r) => { lastPushedTable[r.id] = JSON.stringify(r.data); });
         changedLists.forEach((r) => { lastPushedList[r.id] = JSON.stringify(r.data); });
+        setSyncState('saved');
       })
-      .catch((e) => console.warn('cloud sync failed', e));
+      .catch((e) => {
+        // Nothing is lost — the rows stay marked as unsent and go up on the next
+        // attempt — but the user has to know it has not landed yet.
+        setSyncState('error');
+        console.warn('cloud sync failed', e);
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(scheduleSync, 5000);
+      });
   }, 600);
 }
 
@@ -437,7 +458,7 @@ export async function pullAll() {
 export async function initCloud() {
   if (!dbEnabled()) return false;
   try {
-    if (await pullAll()) return true;
+    if (await pullAll()) { reconcileUpwards(); return true; }
     const { quotes, ...config } = state;
     await Promise.all([
       pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
@@ -449,6 +470,17 @@ export async function initCloud() {
     console.warn('cloud init failed, using local data', e);
   }
   return false;
+}
+
+// Anything on this device that the cloud has never seen goes up now. Quotes written
+// while the access token was expired only ever reached localStorage; without this
+// they would sit in one browser forever, since nothing else re-sends a row that was
+// never acknowledged.
+function reconcileUpwards() {
+  const unsent = state.quotes.filter((q) => !lastPushedQuote[q.id]).length
+    + changedSince(lastPushedTable, tableRows(state)).length
+    + changedSince(lastPushedList, listRows(state)).length;
+  if (unsent) scheduleSync();
 }
 
 // Wire the live channel into the store. Safe to call once at startup; it is a no-op

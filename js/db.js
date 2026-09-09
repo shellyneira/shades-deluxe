@@ -4,13 +4,18 @@
 // person edits those. Quotes, price tables and lists are each their own rows
 // (see below) so two people editing different things never clobber each other.
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
-import { accessToken } from './auth.js';
+import { accessToken, ensureSession } from './auth.js';
 
 export function dbEnabled() {
   return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
-function headers(extra = {}) {
+// The access token expires about hourly. A tab left open all day would otherwise
+// keep sending a dead token, and PostgREST answers 401 — so every write silently
+// vanished while the app still looked like it had saved (localStorage had it).
+// That is how quotes went missing. Refresh before every single request instead.
+async function headers(extra = {}) {
+  await ensureSession();
   return {
     apikey: SUPABASE_ANON_KEY,
     Authorization: 'Bearer ' + accessToken(),
@@ -21,7 +26,7 @@ function headers(extra = {}) {
 
 export async function pullState() {
   if (!dbEnabled()) return null;
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.main&select=data`, { headers: headers() });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.main&select=data`, { headers: await headers() });
   if (!r.ok) throw new Error('pull ' + r.status);
   const rows = await r.json();
   return rows[0]?.data ?? null;
@@ -31,7 +36,7 @@ export async function pushState(data) {
   if (!dbEnabled()) return;
   const r = await fetch(`${SUPABASE_URL}/rest/v1/app_state?on_conflict=id`, {
     method: 'POST',
-    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    headers: await headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
     body: JSON.stringify([{ id: 'main', data, updated_at: new Date().toISOString() }]),
   });
   if (!r.ok) throw new Error('push ' + r.status);
@@ -40,7 +45,7 @@ export async function pushState(data) {
 // Quotes are their own rows (id per quote) so devices don't clobber each other's work.
 export async function pullQuotes() {
   if (!dbEnabled()) return null;
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/quotes?select=data&order=number.desc`, { headers: headers() });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/quotes?select=data&order=number.desc`, { headers: await headers() });
   if (!r.ok) throw new Error('pullq ' + r.status);
   return (await r.json()).map((row) => row.data);
 }
@@ -50,7 +55,7 @@ export async function pushQuotes(quotes) {
   const rows = quotes.map((q) => ({ id: q.id, number: q.number, client_name: q.client?.name || '', status: q.status || 'draft', data: q, updated_at: new Date().toISOString() }));
   const r = await fetch(`${SUPABASE_URL}/rest/v1/quotes?on_conflict=id`, {
     method: 'POST',
-    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    headers: await headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
     body: JSON.stringify(rows),
   });
   if (!r.ok) throw new Error('pushq ' + r.status);
@@ -58,14 +63,14 @@ export async function pushQuotes(quotes) {
 
 export async function deleteQuoteRow(id) {
   if (!dbEnabled()) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/quotes?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: headers() });
+  await fetch(`${SUPABASE_URL}/rest/v1/quotes?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: await headers() });
 }
 
 // Price tables are also their own rows (id = table name) — otherwise editing one
 // table on one device and anything else on another silently drops the other's rows.
 export async function pullTables() {
   if (!dbEnabled()) return null;
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/price_tables?select=id,data`, { headers: headers() });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/price_tables?select=id,data`, { headers: await headers() });
   if (!r.ok) throw new Error('pullt ' + r.status);
   return r.json();
 }
@@ -75,7 +80,7 @@ export async function pushTables(rows) {
   const body = rows.map((row) => ({ id: row.id, data: row.data, updated_at: new Date().toISOString() }));
   const r = await fetch(`${SUPABASE_URL}/rest/v1/price_tables?on_conflict=id`, {
     method: 'POST',
-    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    headers: await headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error('pusht ' + r.status);
@@ -83,13 +88,13 @@ export async function pushTables(rows) {
 
 export async function deleteTableRow(id) {
   if (!dbEnabled()) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/price_tables?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: headers() });
+  await fetch(`${SUPABASE_URL}/rest/v1/price_tables?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: await headers() });
 }
 
 // Lists (dropdown options) — one row per list key, same reasoning as price tables.
 export async function pullLists() {
   if (!dbEnabled()) return null;
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/option_lists?select=id,data`, { headers: headers() });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/option_lists?select=id,data`, { headers: await headers() });
   if (!r.ok) throw new Error('pulll ' + r.status);
   return r.json();
 }
@@ -99,7 +104,7 @@ export async function pushLists(rows) {
   const body = rows.map((row) => ({ id: row.id, data: row.data, updated_at: new Date().toISOString() }));
   const r = await fetch(`${SUPABASE_URL}/rest/v1/option_lists?on_conflict=id`, {
     method: 'POST',
-    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    headers: await headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error('pushl ' + r.status);

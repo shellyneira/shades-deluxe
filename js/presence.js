@@ -6,7 +6,8 @@
 //   • per-quote markers in the list and a banner inside a shared quote
 import { el, nodePath, nodeAtPath, onAfterMount } from './dom.js';
 import { trackPresence, onPresence, onStatus, getPeers, myColor } from './realtime.js';
-import { userEmail } from './auth.js';
+import { onSyncState } from './store.js';
+import { userEmail, displayName, refreshUser } from './auth.js';
 import { currentQuoteRef } from './quotes.js';
 import { activeTable } from './tables.js';
 import { getState } from './store.js';
@@ -17,7 +18,14 @@ let layer;
 let bar;
 let pill;
 
-const initials = (name) => name.split(/[.\s_-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+// Two letters, so a team of single-word names (Shelly, Sarkis) does not collapse
+// into a row of identical "S" circles.
+function initials(name) {
+  const words = name.split(/[.\s_-]+/).filter(Boolean);
+  if (!words.length) return '?';
+  const raw = words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2);
+  return raw.toUpperCase();
+}
 const shorten = (t) => (t.length > 34 ? t.slice(0, 33) + '…' : t);
 
 /* ---------------- context: which screen am I on ---------------- */
@@ -43,10 +51,10 @@ function describe(view) {
 // each view having to remember to announce itself.
 function updateContext() {
   const view = location.hash.slice(1) || 'dashboard';
-  const next = { view, ...describe(view), field, fieldLabel };
+  const next = { view, ...describe(view), field, fieldLabel, name: displayName() };
   if (JSON.stringify(next) === JSON.stringify(ctx)) return;
   ctx = next;
-  trackPresence({ ...next, name: (userEmail() || 'you').split('@')[0] });
+  trackPresence(next);
 }
 
 let field = null;
@@ -69,16 +77,31 @@ function avatar(p, size = 28) {
 
 function renderBar() {
   if (!bar) return;
-  const me = { name: (userEmail() || 'you').split('@')[0], color: myColor(), label: 'You' };
-  bar.replaceChildren(
+  const me = { name: displayName(), color: myColor(), label: 'You', email: userEmail() };
+  // replaceChildren() turns a null into a literal "null" text node — filter first.
+  bar.replaceChildren(...[
     ...peers.slice(0, 5).map((p) => avatar(p)),
     peers.length > 5 ? el('span', { class: 'avatar more' }, ['+' + (peers.length - 5)]) : null,
     avatar(me, 26),
     pill,
-  );
+  ].filter(Boolean));
 }
 
 const STATUS_TEXT = { live: 'Live', connecting: 'Connecting…', offline: 'Offline' };
+
+// The pill answers one question: is my work safe? A failed write outranks the
+// socket state — the channel being up is no comfort if nothing is being saved.
+let connection = 'connecting';
+let saving = 'saved';
+function renderPill() {
+  if (!pill) return;
+  const bad = saving === 'error';
+  pill.className = 'sync-pill ' + (bad ? 'error' : connection);
+  pill.title = bad
+    ? 'Could not save to the cloud — retrying. Do not close this tab.'
+    : 'Live sync status';
+  pill.lastChild.textContent = bad ? 'Not saved' : (saving === 'saving' && connection === 'live' ? 'Saving…' : STATUS_TEXT[connection] || connection);
+}
 
 /* ---------------- field rings ---------------- */
 
@@ -112,7 +135,7 @@ function decorate() {
     ]));
   }
 
-  layer.replaceChildren(...marks, banner(here));
+  layer.replaceChildren(...[...marks, banner(here)].filter(Boolean));
 }
 
 // Two people on the same screen: say so plainly, since the rings are easy to miss
@@ -148,10 +171,8 @@ export function initPresence() {
   bar.style.marginLeft = 'auto';
   if (logout) topbar.insertBefore(bar, logout); else topbar.append(bar);
 
-  onStatus((s) => {
-    pill.className = 'sync-pill ' + s;
-    pill.lastChild.textContent = STATUS_TEXT[s] || s;
-  });
+  onStatus((s) => { connection = s; renderPill(); });
+  onSyncState((s) => { saving = s; renderPill(); });
   onPresence((list) => {
     peers = list;
     renderBar();
@@ -175,4 +196,6 @@ export function initPresence() {
   document.addEventListener('input', scheduleDecorate);
   renderBar();
   updateContext();
+  // Picks up a display name added after this browser last signed in.
+  refreshUser().then((ok) => { if (ok) { renderBar(); updateContext(); } });
 }

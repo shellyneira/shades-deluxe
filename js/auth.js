@@ -17,6 +17,31 @@ export function userEmail() {
   return getSession()?.user?.email || '';
 }
 
+// The name shown on avatars and next to someone's cursor. Set per user in Supabase
+// (Authentication → Users → user metadata `display_name`), never hardcoded here —
+// the email local part is only a fallback for an account that has not been given one.
+export function displayName() {
+  const u = getSession()?.user;
+  return u?.user_metadata?.display_name || u?.user_metadata?.full_name || (u?.email || 'you').split('@')[0];
+}
+
+// A session stored before the display name was set still carries the old metadata,
+// and it would not refresh until the token expired. Ask the server for the current
+// user once at startup so the right name shows immediately.
+export async function refreshUser() {
+  const s = getSession();
+  if (!s?.access_token) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + s.access_token },
+    });
+    if (!r.ok) return false;
+    const user = await r.json();
+    localStorage.setItem(SKEY, JSON.stringify({ ...s, user }));
+    return true;
+  } catch { return false; }
+}
+
 // Token used for authenticated PostgREST calls (falls back to anon before login).
 export function accessToken() {
   return getSession()?.access_token || SUPABASE_ANON_KEY;
