@@ -7,7 +7,7 @@
 import { el, nodePath, nodeAtPath, onAfterMount } from './dom.js';
 import { trackPresence, onPresence, onStatus, getPeers, myColor } from './realtime.js';
 import { onSyncState } from './store.js';
-import { userEmail } from './auth.js';
+import { userEmail, displayName, refreshUser } from './auth.js';
 import { currentQuoteRef } from './quotes.js';
 import { activeTable } from './tables.js';
 import { getState } from './store.js';
@@ -18,7 +18,14 @@ let layer;
 let bar;
 let pill;
 
-const initials = (name) => name.split(/[.\s_-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+// Two letters, so a team of single-word names (Shelly, Sarkis) does not collapse
+// into a row of identical "S" circles.
+function initials(name) {
+  const words = name.split(/[.\s_-]+/).filter(Boolean);
+  if (!words.length) return '?';
+  const raw = words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2);
+  return raw.toUpperCase();
+}
 const shorten = (t) => (t.length > 34 ? t.slice(0, 33) + '…' : t);
 
 /* ---------------- context: which screen am I on ---------------- */
@@ -44,10 +51,10 @@ function describe(view) {
 // each view having to remember to announce itself.
 function updateContext() {
   const view = location.hash.slice(1) || 'dashboard';
-  const next = { view, ...describe(view), field, fieldLabel };
+  const next = { view, ...describe(view), field, fieldLabel, name: displayName() };
   if (JSON.stringify(next) === JSON.stringify(ctx)) return;
   ctx = next;
-  trackPresence({ ...next, name: (userEmail() || 'you').split('@')[0] });
+  trackPresence(next);
 }
 
 let field = null;
@@ -70,7 +77,7 @@ function avatar(p, size = 28) {
 
 function renderBar() {
   if (!bar) return;
-  const me = { name: (userEmail() || 'you').split('@')[0], color: myColor(), label: 'You' };
+  const me = { name: displayName(), color: myColor(), label: 'You', email: userEmail() };
   // replaceChildren() turns a null into a literal "null" text node — filter first.
   bar.replaceChildren(...[
     ...peers.slice(0, 5).map((p) => avatar(p)),
@@ -189,4 +196,6 @@ export function initPresence() {
   document.addEventListener('input', scheduleDecorate);
   renderBar();
   updateContext();
+  // Picks up a display name added after this browser last signed in.
+  refreshUser().then((ok) => { if (ok) { renderBar(); updateContext(); } });
 }
