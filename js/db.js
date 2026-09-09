@@ -10,12 +10,20 @@ export function dbEnabled() {
   return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
+// Raised when there is no usable session. Callers back off on this instead of
+// retrying, since no amount of retrying will fix a signed-out browser.
+export class NotSignedIn extends Error {
+  constructor() { super('not signed in'); this.name = 'NotSignedIn'; }
+}
+
 // The access token expires about hourly. A tab left open all day would otherwise
 // keep sending a dead token, and PostgREST answers 401 — so every write silently
 // vanished while the app still looked like it had saved (localStorage had it).
-// That is how quotes went missing. Refresh before every single request instead.
+// That is how quotes went missing. Refresh before every request instead, and if the
+// session cannot be refreshed, do not fire the request at all: an unauthenticated
+// write can only ever be a 401, and retrying one on a timer is just a storm.
 async function headers(extra = {}) {
-  await ensureSession();
+  if (!(await ensureSession())) throw new NotSignedIn();
   return {
     apikey: SUPABASE_ANON_KEY,
     Authorization: 'Bearer ' + accessToken(),
