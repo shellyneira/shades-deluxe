@@ -33,21 +33,30 @@ let filter = 'All';
 function list() {
   const s = getState();
   const head = el('div', { class: 'section-head' }, [
-    el('div', {}, [el('h2', {}, ['Quotes & Orders']), el('div', { class: 'hint' }, [s.quotes.length + ' total'])]),
+    el('div', {}, [el('h2', {}, ['Quotes & Orders']), el('div', { class: 'hint' }, [
+      s.quotes.filter((q) => !q.isTest).length + ' total'
+      + (s.quotes.some((q) => q.isTest) ? ` · ${s.quotes.filter((q) => q.isTest).length} test` : ''),
+    ])]),
     el('button', { class: 'btn primary', onclick: () => open(newQuote().id) }, ['＋ New Quote']),
   ]);
 
-  const filters = el('div', { class: 'subtabs' }, ['All', ...STAGES].map((f) =>
+  const hasTests = s.quotes.some((q) => q.isTest);
+  const filters = el('div', { class: 'subtabs' }, ['All', ...STAGES, ...(hasTests ? ['Test'] : [])].map((f) =>
     el('button', { class: 'subtab' + (f === filter ? ' active' : ''), onclick: () => { filter = f; renderQuotes(); } }, [f])));
 
-  const shown = s.quotes.filter((q) => filter === 'All' || (q.stage || 'Quote') === filter);
+  // Tests are hidden unless asked for: they are practice, not work in progress.
+  const shown = s.quotes.filter((q) => (filter === 'Test' ? q.isTest
+    : !q.isTest && (filter === 'All' || (q.stage || 'Quote') === filter)));
   const body = shown.length
     ? el('div', { class: 'cards' }, shown.map((q) => {
       const t = quoteTotals(q, s);
       const st = q.stage || 'Quote';
       const num = isInvoiceStage(st) && q.invoiceNumber ? 'INV #' + q.invoiceNumber : 'Q #' + q.number;
       return el('div', { class: 'card', 'data-quote-id': q.id, onclick: () => open(q.id) }, [
-        el('div', { class: 'status' }, [el('span', { class: 'badge ' + stageClass(st) }, [st])]),
+        el('div', { class: 'status' }, [
+          q.isTest ? el('span', { class: 'badge test' }, ['TEST']) : null,
+          el('span', { class: 'badge ' + stageClass(st) }, [st]),
+        ]),
         el('div', { class: 'muted' }, [num + ' · ' + (q.date || '')]),
         el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
         el('div', { class: 'muted' }, [q.items.length + ' item(s)']),
@@ -67,13 +76,20 @@ function editor(q) {
   const toolbar = el('div', { class: 'section-head' }, [
     el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list' }; renderQuotes(); } }, ['← All quotes']),
     el('div', { class: 'row' }, [
+      // One click, and this quote stops counting as business: it leaves every
+      // dashboard number and never takes an invoice number.
+      el('button', {
+        class: 'btn test-toggle' + (q.isTest ? ' on' : ''),
+        title: q.isTest ? 'This is a practice quote — it is excluded from the dashboard' : 'Mark as a practice quote, excluded from the dashboard',
+        onclick: () => { q.isTest = !q.isTest; save(); renderQuotes(); toast(q.isTest ? 'Marked as a test — kept out of your numbers' : 'Back to a real quote'); },
+      }, [q.isTest ? '✓ Test quote' : 'Mark as test']),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
       el('button', { class: 'btn', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list' }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
     ]),
   ]);
 
   const client = el('div', { class: 'panel' }, [
-    el('h3', {}, ['Client · Quote #' + q.number]),
+    el('h3', {}, ['Client · Quote #' + q.number + (q.isTest ? ' · TEST' : '')]),
     el('div', { class: 'row' }, [
       input('Client name', q.client.name, (v) => set(() => (q.client.name = v)), { class: 'grow' }),
       input('Phone', q.client.phone, (v) => set(() => (q.client.phone = v)), { class: 'grow' }),
