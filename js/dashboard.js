@@ -29,7 +29,10 @@ function metrics(s) {
   // counted its full price once and its cost once, and the margin came out fantasy.
   const qty = (it) => Number(it.qty) || 1;
   const rows = real.map((q) => {
-    const total = quoteTotals(q, s).total;
+    // Ex-tax on purpose: sales tax is collected for Florida, not earned. Counting it
+    // as revenue would overstate the business by the tax rate and, since costs carry
+    // no tax, quietly inflate every margin on this board.
+    const total = quoteTotals(q, s).net;
     const cost = q.items.reduce((c, it) => c + (computeLine(it, s).cost || 0) * qty(it), 0);
     const stage = q.stage || 'Quote';
     return { q, total, cost, profit: total - cost, stage, month: (q.date || '').slice(0, 7) };
@@ -263,8 +266,8 @@ export function renderDashboard() {
     ]),
     unpricedWarning(m.unpriced),
     el('div', { class: 'kpi-row' }, [
-      tile('Open pipeline', money(m.pipeline), `${m.openCount} not yet accepted`, '#4a6d8c'),
-      tile('Invoiced', money(m.invoiced), `Est. profit ${money(m.profit)} · ${m.margin}% margin`, '#5e8c6a'),
+      tile('Open pipeline', money(m.pipeline), `${m.openCount} not yet accepted · excl. tax`, '#4a6d8c'),
+      tile('Invoiced', money(m.invoiced), `Est. profit ${money(m.profit)} · ${m.margin}% margin · excl. tax`, '#5e8c6a'),
       tile('Collected', money(m.collected), `${m.conversion}% of quotes became invoices`, '#b9552f'),
       tile('Outstanding', money(m.outstanding), 'Invoiced, not yet paid', '#c99a3f'),
     ]),

@@ -268,14 +268,26 @@ export function describeLine(line, cfg, isWork, compact) {
     .join(', ');
 }
 
+// One place computes what a quote is worth, so the card, the dashboard, the shared
+// message and the printed invoice can never disagree again. Sales tax was previously
+// added only inside the invoice, which meant the client was told $1,070 on paper and
+// $1,000 in the WhatsApp message from the same quote.
+//
+//   net   — what the work is worth, before tax. This is revenue.
+//   tax   — collected on the state's behalf, not income.
+//   total — what the client actually pays.
 export function quoteTotals(quote, state) {
   const subtotal = quote.items.reduce((s, it) => s + (computeLine(it, state).unit || 0) * (Number(it.qty) || 1), 0);
   const discount = Number(quote.discount) || 0;
   const minOrder = Number(state.minimumOrder) || 0;
-  let total = subtotal - discount;
-  const minApplied = quote.items.length > 0 && minOrder > 0 && total < minOrder;
-  if (minApplied) total = minOrder;
-  return { subtotal: round2(subtotal), discount, minOrder, minApplied, total: round2(total) };
+  let net = subtotal - discount;
+  const minApplied = quote.items.length > 0 && minOrder > 0 && net < minOrder;
+  if (minApplied) net = minOrder;
+  const tax = net * (Number(state.taxRate) || 0) / 100;
+  return {
+    subtotal: round2(subtotal), discount, minOrder, minApplied,
+    net: round2(net), tax: round2(tax), total: round2(net + tax),
+  };
 }
 
 export function round2(n) {
