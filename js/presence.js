@@ -18,15 +18,24 @@ let layer;
 let bar;
 let pill;
 
-// Two letters, so a team of single-word names (Shelly, Sarkis) does not collapse
-// into a row of identical "S" circles.
-function initials(name) {
-  const words = name.split(/[.\s_-]+/).filter(Boolean);
+// Initials have one job: tell two people apart at a glance. Two letters is the
+// usual answer, but it fails on look-alike names ("Shelly" and an account still
+// falling back to "shadesdeluxe2020" both start "SH"), so anyone whose initials
+// clash with someone else on screen gets another letter until they don't.
+function baseInitials(name, len = 2) {
+  const words = name.split(/[.\s_@-]+/).filter(Boolean);
   if (!words.length) return '?';
-  const raw = words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2);
-  return raw.toUpperCase();
+  const joined = words.length > 1 ? words.map((w) => w[0]).join('') : words[0];
+  return joined.slice(0, len).toUpperCase();
 }
-const shorten = (t) => (t.length > 34 ? t.slice(0, 33) + '…' : t);
+
+function labelInitials(name, others) {
+  for (let len = 2; len <= 4; len++) {
+    const mine = baseInitials(name, len);
+    if (!others.some((o) => o !== name && baseInitials(o, len) === mine)) return mine;
+  }
+  return baseInitials(name, 4);
+}
 
 /* ---------------- context: which screen am I on ---------------- */
 
@@ -67,17 +76,19 @@ function setField(f, label) {
 
 /* ---------------- top bar ---------------- */
 
+let roster = [];
 function avatar(p, size = 28, extraClass = '') {
   return el('span', {
     class: 'avatar ' + extraClass,
     style: `--who:${p.color};width:${size}px;height:${size}px;font-size:${Math.round(size * 0.4)}px`,
     title: `${p.name} · ${p.label || ''}${p.fieldLabel ? ' · editing ' + p.fieldLabel : ''}`,
-  }, [initials(p.name)]);
+  }, [labelInitials(p.name, roster)]);
 }
 
 function renderBar() {
   if (!bar) return;
   const me = { name: displayName(), color: myColor(), label: 'You', email: userEmail() };
+  roster = [...peers.map((p) => p.name), me.name];
   // replaceChildren() turns a null into a literal "null" text node — filter first.
   bar.replaceChildren(...[
     ...peers.slice(0, 5).map((p) => avatar(p)),
