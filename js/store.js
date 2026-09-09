@@ -173,12 +173,16 @@ function normalize(state) {
     }
     // Rename earlier stage labels to the current, simpler set.
     q.stage = { Sent: 'Quote', 'Deposit Paid': '50% Paid', Paid: '100% Paid' }[q.stage] || q.stage;
+    q.isTest = q.isTest === true;
   });
   return state;
 }
 
 // Invoice numbers are their own sequence, assigned once a quote becomes an invoice.
+// Test quotes never take a number out of the real invoice sequence — otherwise
+// practising would leave permanent gaps in the numbering the business relies on.
 export function assignInvoiceNumber(q) {
+  if (q.isTest) return null;
   if (!q.invoiceNumber) { q.invoiceNumber = state.nextInvoiceNumber++; save(); }
   return q.invoiceNumber;
 }
@@ -552,6 +556,7 @@ export function newQuote() {
     client: { name: '', address: '', phone: '', email: '' },
     discount: 0,
     stage: 'Quote',      // Quote → Sent → Accepted → Deposit Paid → Paid
+    isTest: false,       // a practice quote: kept out of every business number
     invoiceNumber: null, // assigned when it first becomes an invoice (Accepted+)
     items: [],
   };

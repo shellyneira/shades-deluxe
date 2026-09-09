@@ -21,11 +21,14 @@ const STAGE_COLOR = { Quote: '#9a9086', Accepted: '#4a6d8c', '50% Paid': '#c99a3
 const SERIES = ['#b9552f', '#4a6d8c', '#5e8c6a', '#c99a3f', '#8a6a9e', '#4a8c8c'];
 
 function metrics(s) {
+  // Practice quotes are excluded from every number on this board — that is the
+  // whole point of marking one.
+  const real = s.quotes.filter((q) => !q.isTest);
   // Everything here is quantity-weighted. Revenue always was (quoteTotals multiplies
   // by qty), but cost and the per-product totals were not — so a line of 9 shades
   // counted its full price once and its cost once, and the margin came out fantasy.
   const qty = (it) => Number(it.qty) || 1;
-  const rows = s.quotes.map((q) => {
+  const rows = real.map((q) => {
     const total = quoteTotals(q, s).total;
     const cost = q.items.reduce((c, it) => c + (computeLine(it, s).cost || 0) * qty(it), 0);
     const stage = q.stage || 'Quote';
@@ -88,6 +91,7 @@ function metrics(s) {
     margin: invoicedTotal ? Math.round((sum(invoiced, 'profit') / invoicedTotal) * 100) : 0,
     conversion: rows.length ? Math.round((invoiced.length / rows.length) * 100) : 0,
     count: rows.length, openCount: open.length, invoicedCount: invoiced.length,
+    testCount: s.quotes.length - real.length,
     monthly, topProducts, mix, byStage, recent, unpriced,
   };
 }
@@ -252,7 +256,9 @@ export function renderDashboard() {
     el('div', { class: 'section-head' }, [
       el('div', {}, [
         el('h2', {}, ['Dashboard']),
-        el('div', { class: 'hint' }, [`${m.count} quote(s) · ${m.openCount} open · ${m.invoicedCount} invoiced · profit uses your cost factor (Settings → Rates)`]),
+        el('div', { class: 'hint' }, [`${m.count} quote(s) · ${m.openCount} open · ${m.invoicedCount} invoiced`
+          + (m.testCount ? ` · ${m.testCount} test quote${m.testCount > 1 ? 's' : ''} excluded` : '')
+          + ' · profit uses your cost factor (Settings → Rates)']),
       ]),
     ]),
     unpricedWarning(m.unpriced),

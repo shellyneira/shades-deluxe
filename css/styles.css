@@ -344,6 +344,9 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 
 /* The only loud thing on the board. Money that silently priced at zero has earned
    the right to shout. */
+.badge.test { background: #efe9df; color: var(--muted); border: 1px dashed var(--line-strong); }
+.btn.test-toggle.on { background: var(--gold); border-color: var(--gold); color: #fff; }
+
 .alert {
   display: flex; align-items: flex-start; gap: 12px;
   margin-bottom: 18px; padding: 13px 16px; border-radius: var(--radius);
