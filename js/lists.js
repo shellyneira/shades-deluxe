@@ -8,14 +8,16 @@ const LABELS = {
   locations: 'Locations', wdNumbers: 'Window / Door #', products: 'Products',
   fabrics: 'Fabrics / Descriptions', colors: 'Colors', controls: 'Controls',
   systems: 'Systems', styles: 'Styles', headrails: 'Headrails / Bottom rails',
+  accessories: 'Accessories',
 };
 const GROUPED = { products: true, fabrics: true }; // stored one array per category
 // Only these add-ons carry a price. Products/fabrics get their price from the Price
 // Tables; colors, locations, w/d and controls are plain labels.
-const PRICEABLE = { systems: true, styles: true, headrails: true };
+const PRICEABLE = { systems: true, styles: true, headrails: true, accessories: true };
 const PRICE_NOTE = {
   products: 'Price comes from the Price Tables — no extra charge here.',
   fabrics: 'Price comes from the Price Tables — no extra charge here.',
+  accessories: 'Shared across Roller, Zebra and Drapery — pick any number of them on a worksheet line.',
 };
 
 export function renderLists() {

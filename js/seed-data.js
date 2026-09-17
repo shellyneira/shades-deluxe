@@ -1067,6 +1067,7 @@ export const SEED = {
       "Fascia 5\" Double",
       "Total Blackout"
     ],
+    "accessories": [],
     "fractions": [
       0.125,
       0.25,
