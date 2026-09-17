@@ -172,7 +172,7 @@ function blankLine(s) {
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', reverse: false, fascia: false, cassette: false, sideChannel: false,
     installation: s.defaultInstallation || '', brackets: '', mount: 'Ceiling', discount: '', markup: '', motorPrice: '',
-    fabricPrice: '', lining: '', track: '', notes: '',
+    fabricPrice: '', lining: '', track: '', accessories: [], notes: '',
   };
 }
 
@@ -246,6 +246,9 @@ function columns(o, tables, categories) {
     { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
+    // Shared across Roller/Zebra/Drapery (unlike Product/Fabric, which are per-category)
+    // and multi-valued — a line can carry any number of priced accessories.
+    { key: 'accessories', label: 'Accessories', kind: 'multiselect', opts: o.accessories, w: 150 },
     // Free-text, per-line — only printed on the Work Order (its own column there), never
     // on Client Quote or Labels.
     { key: 'notes', label: 'Notes', kind: 'text', w: 160, placeholder: 'Work order only' },
@@ -282,6 +285,7 @@ const COL_HELP = {
   fabricPrice: 'Fabric cost ($ per yard) — Drapery lines only, drives the whole price',
   lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
+  accessories: 'Priced extras (Remote, Valance, etc.) — same list for every table. Cmd/Ctrl-click to pick more than one. Edit prices in Lists.',
   notes: 'Free-text note for the maker — prints only on the Work Order, its own column',
 };
 
@@ -340,6 +344,21 @@ function cell(col, item, onChange) {
     if (col.placeholder && typeof col.placeholder === 'function') inp.dataset.liveInsPlaceholder = col.key; // recalc() refreshes this as width changes
     if (col.prefix) return el('td', {}, [el('div', { style: 'display:flex;align-items:center;gap:2px' }, [el('span', { style: 'color:var(--danger);font-weight:800' }, [col.prefix]), inp])]);
     return el('td', {}, [inp]);
+  }
+  if (col.kind === 'multiselect') {
+    const options = (typeof col.opts === 'function' ? col.opts(item) : col.opts) || [];
+    const cur = new Set(item[col.key] || []);
+    const sel = el('select', {
+      multiple: true, style: `${style};height:${Math.min(4, Math.max(2, options.length || 2)) * 22}px`,
+      onchange: (e) => onChange(col.key, Array.from(e.target.selectedOptions).map((o) => o.value)),
+    });
+    for (const opt of options) {
+      const label = opt.price > 0 ? `${opt.name} (${money(opt.price)})` : opt.name;
+      const o = el('option', { value: opt.name }, [label || ' ']);
+      if (cur.has(opt.name)) o.selected = true;
+      sel.append(o);
+    }
+    return el('td', {}, [sel]);
   }
   // select — options may be plain strings, priced objects {name, price}, or a
   // function of the row item (table-dependent product/fabric lists). `keyFor`

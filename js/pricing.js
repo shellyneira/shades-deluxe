@@ -28,8 +28,15 @@ function optionPrice(state, listKey, name) {
   return found ? Number(found.price) || 0 : 0;
 }
 
+// Accessories (Remote, Valance, etc.) aren't tied to a shade category — the same
+// list applies to Roller, Zebra and Drapery — and a line can carry more than one,
+// unlike the single-value fields above, so it gets its own summing helper.
+function accessoriesExtras(line, state) {
+  return (line.accessories || []).reduce((sum, name) => sum + optionPrice(state, 'accessories', name), 0);
+}
+
 function optionExtras(line, state) {
-  return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field]), 0);
+  return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field]), 0) + accessoriesExtras(line, state);
 }
 
 export function effectiveDim(inches, fraction) {
@@ -196,8 +203,9 @@ export function computeLine(line, state) {
     const d = computeDraperyLine(line, table, state);
     const markup = Number(line.markup) || 0, motor = Number(line.motorPrice) || 0, lineDisc = Number(line.discount) || 0;
     if (!d) return { list: null, fascia: 0, cassette: 0, sideChannel: 0, installation: 0, brackets: 0, extras: 0, cost: null, unit: null };
-    const unit = Math.max(0, round2(d.unit + markup + motor - lineDisc));
-    return { list: unit, fascia: 0, cassette: 0, sideChannel: 0, installation: round2(d.installation), brackets: 0, extras: 0, cost: round2(d.cost), unit };
+    const extras = accessoriesExtras(line, state); // priced accessories — apply to Drapery too, not just Roller/Zebra
+    const unit = Math.max(0, round2(d.unit + extras + markup + motor - lineDisc));
+    return { list: unit, fascia: 0, cassette: 0, sideChannel: 0, installation: round2(d.installation), brackets: 0, extras: round2(extras), cost: round2(d.cost + extras), unit };
   }
   const rates = { ...FALLBACK_RATES, ...(state.rates || {}) };
   const list = lookupListPrice(table, line.width, line.widthFrac, line.height, line.heightFrac);
@@ -239,7 +247,7 @@ export function explainLine(line, state) {
   if (table?.kind === 'formula') {
     // Drapery is computed from a formula per style rather than a grid; report what
     // it produced plus everything added on top of it.
-    steps.push({ kind: 'base', label: `${line.table} (formula)`, detail: 'Priced from the style\u2019s rates in Price Tables, not a size grid', amount: round2((c.unit || 0) - (Number(line.markup) || 0) - (Number(line.motorPrice) || 0) + (Number(line.discount) || 0)) });
+    steps.push({ kind: 'base', label: `${line.table} (formula)`, detail: 'Priced from the style\u2019s rates in Price Tables, not a size grid', amount: round2((c.unit || 0) - (c.extras || 0) - (Number(line.markup) || 0) - (Number(line.motorPrice) || 0) + (Number(line.discount) || 0)) });
   } else {
     const ew = effectiveDim(line.width, line.widthFrac);
     const eh = effectiveDim(line.height, line.heightFrac);
@@ -265,6 +273,10 @@ export function explainLine(line, state) {
     }
   }
 
+  for (const name of line.accessories || []) {
+    const price = optionPrice(state, 'accessories', name);
+    if (price) steps.push({ kind: 'add', label: `Accessory — ${name}`, detail: '“Accessories” is priced in Lists', amount: round2(price) });
+  }
   if (c.installation) steps.push({ kind: 'add', label: 'Installation', detail: 'Typed on the line', amount: round2(c.installation) });
   if (c.brackets) steps.push({ kind: 'add', label: 'Brackets', detail: 'Typed on the line', amount: round2(c.brackets) });
   if (Number(line.motorPrice)) steps.push({ kind: 'add', label: 'Motor', detail: 'Typed on the line', amount: round2(Number(line.motorPrice)) });
@@ -314,6 +326,7 @@ export const DESC_FIELDS = [
   // Wall vs. ceiling mount only matters to the maker — the client quote just says "with Brackets".
   { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.mount === 'Wall' ? 'WALL' : 'CEILING') : ''}` : '') },
   { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
+  { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
 ];
 
 export function describeLine(line, cfg, isWork, compact) {

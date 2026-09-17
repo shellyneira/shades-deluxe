@@ -27,14 +27,14 @@ const DEFAULT_COMPANY = {
 // Which fields land in each document's Description column (Settings → Documents).
 const DEFAULT_DOC_CONFIG = {
   // Client quote: no dimensions, shown with prices.
-  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
+  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true },
   // Work order: every build detail, dimensions shown, no prices. Shade Type off —
   // that's an internal price-tier name, not something to reveal (Product/Fabric
   // already say what it is, and the client shouldn't be able to shop the exact tier
   // elsewhere).
-  work: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true },
+  work: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true },
   // DYMO sticker: short — product shown separately, so description = fabric + control.
-  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false },
+  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false, accessories: false },
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
@@ -115,7 +115,7 @@ function freshState() {
 // Option list items carry an optional price: stored as { name, price }. Strings from
 // older data (or the seed) migrate to { name, price: 0 }.
 const toPriced = (arr) => (arr || []).map((x) => (typeof x === 'string' ? { name: x, price: 0 } : { name: x.name, price: Number(x.price) || 0 }));
-const FLAT_PRICED_LISTS = ['locations', 'wdNumbers', 'colors', 'controls', 'systems', 'styles', 'headrails'];
+const FLAT_PRICED_LISTS = ['locations', 'wdNumbers', 'colors', 'controls', 'systems', 'styles', 'headrails', 'accessories'];
 
 // Table category ("Roller"/"Zebra"/anything you name) used to be guessed from the
 // table's name; it's now an explicit field on the table, and Products/Fabrics are
