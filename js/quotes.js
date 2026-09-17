@@ -418,6 +418,13 @@ function sheet(q, rerender) {
     const taxable = minApplied ? minOrder : afterDiscount;
     const rate = Number(s.taxRate) || 0;
     const tax = roundWhole(taxable * rate / 100);
+    // Sized but unpriceable — an unsized draft row is not a finding, it is a row
+    // nobody has filled in yet.
+    const offChart = [...q.items, draft].filter(
+      (it) => Number(it.width) && Number(it.height) && computeLine(it, s).unit == null).length;
+    totalsRefs.offRow.style.display = offChart > 0 ? '' : 'none';
+    totalsRefs.off.textContent = offChart + ' not counted';
+    totalsRefs.offRow.title = 'These lines are off their price chart, so they add $0 here and print as $0 to the client. Extend the chart in Price Tables or price them by hand.';
     totalsRefs.minRow.style.display = minApplied ? '' : 'none';
     if (minApplied) totalsRefs.min.textContent = '+' + money0(minOrder - afterDiscount);
     totalsRefs.sub.textContent = money0(sub);
@@ -507,6 +514,11 @@ function sheet(q, rerender) {
   totalsRefs.taxRow = el('div', { class: 'line', style: 'display:none' }, [totalsRefs.taxLbl, totalsRefs.tax]);
   totalsRefs.min = el('span', {}, ['—']);
   totalsRefs.minRow = el('div', { class: 'line', style: 'display:none' }, [el('span', {}, ['Minimum order']), totalsRefs.min]);
+  // A line that is off the chart contributes $0, so the total silently understates
+  // the job. Say so next to the number rather than leaving the gap to be noticed.
+  totalsRefs.offRow = el('div', { class: 'line', style: 'display:none;color:var(--danger,#b3261e)' }, [
+    el('span', {}, ['Unpriced lines']), (totalsRefs.off = el('span', {}, ['—'])),
+  ]);
   totalsRefs.revenue = el('span', {}, ['—']);
   totalsRefs.material = el('span', {}, ['—']);
   totalsRefs.labor = el('span', {}, ['—']);
@@ -518,6 +530,7 @@ function sheet(q, rerender) {
       (() => { const i = el('input', { type: 'number', value: q.discount || 0, style: 'width:120px;padding:8px;border:1px solid var(--line-strong);border-radius:8px', oninput: (e) => { q.discount = Number(e.target.value) || 0; save(); recalc(); } }); return i; })(),
     ]),
     totalsRefs.minRow,
+    totalsRefs.offRow,
     totalsRefs.taxRow,
     el('div', { class: 'line grand' }, [el('span', {}, ['Total']), totalsRefs.total]),
     el('div', { class: 'profit-box' }, [
@@ -768,12 +781,15 @@ function clientTable(q, s) {
     const c = computeLine(l, s);
     const qty = Number(l.qty) || 1;
     const shownUnit = (c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0);
-    return el('tr', {}, [
+    // An off-chart line used to print $0 / $0 — a client-facing invoice offering a
+    // shade for free, with nothing on the page saying it was unpriced.
+    const unpriced = c.unit == null;
+    return el('tr', { class: unpriced ? 'unpriced' : '' }, [
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
       el('td', { class: 'desc' }, [describeLine(l, cfg)]),
-      el('td', { class: 'num' }, [money0(shownUnit)]),
-      el('td', { class: 'num strong' }, [money0(roundWhole(shownUnit) * qty)]),
+      el('td', { class: 'num' }, [unpriced ? 'TBD' : money0(shownUnit)]),
+      el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(roundWhole(shownUnit) * qty)]),
     ]);
   });
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];

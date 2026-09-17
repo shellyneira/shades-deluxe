@@ -178,6 +178,10 @@ table.grid tbody tr:last-child td:first-child { border-bottom-left-radius: var(-
 .invoice table.items td { padding: 13px 12px; border-bottom: 1px solid var(--hair); font-size: 13px; vertical-align: top; color: var(--ink2); }
 .invoice table.items td.strong { font-weight: 600; color: var(--ink1); }
 .invoice table.items td.desc { color: var(--ink3); max-width: 280px; line-height: 1.55; }
+/* A line the price chart cannot reach prints TBD, not $0. Make it unmissable on the
+   page so it is never mailed as a free shade. */
+.invoice table.items tr.unpriced td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
+.invoice table.items tr.unpriced td.num { color: var(--danger); font-weight: 800; letter-spacing: .5px; }
 .invoice .sum { display: flex; justify-content: flex-end; margin-top: 20px; }
 .invoice .sum-box { width: 300px; }
 .invoice .sum-box .line { display: flex; justify-content: space-between; padding: 8px 2px; font-size: 14px; color: var(--ink2); }
