@@ -409,7 +409,10 @@ function sheet(q, rerender) {
     // The worksheet used to ignore the minimum order entirely, so the screen showed
     // one total and the printed invoice another for the same quote.
     const minOrder = roundWhole(Number(s.minimumOrder) || 0);
-    const minApplied = q.items.length > 0 && minOrder > 0 && afterDiscount < minOrder;
+    // The subtotal above counts the draft row, so the minimum has to as well — keyed
+    // to committed lines only, a priced draft showed a total that jumped the moment
+    // you clicked ✓ on the same numbers.
+    const minApplied = (q.items.length > 0 || sub > 0) && minOrder > 0 && afterDiscount < minOrder;
     const taxable = minApplied ? minOrder : afterDiscount;
     const rate = Number(s.taxRate) || 0;
     const tax = roundWhole(taxable * rate / 100);
