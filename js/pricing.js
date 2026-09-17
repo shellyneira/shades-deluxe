@@ -256,7 +256,16 @@ export function explainLine(line, state) {
     if (fw > 0 || fh > 0) {
       steps.push({ kind: 'note', label: 'Size used', detail: `${w}${fw ? ' + ' + FRACTION_TEXT[fw] : ''}" \u00d7 ${h}${fh ? ' + ' + FRACTION_TEXT[fh] : ''}" \u2192 ${ew}" \u00d7 ${eh}" (over \u00bd rounds up, otherwise stays)` });
     }
-    if (c.list == null) {
+    if (c.list == null && !(Number(line.width) && Number(line.height))) {
+      // Blaming the chart for a row nobody has sized yet reads as a broken app: the
+      // old text rendered `0" x 0" is off the Roller chart` on an empty line.
+      const held = [
+        Number(line.markup) ? `extra +${money(Number(line.markup))}` : null,
+        Number(line.installation) ? `installation ${money(Number(line.installation))}` : null,
+        Number(line.motorPrice) ? `motor ${money(Number(line.motorPrice))}` : null,
+      ].filter(Boolean);
+      steps.push({ kind: 'note', label: 'Needs a size', detail: `Enter width and height \u2014 every charge is added on top of the ${line.table} list price, so there is nothing to add them to yet${held.length ? '. Held on this row: ' + held.join(', ') : ''}` });
+    } else if (c.list == null) {
       steps.push({ kind: 'note', label: 'No price', detail: `${ew}" \u00d7 ${eh}" is off the ${line.table} chart \u2014 this line has no price at all` });
     } else {
       const col = table.widths.find((x) => Number(x) >= ew);

@@ -395,8 +395,10 @@ function sheet(q, rerender) {
       p.node.classList.toggle('off', c.unit == null && hasDims);
       p.td.querySelector('.mintag')?.remove();
       if (c.floored) p.td.append(el('span', { class: 'mintag', title: `Table minimum ${money(c.floor)} for ${p.item.table} — raise the size or lower the minimum in Price Tables` }, ['min']));
+      // An untitled em-dash is why a row with a markup typed into it reads as a dead
+      // app. Say what is missing instead of saying nothing.
       p.node.title = c.list == null
-        ? (hasDims ? `Size is larger than the ${p.item.table} chart` : '')
+        ? (hasDims ? `Size is larger than the ${p.item.table} chart` : 'Enter width and height — charges are added on top of the list price, so there is nothing to price yet')
         : (c.floored ? `List ${money(c.list)} · minimum ${money(c.floor)} applied` : `List ${money(c.list)}`);
       p.client.textContent = c.unit == null ? '—' : money0((c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0));
     }
