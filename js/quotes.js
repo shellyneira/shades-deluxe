@@ -457,7 +457,8 @@ function sheet(q, rerender) {
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
     // number is never a surprising $0 while a priced line sits in the draft row.
     // Mirror the client invoice: whole-dollar amounts + tax, so the worksheet matches.
-    const priced = [...q.items, draft].map((it) => ({ c: computeLine(it, s), qty: Number(it.qty) || 1 }));
+    // Live q._draft, not the `draft` this sheet captured — same reason the rows do it.
+    const priced = [...q.items, q._draft || draft].map((it) => ({ c: computeLine(it, s), qty: Number(it.qty) || 1 }));
     const sub = priced.reduce((a, p) => a + roundWhole(p.c.unit || 0) * p.qty, 0);
     const afterDiscount = sub - roundWhole(Number(q.discount) || 0);
     // The worksheet used to ignore the minimum order entirely, so the screen showed
@@ -472,7 +473,7 @@ function sheet(q, rerender) {
     const tax = roundWhole(taxable * rate / 100);
     // Sized but unpriceable — an unsized draft row is not a finding, it is a row
     // nobody has filled in yet.
-    const offChart = [...q.items, draft].filter(
+    const offChart = [...q.items, q._draft || draft].filter(
       (it) => Number(it.width) && Number(it.height) && computeLine(it, s).unit == null).length;
     totalsRefs.offRow.style.display = offChart > 0 ? '' : 'none';
     totalsRefs.off.textContent = offChart + ' not counted';
@@ -498,33 +499,50 @@ function sheet(q, rerender) {
     totalsRefs.margin.textContent = taxable > 0 ? Math.round((profit / taxable) * 100) + '% margin' : '';
   };
 
-  const makeRow = (item, { draftRow } = {}) => {
+  // A ROW MUST NOT CAPTURE ITS ITEM. A sync replaces q.items with fresh objects of
+  // the same content, in the same order, while this sheet keeps rendering — so a row
+  // that closed over its item then writes to an object the quote no longer holds.
+  // Measured: after the first edit the identity breaks ~400ms later (the echo of our
+  // own push), and the NEXT edit writes 555 into the orphan while q.items still says
+  // 999 — the line price moves (it reads the capture), the subtotal does not (it
+  // reads q.items), and the save drops the edit entirely. Resolve by position on
+  // every access instead; order is preserved by the merge, and the two operations
+  // that do reorder (duplicate, remove) rerender.
+  // q._draft is replaced by the same merge, so the draft row resolves it too rather
+  // than holding the object `draft` pointed at when this sheet was built.
+  const liveItem = (idx, draftRow, captured) =>
+    (draftRow ? q._draft : q.items[idx]) || captured;
+
+  const makeRow = (captured, { draftRow, idx } = {}) => {
+    // Falling back to `captured` (never to the draft) keeps a row whose index went
+    // away writing to its own dead object instead of corrupting a different line.
+    const live = () => liveItem(idx, draftRow, captured);
+    const item = live();
     // Changing the table refilters the Product/Description options, so rebuild the row.
     // Save on every keystroke, draft row included — otherwise a refresh (or a browser
     // that never gets to "Add line") silently loses whatever was typed into it.
-    const onChange = (key, val) => { item[key] = val; save(); recalc(); if (key === 'table') rerender(); };
+    const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table') rerender(); };
     // Every charge should be checkable without trusting the app: click the price and
     // it shows the arithmetic that produced it.
     const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
-    const priceTd = el('td', { class: 'r price', onclick: () => showBreakdown(item, getState()) }, [priceNode]);
+    const priceTd = el('td', { class: 'r price', onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
     const clientNode = el('span', {}, ['—']);
     const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
-    priceCells.push({ item, node: priceNode, td: priceTd, client: clientNode });
+    priceCells.push({ get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
     const cells = cols.map((col) => cell(col, item, onChange));
     const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
-    if (insInput) insCells.push({ item, input: insInput });
+    if (insInput) insCells.push({ get item() { return live(); }, input: insInput });
     cells.push(priceTd);
     cells.push(clientTd);
     if (draftRow) {
       cells.push(el('td', { style: 'white-space:nowrap' }, [
         el('button', { class: 'icon', style: 'color:var(--accent);font-weight:800', title: 'Add this line', onclick: () => addLine() }, ['✓']),
-        el('button', { class: 'icon', title: 'Clear this row', onclick: () => { if (isRowEmpty(item) || confirmAction('Clear this row?')) { q._draft = blankLine(s); save(); rerender(); } } }, ['↺']),
+        el('button', { class: 'icon', title: 'Clear this row', onclick: () => { if (isRowEmpty(live()) || confirmAction('Clear this row?')) { q._draft = blankLine(s); save(); rerender(); } } }, ['↺']),
       ]));
       return el('tr', { class: 'draftrow' }, cells);
     }
-    const idx = q.items.indexOf(item);
     cells.push(el('td', { style: 'white-space:nowrap' }, [
-      el('button', { class: 'icon', style: 'color:var(--muted)', title: 'Duplicate', onclick: () => { q.items.splice(idx + 1, 0, { ...item }); save(); rerender(); } }, ['⎘']),
+      el('button', { class: 'icon', style: 'color:var(--muted)', title: 'Duplicate', onclick: () => { q.items.splice(idx + 1, 0, { ...live() }); save(); rerender(); } }, ['⎘']),
       el('button', { class: 'icon', title: 'Remove', onclick: () => { if (confirmAction('Delete this line?')) { q.items.splice(idx, 1); save(); rerender(); } } }, ['✕']),
     ]));
     return el('tr', {}, cells);
@@ -545,7 +563,7 @@ function sheet(q, rerender) {
     el('th', {}, ['']),
   ]);
 
-  const bodyRows = q.items.map((it) => makeRow(it));
+  const bodyRows = q.items.map((it, idx) => makeRow(it, { idx }));
   const draftRow = makeRow(draft, { draftRow: true });
   // Enter anywhere in the draft row commits it.
   draftRow.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addLine(); } });
