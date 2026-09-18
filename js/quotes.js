@@ -443,14 +443,18 @@ function sheet(q, rerender) {
     for (const p of priceCells) {
       const c = computeLine(p.item, s);
       const hasDims = p.item.width && p.item.height;
-      p.node.textContent = c.unit != null ? money(c.unit) : (hasDims ? 'off chart' : '—');
-      p.node.classList.toggle('off', c.unit == null && hasDims);
+      p.node.textContent = c.unit != null ? money(c.unit) : '—';
+      p.node.classList.toggle('off', !!c.listMissing);
       p.td.querySelector('.mintag')?.remove();
+      p.td.querySelector('.offtag')?.remove();
       if (c.floored) p.td.append(el('span', { class: 'mintag', title: `Table minimum ${money(c.floor)} for ${p.item.table} — raise the size or lower the minimum in Price Tables` }, ['min']));
+      // The amount shown IS charged now, so the tag has to say what it is missing
+      // rather than the price cell reading as a complete one.
+      if (c.listMissing) p.td.append(el('span', { class: 'offtag', title: `This size is off the ${p.item.table} chart, so the shade itself is not priced — only the charges typed on this line are. Extend the chart in Price Tables.` }, ['no list']));
       // An untitled em-dash is why a row with a markup typed into it reads as a dead
       // app. Say what is missing instead of saying nothing.
       p.node.title = c.list == null
-        ? (hasDims ? `Size is larger than the ${p.item.table} chart` : 'Enter width and height — charges are added on top of the list price, so there is nothing to price yet')
+        ? (hasDims ? `Off the ${p.item.table} chart — this is the typed charges only, NOT a full price` : 'Enter width and height — charges are added on top of the list price, so there is nothing to price yet')
         : (c.floored ? `List ${money(c.list)} · minimum ${money(c.floor)} applied` : `List ${money(c.list)}`);
       p.client.textContent = c.unit == null ? '—' : money0((c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0));
     }
@@ -473,11 +477,10 @@ function sheet(q, rerender) {
     const tax = roundWhole(taxable * rate / 100);
     // Sized but unpriceable — an unsized draft row is not a finding, it is a row
     // nobody has filled in yet.
-    const offChart = [...q.items, q._draft || draft].filter(
-      (it) => Number(it.width) && Number(it.height) && computeLine(it, s).unit == null).length;
+    const offChart = priced.filter((p) => p.c.listMissing).length;
     totalsRefs.offRow.style.display = offChart > 0 ? '' : 'none';
-    totalsRefs.off.textContent = offChart + ' not counted';
-    totalsRefs.offRow.title = 'These lines are off their price chart, so they add $0 here and print as $0 to the client. Extend the chart in Price Tables or price them by hand.';
+    totalsRefs.off.textContent = offChart + ' missing a list price';
+    totalsRefs.offRow.title = 'These lines are off their price chart. The charges typed on them ARE in the total above, but the shade itself is not priced — so the total is an UNDERCOUNT, not a quote. Extend the chart in Price Tables before sending.';
     totalsRefs.minRow.style.display = minApplied ? '' : 'none';
     if (minApplied) totalsRefs.min.textContent = '+' + money0(minOrder - afterDiscount);
     totalsRefs.sub.textContent = money0(sub);
@@ -586,8 +589,8 @@ function sheet(q, rerender) {
   totalsRefs.minRow = el('div', { class: 'line', style: 'display:none' }, [el('span', {}, ['Minimum order']), totalsRefs.min]);
   // A line that is off the chart contributes $0, so the total silently understates
   // the job. Say so next to the number rather than leaving the gap to be noticed.
-  totalsRefs.offRow = el('div', { class: 'line', style: 'display:none;color:var(--danger,#b3261e)' }, [
-    el('span', {}, ['Unpriced lines']), (totalsRefs.off = el('span', {}, ['—'])),
+  totalsRefs.offRow = el('div', { class: 'line', style: 'display:none;color:var(--danger)' }, [
+    el('span', {}, ['Lines missing a list price']), (totalsRefs.off = el('span', {}, ['—'])),
   ]);
   totalsRefs.revenue = el('span', {}, ['—']);
   totalsRefs.material = el('span', {}, ['—']);
@@ -853,6 +856,9 @@ function clientTable(q, s) {
     const shownUnit = (c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0);
     // An off-chart line used to print $0 / $0 — a client-facing invoice offering a
     // shade for free, with nothing on the page saying it was unpriced.
+    // A line with no size at all still cannot be priced; one that is merely off the
+    // chart now carries its typed charges, and those are in the totals below, so the
+    // page has to print them or the column would not add up to the Total.
     const unpriced = c.unit == null;
     return el('tr', { class: unpriced ? 'unpriced' : '' }, [
       el('td', { class: 'num' }, [String(qty)]),
