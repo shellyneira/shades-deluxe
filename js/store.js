@@ -269,8 +269,22 @@ function configOf(s) {
   return config;
 }
 
+// KEY ORDER IS NOT A CHANGE. Every "has this changed?" test here used
+// JSON.stringify, which is order-sensitive, and Postgres hands jsonb back with its
+// own key order — so a row we had just pushed came back looking different from the
+// copy we pushed. Measured: one keystroke produced ten ASSIGNs, one per quote in the
+// account, each with keyOrderDiffers true and the data byte-identical once sorted
+// (isTest sat last locally because normalize() appends it, and mid-object remotely).
+// That is a write loop against the database, and it was also replacing q.items on
+// every pass, which is what orphaned the open worksheet's rows.
+const fingerprint = (v) => {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+  if (Array.isArray(v)) return '[' + v.map(fingerprint).join(',') + ']';
+  return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + fingerprint(v[k])).join(',') + '}';
+};
+
 function changedSince(seen, rows, key = (r) => r.id, val = (r) => r.data) {
-  return rows.filter((r) => JSON.stringify(val(r)) !== seen[key(r)]);
+  return rows.filter((r) => fingerprint(val(r)) !== seen[key(r)]);
 }
 
 function scheduleSync() {
@@ -278,7 +292,7 @@ function scheduleSync() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
     const config = configOf(state);
-    const changedQuotes = state.quotes.filter((q) => JSON.stringify(q) !== lastPushedQuote[q.id]);
+    const changedQuotes = state.quotes.filter((q) => fingerprint(q) !== lastPushedQuote[q.id]);
     const changedTables = changedSince(lastPushedTable, tableRows(state));
     const changedLists = changedSince(lastPushedList, listRows(state));
     setSyncState('saving');
@@ -289,9 +303,9 @@ function scheduleSync() {
       pushLists(changedLists),
     ])
       .then(() => {
-        changedQuotes.forEach((q) => { lastPushedQuote[q.id] = JSON.stringify(q); });
-        changedTables.forEach((r) => { lastPushedTable[r.id] = JSON.stringify(r.data); });
-        changedLists.forEach((r) => { lastPushedList[r.id] = JSON.stringify(r.data); });
+        changedQuotes.forEach((q) => { lastPushedQuote[q.id] = fingerprint(q); });
+        changedTables.forEach((r) => { lastPushedTable[r.id] = fingerprint(r.data); });
+        changedLists.forEach((r) => { lastPushedList[r.id] = fingerprint(r.data); });
         setSyncState('saved');
         retryDelay = 5000;
         retriesLeft = MAX_RETRIES;
@@ -321,10 +335,10 @@ function scheduleBroadcast() {
     const patch = pendingBroadcast;
     pendingBroadcast = null;
     if (!broadcastPatch(patch)) return;
-    patch.quotes.forEach((q) => { lastSentQuote[q.id] = JSON.stringify(q); });
-    patch.tables.forEach((r) => { lastSentTable[r.id] = JSON.stringify(r.data); });
-    patch.lists.forEach((r) => { lastSentList[r.id] = JSON.stringify(r.data); });
-    if (patch.config) lastSentConfig = JSON.stringify(configOf(state));
+    patch.quotes.forEach((q) => { lastSentQuote[q.id] = fingerprint(q); });
+    patch.tables.forEach((r) => { lastSentTable[r.id] = fingerprint(r.data); });
+    patch.lists.forEach((r) => { lastSentList[r.id] = fingerprint(r.data); });
+    if (patch.config) lastSentConfig = fingerprint(configOf(state));
   }, 120);
 }
 
@@ -346,10 +360,10 @@ export function save() {
     // each touched quote so an inbound copy of a row being typed into right now is
     // held back rather than overwriting the caret.
     const now = Date.now();
-    const quotes = state.quotes.filter((q) => JSON.stringify(q) !== lastSentQuote[q.id]);
+    const quotes = state.quotes.filter((q) => fingerprint(q) !== lastSentQuote[q.id]);
     quotes.forEach((q) => { localTouch[q.id] = now; });
     const config = configOf(state);
-    const configChanged = JSON.stringify(config) !== lastSentConfig;
+    const configChanged = fingerprint(config) !== lastSentConfig;
     pendingBroadcast = {
       quotes,
       tables: changedSince(lastSentTable, tableRows(state)),
@@ -374,7 +388,7 @@ function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], c
   for (const q of quotes) {
     if (!q?.id) continue;
     const mine = state.quotes.find((x) => x.id === q.id);
-    if (mine && JSON.stringify(mine) === JSON.stringify(q)) continue;
+    if (mine && fingerprint(mine) === fingerprint(q)) continue;
     if (now - (localTouch[q.id] || 0) < EDIT_GRACE) { hold(q.id, q); continue; }
     if (mine) Object.assign(mine, q);
     else state.quotes.unshift(q);
@@ -387,7 +401,7 @@ function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], c
   }
   for (const r of tables) {
     if (!r?.id || !r.data) continue;
-    if (JSON.stringify({ grid: state.tables[r.id], minPrice: state.minPrice[r.id] ?? 0 }) === JSON.stringify(r.data)) continue;
+    if (fingerprint({ grid: state.tables[r.id], minPrice: state.minPrice[r.id] ?? 0 }) === fingerprint(r.data)) continue;
     state.tables[r.id] = r.data.grid;
     state.minPrice[r.id] = r.data.minPrice || 0;
     changed = true;
@@ -395,21 +409,21 @@ function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], c
   for (const r of lists) {
     if (!r?.id || r.data == null) continue;
     const current = r.id === 'customLists' ? state.customLists : state.options[r.id];
-    if (JSON.stringify(current) === JSON.stringify(r.data)) continue;
+    if (fingerprint(current) === fingerprint(r.data)) continue;
     if (r.id === 'customLists') state.customLists = r.data; else state.options[r.id] = r.data;
     changed = true;
   }
   if (config) {
     const { quotes: _q, tables: _t, minPrice: _m, options: _o, customLists: _c, ...rest } = config;
-    if (JSON.stringify(configOf(state)) !== JSON.stringify(rest)) { Object.assign(state, rest); changed = true; }
+    if (fingerprint(configOf(state)) !== fingerprint(rest)) { Object.assign(state, rest); changed = true; }
   }
   if (!changed) return;
 
   // Mark everything we just took as already-known, so the merge doesn't bounce
   // straight back out as a "local change".
-  quotes.forEach((q) => { lastSentQuote[q.id] = lastPushedQuote[q.id] = JSON.stringify(q); });
-  tables.forEach((r) => { lastSentTable[r.id] = lastPushedTable[r.id] = JSON.stringify(r.data); });
-  lists.forEach((r) => { lastSentList[r.id] = lastPushedList[r.id] = JSON.stringify(r.data); });
+  quotes.forEach((q) => { lastSentQuote[q.id] = lastPushedQuote[q.id] = fingerprint(q); });
+  tables.forEach((r) => { lastSentTable[r.id] = lastPushedTable[r.id] = fingerprint(r.data); });
+  lists.forEach((r) => { lastSentList[r.id] = lastPushedList[r.id] = fingerprint(r.data); });
 
   applyingRemote = true;
   try { state = normalize(state); save(); } finally { applyingRemote = false; }
