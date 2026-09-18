@@ -36,7 +36,16 @@ body { font-size: 14px; line-height: 1.5; }
 .brand { font-weight: 800; font-size: 18px; letter-spacing: -.2px; color: var(--ink); display: flex; align-items: center; gap: 9px; }
 .brand span { vertical-align: middle; }
 .brand-logo { width: 30px; height: 30px; object-fit: contain; border-radius: 6px; }
-.price-tag { background: #eef3e9; color: #3f7d5f; font-weight: 800; font-size: 11px; border-radius: 5px; padding: 1px 6px; }
+/* Option prices are edited where they are shown — a read-only tag meant deleting
+   and re-adding an accessory to price it, and the name is the key lines store. */
+.price-edit-wrap { display: inline-flex; align-items: center; gap: 1px; background: #eef3e9; border-radius: 5px; padding: 1px 4px 1px 6px; }
+.price-edit-wrap span { color: #3f7d5f; font-weight: 800; font-size: 11px; }
+input.price-edit {
+  width: 52px; border: 0; background: transparent; color: #3f7d5f; font-weight: 800; font-size: 11px;
+  padding: 1px 2px; font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+}
+input.price-edit::-webkit-outer-spin-button, input.price-edit::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input.price-edit:focus { outline: 0; background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--brand-tint); }
 .tabs { display: flex; gap: 2px; }
 .tab {
   background: transparent; color: var(--muted); border: 0;

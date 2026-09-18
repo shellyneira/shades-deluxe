@@ -24,13 +24,27 @@ export function renderLists() {
   const s = getState();
   const keys = Object.keys(LABELS).filter((k) => s.options[k]);
 
-  const money = (n) => '$' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const chip = (arr, i) => {
+  // The price was display-only: a chip showed it and offered nothing but Remove, so
+  // setting a price on an existing accessory meant deleting and re-adding it. The
+  // name is the key a worksheet line stores, so one typo on the way back in silently
+  // drops the price (and the tick) from every line already using it. Edit in place.
+  const priceBox = (it) => {
+    const inp = el('input', {
+      type: 'number', min: '0', step: '0.01', value: it.price || 0, class: 'price-edit',
+      title: `Price added when “${it.name}” is picked on a line — 0 charges nothing`,
+      onclick: (e) => e.stopPropagation(),
+    });
+    // Blank is 0, not NaN: an empty box must never poison a line total.
+    inp.oninput = () => { it.price = Number(inp.value) || 0; save(); };
+    return el('label', { class: 'price-edit-wrap' }, [el('span', {}, ['$']), inp]);
+  };
+
+  const chip = (arr, i, priced) => {
     const it = arr[i];
     return el('span', { class: 'pill', style: 'display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 12px' }, [
       it.name,
-      it.price > 0 ? el('span', { class: 'price-tag' }, [money(it.price)]) : null,
+      priced ? priceBox(it) : null,
       el('button', { class: 'icon', style: 'padding:0 4px;font-size:13px', title: 'Remove', onclick: () => { if (confirmAction(`Remove “${it.name}” from the list?`)) { arr.splice(i, 1); save(); renderLists(); } } }, ['✕']),
     ]);
   };
@@ -48,13 +62,13 @@ export function renderLists() {
     ]);
   };
 
-  const flatList = (arr) => arr.length
-    ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i)))
+  const flatList = (arr, priced) => arr.length
+    ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i, priced)))
     : el('div', { class: 'muted' }, ['(empty)']);
 
   const groupCol = (arr, title, priced) => el('div', { class: 'list-group' }, [
     el('div', { class: 'list-group-head', style: `--cat-color:${categoryColor(title)}` }, [el('span', { class: 'dot' }, []), title, el('span', { class: 'count' }, [String(arr.length)])]),
-    arr.length ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i))) : el('div', { class: 'muted', style: 'font-size:13px' }, ['(none)']),
+    arr.length ? el('div', { class: 'row', style: 'gap:8px' }, arr.map((_, i) => chip(arr, i, priced))) : el('div', { class: 'muted', style: 'font-size:13px' }, ['(none)']),
     addBox(arr, title.toLowerCase(), priced),
   ]);
 
@@ -63,7 +77,7 @@ export function renderLists() {
     const priced = !!PRICEABLE[key];
     const body = GROUPED[key]
       ? el('div', { class: 'list-split' }, s.categories.map((cat) => groupCol(val[cat] || (val[cat] = []), cat, priced)))
-      : el('div', {}, [flatList(val), addBox(val, LABELS[key].toLowerCase(), priced)]);
+      : el('div', {}, [flatList(val, priced), addBox(val, LABELS[key].toLowerCase(), priced)]);
 
     return el('div', { class: 'panel' }, [
       el('div', { class: 'section-head', style: 'margin-bottom:12px' }, [
