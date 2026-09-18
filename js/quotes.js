@@ -257,6 +257,12 @@ function columns(o, tables, categories) {
 
 const FRAC_OPTS = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
 
+// One accessories popover at a time, and it must survive a row re-render — so it
+// lives on <body> and is torn down by name rather than by closure.
+function closePop() {
+  for (const n of document.querySelectorAll('.multisel-pop')) n.remove();
+}
+
 // Hover help for each worksheet column header — says what it is and where in Settings/Lists it's set.
 const COL_HELP = {
   table: 'Product line — sets the base price from Price Tables',
@@ -285,7 +291,7 @@ const COL_HELP = {
   fabricPrice: 'Fabric cost ($ per yard) — Drapery lines only, drives the whole price',
   lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
-  accessories: 'Priced extras (Remote, Valance, etc.) — same list for every table. Cmd/Ctrl-click to pick more than one. Edit prices in Lists.',
+  accessories: 'Priced extras (Remote, Valance, etc.) — same list for every table. Click to open and tick as many as you need. Edit prices in Lists.',
   notes: 'Free-text note for the maker — prints only on the Work Order, its own column',
 };
 
@@ -346,19 +352,65 @@ function cell(col, item, onChange) {
     return el('td', {}, [inp]);
   }
   if (col.kind === 'multiselect') {
+    // NOT a <select multiple>. That renders as an inline list box in every browser —
+    // never the native popup every other column gets — so this one column looked
+    // broken next to Lining, and picking two needed an undiscoverable Cmd-click.
+    // A button plus a checkbox popover reads like the other cells and says how to
+    // multi-select by showing checkboxes.
     const options = (typeof col.opts === 'function' ? col.opts(item) : col.opts) || [];
-    const cur = new Set(item[col.key] || []);
-    const sel = el('select', {
-      multiple: true, style: `${style};height:${Math.min(4, Math.max(2, options.length || 2)) * 22}px`,
-      onchange: (e) => onChange(col.key, Array.from(e.target.selectedOptions).map((o) => o.value)),
-    });
-    for (const opt of options) {
-      const label = opt.price > 0 ? `${opt.name} (${money(opt.price)})` : opt.name;
-      const o = el('option', { value: opt.name }, [label || ' ']);
-      if (cur.has(opt.name)) o.selected = true;
-      sel.append(o);
-    }
-    return el('td', {}, [sel]);
+    const btn = el('button', { type: 'button', class: 'multisel', style, title: '' });
+    const paint = () => {
+      const c = item[col.key] || [];
+      btn.textContent = c.length === 0 ? '—' : (c.length === 1 ? c[0] : `${c.length} selected`);
+      btn.classList.toggle('empty', c.length === 0);
+      btn.title = c.length ? c.join(', ') : 'None selected';
+    };
+    paint();
+    btn.onclick = () => {
+      if (document.querySelector('.multisel-pop')) { closePop(); return; }
+      // .sheet-wrap clips overflow-y, so an absolutely positioned panel inside the
+      // cell would be cut off. Anchor a fixed one to the button instead.
+      const r = btn.getBoundingClientRect();
+      const pop = el('div', { class: 'multisel-pop' });
+      if (!options.length) pop.append(el('div', { class: 'multisel-empty' }, ['No accessories yet — add them in Lists']));
+      for (const opt of options) {
+        const on = (item[col.key] || []).includes(opt.name);
+        const box = el('input', { type: 'checkbox' });
+        box.checked = on;
+        const row = el('label', { class: 'multisel-item' }, [
+          box, el('span', {}, [opt.name]),
+          opt.price > 0 ? el('em', {}, [money(opt.price)]) : null,
+        ]);
+        box.onchange = () => {
+          const picked = new Set(item[col.key] || []);
+          if (box.checked) picked.add(opt.name); else picked.delete(opt.name);
+          // Store in the list's own order, so the printed description is stable
+          // regardless of the order they were clicked.
+          onChange(col.key, options.map((o) => o.name).filter((n) => picked.has(n)));
+          paint();
+        };
+        pop.append(row);
+      }
+      document.body.append(pop);
+      const h = pop.offsetHeight;
+      const below = window.innerHeight - r.bottom;
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+      pop.style.top = (below < h + 12 && r.top > h + 12 ? r.top - h - 4 : r.bottom + 4) + 'px';
+      pop.style.minWidth = r.width + 'px';
+      setTimeout(() => {
+        document.addEventListener('mousedown', function away(e) {
+          if (pop.contains(e.target) || btn.contains(e.target)) return;
+          closePop(); document.removeEventListener('mousedown', away);
+        });
+      }, 0);
+      // Fixed position detaches on scroll/resize — close rather than float wrong.
+      window.addEventListener('scroll', closePop, { once: true, capture: true });
+      window.addEventListener('resize', closePop, { once: true });
+      document.addEventListener('keydown', function esc(e) {
+        if (e.key === 'Escape') { closePop(); document.removeEventListener('keydown', esc); }
+      });
+    };
+    return el('td', {}, [btn]);
   }
   // select — options may be plain strings, priced objects {name, price}, or a
   // function of the row item (table-dependent product/fabric lists). `keyFor`
