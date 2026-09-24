@@ -208,9 +208,11 @@ function columns(o, tables, categories, customLists) {
   // kind of table each one is, even though the table names themselves are plain.
   const tableGroups = categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) }));
   const forDrapery = (it) => isDrapery(it, tables);
-  // Per-category attributes created from the Lists screen (Pattern, and whatever
-  // gets added after it) — same shape as Product/Fabric, so they slot in the same
-  // way: one dropdown, filtered by the line's category, right before Color.
+  // Per-category attributes created from the Lists screen (Pattern, and whatever gets
+  // added after it) — same shape as Product/Fabric, so they're filtered by the line's
+  // category the same way. Placed after Color rather than squeezed between Description
+  // and Color: they read as their own group, right after the shade's core identity
+  // (Product/Fabric/Color), not wedged into the middle of it.
   const customCols = (customLists || []).filter((l) => l.perCategory).map((l) => ({
     key: 'custom_' + l.id, label: l.name, kind: 'select', w: 130,
     opts: (it) => opt(l.items[tableCategory(it.table, tables)] || []),
@@ -226,8 +228,8 @@ function columns(o, tables, categories, customLists) {
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
     { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
-    ...customCols,
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
+    ...customCols,
     // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
     // (Motorized/Manual) instead — the two concepts play the same role, so Track
     // replaces System in place rather than sitting in its own separate column.
@@ -254,7 +256,7 @@ function columns(o, tables, categories, customLists) {
     // Drapery Cornice/Swag/Grommet: no formula exists, so it behaves exactly like Brackets.
     { key: 'installation', label: 'Ins', kind: 'num', w: 58, placeholder: (it) => String(draperyAutoInstall(it, tables[it.table]) || '0') },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
-    { key: 'mount', label: 'Mount', kind: 'select', opts: ['Ceiling', 'Wall'], w: 90 },
+    { key: 'mount', label: 'Mount', kind: 'select', opts: opt(o.mount), w: 90 },
     { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0' },
     { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },

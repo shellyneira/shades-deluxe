@@ -8,7 +8,7 @@ const LABELS = {
   locations: 'Locations', wdNumbers: 'Window / Door #', products: 'Products',
   fabrics: 'Fabrics / Descriptions', colors: 'Colors', controls: 'Controls',
   systems: 'Systems', styles: 'Styles', headrails: 'Headrails / Bottom rails',
-  accessories: 'Accessories',
+  accessories: 'Accessories', mount: 'Mount',
 };
 const GROUPED = { products: true, fabrics: true }; // stored one array per category
 // Only these add-ons carry a price. Products/fabrics get their price from the Price
@@ -154,7 +154,7 @@ export function renderLists() {
       : [{ label: null, arr: list.items }];
     return categoryCard({
       title: list.name,
-      hint: list.perCategory ? 'One list per product type — shown on the worksheet before Color.' : 'One shared list.',
+      hint: list.perCategory ? 'One list per product type — shown on the worksheet after Color.' : 'One shared list.',
       groups, priced: list.priced, onChange: () => { save(); renderLists(); },
       headerActions: [
         el('button', { class: 'btn small ghost', onclick: () => { const nn = prompt('Rename category:', list.name); if (nn?.trim()) { list.name = nn.trim(); save(); renderLists(); } } }, ['Rename']),
