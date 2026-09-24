@@ -156,7 +156,30 @@ function normalize(state) {
   state.docConfig.work.table = false; // one-time: Shade Type briefly defaulted on for Work Order — turn it back off
 
 
-  state.customLists = (state.customLists || []).map((l) => ({ name: l.name, items: toPriced(l.items) }));
+  // Custom lists used to be a single flat, always-priced array (a plain reference
+  // list). They can now also be "per product type" — one column per category, same
+  // shape as Products/Fabrics — so a new attribute (e.g. Drapery's Pattern) can be
+  // added from the Lists screen without a code change. `id` is assigned once and
+  // kept forever: it's what a worksheet line's value is stored against, so renaming
+  // the list must never orphan data already picked on a quote.
+  state.customLists = (state.customLists || []).map((l, i) => {
+    const id = l.id || `cl_${i}_${Math.random().toString(36).slice(2, 8)}`;
+    const perCategory = !!l.perCategory;
+    const priced = l.priced !== false; // legacy lists were always priced
+    const items = perCategory
+      ? Object.fromEntries(state.categories.map((cat) => [cat, toPriced((l.items && !Array.isArray(l.items) ? l.items[cat] : null) || [])]))
+      : toPriced(Array.isArray(l.items) ? l.items : []);
+    return { id, name: l.name, perCategory, priced, items };
+  });
+  // Seed once: Drapery's Pattern field, requested as the first of these per-category
+  // attributes. No price for now — the user can turn pricing on later from Lists.
+  if (!state.customLists.some((l) => l.name === 'Pattern' && l.perCategory)) {
+    state.customLists.push({
+      id: `cl_pattern_${Math.random().toString(36).slice(2, 8)}`,
+      name: 'Pattern', perCategory: true, priced: false,
+      items: Object.fromEntries(state.categories.map((cat) => [cat, []])),
+    });
+  }
   state.nextInvoiceNumber = Number(state.nextInvoiceNumber) || 2001;
   // Migrate legacy status/payment into the single lifecycle stage.
   (state.quotes || []).forEach((q) => {

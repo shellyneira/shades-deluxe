@@ -196,13 +196,20 @@ const draperyStyleOf = (it, tables) => (isDrapery(it, tables) ? DRAPERY_STYLES[t
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
 // `hideWhen(item)` greys a cell out for rows where the field is meaningless.
-function columns(o, tables, categories) {
+function columns(o, tables, categories, customLists) {
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
   // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
   // kind of table each one is, even though the table names themselves are plain.
   const tableGroups = categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) }));
   const forDrapery = (it) => isDrapery(it, tables);
+  // Per-category attributes created from the Lists screen (Pattern, and whatever
+  // gets added after it) — same shape as Product/Fabric, so they slot in the same
+  // way: one dropdown, filtered by the line's category, right before Color.
+  const customCols = (customLists || []).filter((l) => l.perCategory).map((l) => ({
+    key: 'custom_' + l.id, label: l.name, kind: 'select', w: 130,
+    opts: (it) => opt(l.items[tableCategory(it.table, tables)] || []),
+  }));
   return [
     { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
@@ -214,6 +221,7 @@ function columns(o, tables, categories) {
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
     { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
+    ...customCols,
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
     // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
     // (Motorized/Manual) instead — the two concepts play the same role, so Track
@@ -431,7 +439,7 @@ function cell(col, item, onChange) {
 
 function sheet(q, rerender) {
   const s = getState();
-  const cols = columns(s.options, s.tables, s.categories);
+  const cols = columns(s.options, s.tables, s.categories, s.customLists);
   const draft = q._draft || (q._draft = blankLine(s));
 
   const priceCells = []; // {getItem, node}

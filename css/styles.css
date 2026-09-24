@@ -36,16 +36,6 @@ body { font-size: 14px; line-height: 1.5; }
 .brand { font-weight: 800; font-size: 18px; letter-spacing: -.2px; color: var(--ink); display: flex; align-items: center; gap: 9px; }
 .brand span { vertical-align: middle; }
 .brand-logo { width: 30px; height: 30px; object-fit: contain; border-radius: 6px; }
-/* Option prices are edited where they are shown — a read-only tag meant deleting
-   and re-adding an accessory to price it, and the name is the key lines store. */
-.price-edit-wrap { display: inline-flex; align-items: center; gap: 1px; background: #eef3e9; border-radius: 5px; padding: 1px 4px 1px 6px; }
-.price-edit-wrap span { color: #3f7d5f; font-weight: 800; font-size: 11px; }
-input.price-edit {
-  width: 52px; border: 0; background: transparent; color: #3f7d5f; font-weight: 800; font-size: 11px;
-  padding: 1px 2px; font-variant-numeric: tabular-nums; -moz-appearance: textfield;
-}
-input.price-edit::-webkit-outer-spin-button, input.price-edit::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-input.price-edit:focus { outline: 0; background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--brand-tint); }
 .tabs { display: flex; gap: 2px; }
 .tab {
   background: transparent; color: var(--muted); border: 0;
@@ -110,8 +100,6 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 table.data tbody tr:hover { background: #faf7f2; }
 table.data tbody tr:last-child td { border-bottom: 0; }
 .scroll { overflow-x: auto; border-radius: var(--radius-sm); }
-.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--brand-tint); color: var(--brand-dark); }
-.pill.soft { background: var(--bg); color: var(--ink-soft); }
 .muted { color: var(--muted); }
 .empty { text-align: center; color: var(--muted); padding: 54px 10px; font-size: 15px; }
 .empty .big { font-size: 40px; margin-bottom: 8px; }
@@ -493,12 +481,55 @@ td.price:hover .price-explain { color: var(--brand); border-bottom-color: var(--
 .login-input:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-tint); }
 .login-err { color: var(--danger); font-size: 13px; font-weight: 600; margin-top: 12px; min-height: 18px; }
 
-/* ---------- lists (split roller/zebra) ---------- */
-.list-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-.list-group { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; }
-.list-group-head { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 12px; color: var(--cat-color, var(--ink-soft)); }
-.list-group-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cat-color, var(--ink-soft)); }
-.list-group-head .count { margin-left: auto; background: var(--bg); color: var(--muted); border-radius: 999px; padding: 1px 9px; font-size: 11px; }
+/* ---------- lists ----------
+   One neutral visual language for every category — system or user-created — so
+   there is exactly one thing to learn: a chip is an option, a chip with a box is
+   an option with a price, and a card with several columns just means "one list
+   per product type". No color-coding to decode. */
+.field-panel { }
+.field-subcard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+.field-subcard { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; }
+.field-subcard-head { display: flex; align-items: center; font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 12px; }
+.field-count { margin-left: auto; background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; font-size: 11px; font-weight: 700; }
+.field-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.field-empty { color: var(--muted); font-size: 13px; padding: 4px 0 12px; }
+
+.field-chip {
+  display: inline-flex; align-items: center; gap: 8px; background: var(--panel);
+  border: 1px solid var(--line-strong); border-radius: 999px; padding: 7px 8px 7px 14px;
+  font-size: 14px; font-weight: 600; color: var(--ink);
+}
+.field-chip--priced { padding-right: 6px; }
+.field-chip-currency { color: var(--muted); font-weight: 700; font-size: 13px; }
+input.field-chip-price {
+  width: 56px; border: 1px solid transparent; background: var(--bg); border-radius: 6px;
+  color: var(--ink); font-weight: 700; font-size: 13px; padding: 4px 6px; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+input.field-chip-price::-webkit-outer-spin-button, input.field-chip-price::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input.field-chip-price:focus { outline: 0; border-color: var(--brand); background: #fff; }
+.field-chip-x {
+  border: 0; background: var(--bg); color: var(--muted); width: 22px; height: 22px; border-radius: 50%;
+  font-size: 12px; line-height: 1; cursor: pointer; flex-shrink: 0;
+}
+.field-chip-x:hover { background: #fbe9e4; color: var(--danger); }
+
+.field-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.field-add-input, .field-add-price {
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 9px 12px; font-size: 14px; background: #fff;
+}
+.field-add-input { flex: 1 1 160px; min-width: 140px; }
+.field-add-price { width: 84px; }
+.field-add-input:focus, .field-add-price:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-tint); }
+
+.new-cat-card { border: 2px dashed var(--line-strong); background: var(--bg); }
+.field-choice-group { margin-bottom: 16px; }
+.field-choice-q { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.choice-btn {
+  border: 1px solid var(--line-strong); background: #fff; color: var(--ink-soft);
+  border-radius: var(--radius-sm); padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.choice-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
 
 .hint { color: var(--muted); font-size: 13px; }
 .divider { height: 1px; background: var(--line); margin: 20px 0; border: 0; }

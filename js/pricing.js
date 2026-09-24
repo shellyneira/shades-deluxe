@@ -35,8 +35,23 @@ function accessoriesExtras(line, state) {
   return (line.accessories || []).reduce((sum, name) => sum + optionPrice(state, 'accessories', name), 0);
 }
 
+// Custom per-category attributes created from the Lists screen (Drapery's Pattern,
+// and whatever the user adds after it) — same shape as Products/Fabrics, so priced
+// ones are summed the same way as the built-in fields above.
+function customListExtras(line, state) {
+  const category = state.tables[line.table]?.category || 'Roller';
+  return (state.customLists || []).reduce((sum, l) => {
+    if (!l.perCategory || !l.priced) return sum;
+    const name = line['custom_' + l.id];
+    if (!name) return sum;
+    const found = (l.items[category] || []).find((o) => o && o.name === name);
+    return sum + (found ? Number(found.price) || 0 : 0);
+  }, 0);
+}
+
 function optionExtras(line, state) {
-  return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field]), 0) + accessoriesExtras(line, state);
+  return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field]), 0)
+    + accessoriesExtras(line, state) + customListExtras(line, state);
 }
 
 export function effectiveDim(inches, fraction) {
@@ -203,7 +218,7 @@ export function computeLine(line, state) {
     const d = computeDraperyLine(line, table, state);
     const markup = Number(line.markup) || 0, motor = Number(line.motorPrice) || 0, lineDisc = Number(line.discount) || 0;
     if (!d) return { list: null, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation: 0, brackets: 0, extras: 0, cost: null, unit: null };
-    const extras = accessoriesExtras(line, state); // priced accessories — apply to Drapery too, not just Roller/Zebra
+    const extras = accessoriesExtras(line, state) + customListExtras(line, state); // priced accessories/attributes — apply to Drapery too, not just Roller/Zebra
     const unit = Math.max(0, round2(d.unit + extras + markup + motor - lineDisc));
     return { list: unit, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation: round2(d.installation), brackets: 0, extras: round2(extras), cost: round2(d.cost + extras), unit };
   }
