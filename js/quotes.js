@@ -9,6 +9,11 @@ let sub = { view: 'list', quoteId: null };
 // Which quote this screen is on — read by presence.js to tell everyone else.
 export const currentQuoteRef = () => sub;
 
+// Jump straight to a quote's worksheet from another screen (e.g. the dashboard's
+// "no price" warning). Only sets where the Quotes tab should land — the caller
+// still has to switch to that tab, since this module doesn't own the router.
+export function openQuote(id, view = 'edit') { sub = { view, quoteId: id }; }
+
 export function renderQuotes() {
   if (sub.view === 'edit' && getQuote(sub.quoteId)) return mount(editor(getQuote(sub.quoteId)));
   if (sub.view === 'invoice' && getQuote(sub.quoteId)) return mount(invoice(getQuote(sub.quoteId)));

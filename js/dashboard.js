@@ -7,9 +7,10 @@
 // were permanently zero while fully paid invoices sat in "open pipeline".
 //
 // No chart library: bars are divs, the rings are inline SVG.
-import { el, mount } from './dom.js';
+import { el, mount, FRACTION_LABEL } from './dom.js';
 import { getState } from './store.js';
 import { quoteTotals, computeLine, money, money0 } from './pricing.js';
+import { openQuote } from './quotes.js';
 
 const STAGES = ['Quote', 'Accepted', '50% Paid', '100% Paid'];
 const stagePct = (st) => (st === '100% Paid' ? 1 : st === '50% Paid' ? 0.5 : 0);
@@ -83,8 +84,20 @@ function metrics(s) {
   // prints $0.00, which is easy to miss and expensive to miss.
   const unpriced = [];
   for (const r of rows) {
-    const n = r.q.items.filter((it) => computeLine(it, s).unit == null).length;
-    if (n) unpriced.push({ number: r.q.number, name: r.q.client?.name || 'Untitled client', lines: n });
+    // Not `unit == null` — a fixed shade prices at $0 off-chart now (it still charges
+    // fascia/installation/etc.), so `unit` alone can no longer tell "off-chart" from
+    // "priced in full". `listMissing` is the flag pricing.js documents for exactly
+    // this: no size at all still means nothing to warn about.
+    const badLines = r.q.items.filter((it) => computeLine(it, s).listMissing);
+    if (badLines.length) {
+      unpriced.push({
+        id: r.q.id, number: r.q.number, name: r.q.client?.name || 'Untitled client',
+        lines: badLines.map((it) => ({
+          table: it.table, location: it.location || '', wdNumber: it.wdNumber || '',
+          width: it.width, widthFrac: it.widthFrac, height: it.height, heightFrac: it.heightFrac,
+        })),
+      });
+    }
   }
 
   return {
@@ -232,16 +245,47 @@ function recentList(recent) {
   ])));
 }
 
-// The one thing on this board worth interrupting someone for.
+const dimLabel = (l) => {
+  const frac = (n, f) => (n ? `${n}${FRACTION_LABEL[f] && FRACTION_LABEL[f] !== '—' ? ' ' + FRACTION_LABEL[f] : ''}"` : '?');
+  return `${frac(l.width, l.widthFrac)} × ${frac(l.height, l.heightFrac)}`;
+};
+
+let unpricedExpanded = false;
+
+// The one thing on this board worth interrupting someone for. Collapsed, it just
+// says how bad it is; expanded, it says exactly which lines and lets you jump
+// straight to fixing them instead of hunting through every open quote.
 function unpricedWarning(unpriced) {
   if (!unpriced.length) return null;
-  const lines = unpriced.reduce((a, u) => a + u.lines, 0);
+  const lineCount = unpriced.reduce((a, u) => a + u.lines.length, 0);
   const who = unpriced.slice(0, 4).map((u) => `#${u.number} ${u.name}`).join(', ');
+
+  const goToQuote = (id) => { openQuote(id); document.querySelector('.tab[data-view="quotes"]')?.click(); };
+
+  const detail = unpricedExpanded ? el('div', { class: 'alert-detail' }, unpriced.map((u) => el('div', { class: 'alert-quote' }, [
+    el('div', { class: 'alert-quote-head' }, [
+      el('span', {}, [`#${u.number} ${u.name}`]),
+      el('button', { class: 'btn small ghost', onclick: () => goToQuote(u.id) }, ['Edit →']),
+    ]),
+    ...u.lines.map((l) => el('div', { class: 'alert-line' }, [
+      l.table, l.location ? ' · ' + l.location : '', l.wdNumber ? ' · ' + l.wdNumber : '', ' — ', dimLabel(l),
+    ])),
+  ]))) : null;
+
   return el('div', { class: 'alert' }, [
     el('span', { class: 'alert-mark' }, ['!']),
-    el('div', {}, [
-      el('strong', {}, [`${lines} line${lines > 1 ? 's' : ''} on ${unpriced.length} quote${unpriced.length > 1 ? 's' : ''} ${lines > 1 ? 'have' : 'has'} no price`]),
-      el('div', { class: 'alert-sub' }, [`The size falls outside its price table, so it counts as $0 here — and prints as $0.00 on the client's quote. ${who}${unpriced.length > 4 ? '…' : ''}`]),
+    el('div', { style: 'flex:1' }, [
+      el('div', { class: 'row', style: 'justify-content:space-between;gap:12px' }, [
+        el('div', {}, [
+          el('strong', {}, [`${lineCount} line${lineCount > 1 ? 's' : ''} on ${unpriced.length} quote${unpriced.length > 1 ? 's' : ''} ${lineCount > 1 ? 'have' : 'has'} no price`]),
+          el('div', { class: 'alert-sub' }, [`The size falls outside its price table, so it counts as $0 here — and prints as $0.00 on the client's quote. ${who}${unpriced.length > 4 ? '…' : ''}`]),
+        ]),
+        el('button', {
+          class: 'btn small ghost', style: 'flex:none',
+          onclick: () => { unpricedExpanded = !unpricedExpanded; renderDashboard(); },
+        }, [unpricedExpanded ? 'Hide details ▴' : 'Show details ▾']),
+      ]),
+      detail,
     ]),
   ]);
 }

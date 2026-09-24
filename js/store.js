@@ -171,8 +171,9 @@ function normalize(state) {
       : toPriced(Array.isArray(l.items) ? l.items : []);
     return { id, name: l.name, perCategory, priced, items };
   });
-  // Seed once: Drapery's Pattern field, requested as the first of these per-category
-  // attributes. No price for now — the user can turn pricing on later from Lists.
+  // Seed once: Pattern, requested as the first of these per-category attributes —
+  // one list per product type (Roller/Zebra/Drapery all use it, filled in separately
+  // from Lists). No price for now — the user can turn pricing on later from Lists.
   if (!state.customLists.some((l) => l.name === 'Pattern' && l.perCategory)) {
     state.customLists.push({
       id: `cl_pattern_${Math.random().toString(36).slice(2, 8)}`,
