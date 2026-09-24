@@ -353,9 +353,12 @@ function controlText(ctrl) {
   return '';
 }
 
-// Every field that can go into a document's Description, in display order.
-// Settings → Documents lets the user toggle each per document (Client vs Work order).
-export const DESC_FIELDS = [
+// Every BUILT-IN field that can go into a document's Description. Custom per-category
+// attributes from the Lists screen (Pattern, and anything added after it) are not
+// listed here — they were hardcoded once before and a new one needed a code change
+// every time; `descFields()` below appends one for each of those automatically, so
+// Settings → Documents always offers exactly what the worksheet currently has.
+const BUILTIN_DESC_FIELDS = [
   // The table name (Roller #3, Zebra #5, Heavy Fabric...) is an internal price-tier
   // label, not something to print anywhere — Product/Fabric already say what it is,
   // for every category. Off by default (Settings → Documents); a plain toggle like
@@ -382,10 +385,30 @@ export const DESC_FIELDS = [
   { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.mount === 'Wall' ? 'WALL' : 'CEILING') : ''}` : '') },
   { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
   { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
+  // Was silently missing entirely — Work Order needs it (the maker has to know which),
+  // the client quote never should (only the price matters to them).
+  { key: 'mount', label: 'Mount', fmt: (l) => (l.mount === 'Wall' ? 'Wall Mount' : l.mount === 'Ceiling' ? 'Ceiling Mount' : '') },
 ];
 
-export function describeLine(line, cfg, isWork, compact) {
-  return DESC_FIELDS
+// Built-ins plus one entry per per-category custom list (Lists screen), in the order
+// the user dragged them into in Settings → Documents — any field not in that saved
+// order (a field that existed before ordering was added, or a category created since)
+// is appended at the end, so it shows up rather than silently vanishing.
+export function descFields(state) {
+  const custom = (state.customLists || []).filter((l) => l.perCategory).map((l) => ({
+    key: 'custom_' + l.id, label: l.name, fmt: (line) => line['custom_' + l.id] || '',
+  }));
+  const all = [...BUILTIN_DESC_FIELDS, ...custom];
+  const order = state.docFieldOrder;
+  if (!order || !order.length) return all;
+  const byKey = new Map(all.map((f) => [f.key, f]));
+  const ordered = order.map((k) => byKey.get(k)).filter(Boolean);
+  const placed = new Set(order);
+  return [...ordered, ...all.filter((f) => !placed.has(f.key))];
+}
+
+export function describeLine(line, cfg, isWork, compact, state) {
+  return descFields(state)
     .filter((f) => !cfg || cfg[f.key])
     .map((f) => f.fmt(line, isWork, compact))
     .filter(Boolean)

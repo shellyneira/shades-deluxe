@@ -26,15 +26,16 @@ const DEFAULT_COMPANY = {
 
 // Which fields land in each document's Description column (Settings → Documents).
 const DEFAULT_DOC_CONFIG = {
-  // Client quote: no dimensions, shown with prices.
-  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true },
+  // Client quote: no dimensions, shown with prices. Mount is a build detail for the
+  // maker, not the client.
+  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true, mount: false },
   // Work order: every build detail, dimensions shown, no prices. Shade Type off —
   // that's an internal price-tier name, not something to reveal (Product/Fabric
   // already say what it is, and the client shouldn't be able to shop the exact tier
-  // elsewhere).
-  work: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true },
+  // elsewhere). Mount ON — the maker needs to know Wall vs. Ceiling.
+  work: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true, mount: true },
   // DYMO sticker: short — product shown separately, so description = fabric + control.
-  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false, accessories: false },
+  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false, accessories: false, mount: false },
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
@@ -100,6 +101,7 @@ function freshState() {
     minPrice: { ...SEED.minPrice },
     options: structuredClone(SEED.options),
     docConfig: structuredClone(DEFAULT_DOC_CONFIG),
+    docFieldOrder: [],
     rates: { ...DEFAULT_RATES },
     minimumOrder: 0,
     defaultInstallation: 0,
@@ -154,6 +156,7 @@ function normalize(state) {
     state.docConfig[doc] = { ...DEFAULT_DOC_CONFIG[doc], ...(state.docConfig[doc] || {}) };
   }
   state.docConfig.work.table = false; // one-time: Shade Type briefly defaulted on for Work Order — turn it back off
+  state.docFieldOrder = Array.isArray(state.docFieldOrder) ? state.docFieldOrder : [];
 
 
   // Custom lists used to be a single flat, always-priced array (a plain reference

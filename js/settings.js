@@ -2,30 +2,69 @@
 import { el, mount, input, toast, confirmAction } from './dom.js';
 import { getState, save, exportJSON, importJSON, resetToDefaults } from './store.js';
 import { dbEnabled } from './db.js';
-import { DESC_FIELDS, TRACK_RATE_LABELS } from './pricing.js';
+import { descFields, TRACK_RATE_LABELS } from './pricing.js';
 
-// Two checkbox columns controlling what each document's Description includes.
+// Drag a row to reorder — one shared order, used by every document, so dragging in
+// Settings never raises "does this affect just this document?" The list itself
+// comes from descFields(), which already includes any category the user has added
+// from Lists — nothing here is hardcoded to a fixed field set.
+function fieldOrderPanel(s) {
+  const fields = descFields(s); // already sorted by s.docFieldOrder
+  const order = fields.map((f) => f.key);
+  const isBefore = (e, row) => e.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2;
+
+  const row = (f) => {
+    const r = el('div', {
+      class: 'order-row', draggable: true,
+      ondragstart: (e) => { e.dataTransfer.setData('text/plain', f.key); r.classList.add('dragging'); },
+      ondragend: () => r.classList.remove('dragging'),
+      ondragover: (e) => { e.preventDefault(); r.classList.toggle('dragover-top', isBefore(e, r)); r.classList.toggle('dragover-bottom', !isBefore(e, r)); },
+      ondragleave: () => r.classList.remove('dragover-top', 'dragover-bottom'),
+      ondrop: (e) => {
+        e.preventDefault();
+        const draggedKey = e.dataTransfer.getData('text/plain');
+        const before = isBefore(e, r);
+        r.classList.remove('dragover-top', 'dragover-bottom');
+        if (draggedKey === f.key) return;
+        const next = order.filter((k) => k !== draggedKey);
+        next.splice(next.indexOf(f.key) + (before ? 0 : 1), 0, draggedKey);
+        s.docFieldOrder = next;
+        save(); renderSettings();
+      },
+    }, [el('span', { class: 'drag-handle' }, ['⠿']), f.label]);
+    return r;
+  };
+
+  return el('div', { class: 'panel' }, [
+    el('h2', {}, ['Order these appear in every document']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Drag to reorder. This is the order used everywhere a Description is printed — Client Quote, Work Order and Stickers all follow it.']),
+    el('div', { class: 'order-list' }, fields.map(row)),
+  ]);
+}
+
+// Three checkbox columns controlling what each document's Description includes.
 function documentsPanel(s) {
+  const fields = descFields(s);
   const col = (docKey, title, note) => {
     const cfg = s.docConfig[docKey];
     // Labels always print the control's hand side next to the size — the Description
     // toggle for it would just duplicate that, so it's not offered here.
-    const fields = docKey === 'label' ? DESC_FIELDS.filter((f) => f.key !== 'control') : DESC_FIELDS;
-    const boxes = fields.map((f) => {
+    const docFields = docKey === 'label' ? fields.filter((f) => f.key !== 'control') : fields;
+    const boxes = docFields.map((f) => {
       const box = el('input', { type: 'checkbox', onchange: (e) => { cfg[f.key] = e.target.checked; save(); } });
       box.checked = !!cfg[f.key];
       return el('label', { class: 'field check', style: 'margin:0' }, [box, f.label]);
     });
-    return el('div', { class: 'list-group' }, [
-      el('div', { class: 'list-group-head', style: 'color:var(--ink)' }, [title]),
+    return el('div', { class: 'field-subcard' }, [
+      el('div', { class: 'field-subcard-head' }, [title]),
       el('p', { class: 'hint', style: 'margin:-6px 0 12px' }, [note]),
       el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px 14px' }, boxes),
     ]);
   };
   return el('div', { class: 'panel' }, [
     el('h2', {}, ['Documents — what to show']),
-    el('p', { class: 'muted', style: 'margin-top:0' }, ['Pick which details go into each document’s Description. Location, size and price are handled by their own columns.']),
-    el('div', { class: 'list-split' }, [
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Pick which details go into each document’s Description. Location, size and price are handled by their own columns. Adding a category in Lists adds it here too — nothing to wire up by hand.']),
+    el('div', { class: 'field-subcard-grid' }, [
       col('client', 'Client Quote', 'Shown to the customer. No dimensions; prices shown.'),
       col('work', 'Work Order', 'For your maker. Dimensions shown; no prices.'),
       col('label', 'Stickers (DYMO)', 'Extra info line on each shade label (name, location, product, size & control are always shown).'),
@@ -127,6 +166,7 @@ export function renderSettings() {
       el('label', { class: 'field', style: 'margin-top:14px' }, ['Payment & terms', terms]),
     ]),
     ratesPanel(s),
+    fieldOrderPanel(s),
     documentsPanel(s),
     el('div', { class: 'panel' }, [
       el('h2', {}, ['Backup & data']),

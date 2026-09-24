@@ -658,7 +658,7 @@ function docText(q, s, isWork) {
   const cfg = isWork ? s.docConfig.work : s.docConfig.client;
   const t = quoteTotals(q, s);
   const rows = q.items.map((l, i) => {
-    const desc = describeLine(l, cfg, isWork);
+    const desc = describeLine(l, cfg, isWork, false, s);
     const size = isWork ? ` [${sizeText(l)}]` : '';
     const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
     const qty = Number(l.qty) || 1;
@@ -820,7 +820,7 @@ function labelsView(q, s) {
       el('div', { class: 'dl-text' }, [
         el('div', { class: 'dl-name' }, [q.client.name || '']),
         el('div', { class: 'dl-loc' }, [(l.location || '') + (n > 1 ? ` (${k + 1} of ${n})` : '')]),
-        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true)].filter(Boolean).join(' — ')]),
+        el('div', { class: 'dl-prod' }, [[l.product, describeLine(l, cfg, false, true, s)].filter(Boolean).join(' — ')]),
         el('div', { class: 'dl-size' }, [(sizeText(l) + (l.control ? ' ' + l.control : '')).trim()]),
       ]),
       el('img', { class: 'dl-logo', src: 'assets/logo.png', alt: '' }),
@@ -876,7 +876,7 @@ function clientTable(q, s) {
     return el('tr', { class: unpriced ? 'unpriced' : '' }, [
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
-      el('td', { class: 'desc' }, [describeLine(l, cfg)]),
+      el('td', { class: 'desc' }, [describeLine(l, cfg, false, false, s)]),
       el('td', { class: 'num' }, [unpriced ? 'TBD' : money0(shownUnit)]),
       el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(roundWhole(shownUnit) * qty)]),
     ]);
@@ -900,7 +900,7 @@ function workTable(q, s) {
     el('td', { class: 'num strong' }, [String(Number(l.qty) || 1)]),
     el('td', { class: 'strong' }, [l.location]),
     el('td', { class: 'strong' }, [sizeText(l)]),
-    el('td', { class: 'desc' }, [describeLine(l, cfg, true)]),
+    el('td', { class: 'desc' }, [describeLine(l, cfg, true, false, s)]),
     el('td', { class: 'desc' }, [l.notes || '']),
   ]));
   return el('table', { class: 'items' }, [

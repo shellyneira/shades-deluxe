@@ -534,6 +534,18 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 }
 .choice-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
 
+/* ---------- document field order (Settings) ---------- */
+.order-list { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.order-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--bg);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+  color: var(--ink); cursor: grab; user-select: none; border-top: 2px solid transparent; border-bottom: 2px solid transparent;
+}
+.order-row.dragging { opacity: .4; }
+.order-row.dragover-top { border-top-color: var(--brand); }
+.order-row.dragover-bottom { border-bottom-color: var(--brand); }
+.drag-handle { color: var(--muted); font-size: 15px; flex: none; }
+
 .hint { color: var(--muted); font-size: 13px; }
 .divider { height: 1px; background: var(--line); margin: 20px 0; border: 0; }
 
