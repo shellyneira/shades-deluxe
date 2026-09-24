@@ -389,6 +389,11 @@ function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], c
     if (!q?.id) continue;
     const mine = state.quotes.find((x) => x.id === q.id);
     if (mine && fingerprint(mine) === fingerprint(q)) continue;
+    // The DB-change channel has no sender filter, unlike broadcast (see applyRemotePatch),
+    // so our own push echoes back here. If it's exactly what we last pushed it carries no
+    // new information — queuing it for delayed replay would just clobber whatever we've
+    // typed since with our own older text.
+    if (fingerprint(q) === lastPushedQuote[q.id]) continue;
     if (now - (localTouch[q.id] || 0) < EDIT_GRACE) { hold(q.id, q); continue; }
     if (mine) Object.assign(mine, q);
     else state.quotes.unshift(q);
