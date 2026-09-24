@@ -7,6 +7,11 @@ export function el(tag, attrs = {}, children = []) {
     else if (k === 'html') node.innerHTML = v;
     else if (k === 'text') node.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+    // `draggable` is an enumerated attribute, not a boolean one — it only works as
+    // the literal string "true"/"false". `draggable=""` (what the boolean shorthand
+    // below would set) means "auto", which for a <div> means NOT draggable, so every
+    // `draggable: true` in the app was silently inert.
+    else if (k === 'draggable') node.setAttribute('draggable', v ? 'true' : 'false');
     else if (v === true) node.setAttribute(k, '');
     else if (v !== false && v != null) node.setAttribute(k, v);
   }
