@@ -2,7 +2,7 @@
 // (durable, shared across devices) and is kept live over a Realtime channel so a
 // change made on one screen shows up on every other screen within a second.
 import { SEED } from './seed-data.js';
-import { DRAPERY_STYLES, DEFAULT_TRACK_RATES } from './pricing.js';
+import { DRAPERY_STYLES, DEFAULT_TRACK_RATES, DEFAULT_ABBREV } from './pricing.js';
 import {
   dbEnabled, pullState, pushState,
   pullQuotes, pushQuotes, deleteQuoteRow,
@@ -102,6 +102,7 @@ function freshState() {
     options: structuredClone(SEED.options),
     docConfig: structuredClone(DEFAULT_DOC_CONFIG),
     docFieldOrder: [],
+    abbrev: { ...DEFAULT_ABBREV },
     rates: { ...DEFAULT_RATES },
     minimumOrder: 0,
     defaultInstallation: 0,
@@ -161,6 +162,7 @@ function normalize(state) {
   }
   state.docConfig.work.table = false; // one-time: Shade Type briefly defaulted on for Work Order — turn it back off
   state.docFieldOrder = Array.isArray(state.docFieldOrder) ? state.docFieldOrder : [];
+  state.abbrev = { ...DEFAULT_ABBREV, ...(state.abbrev || {}) };
 
 
   // Custom lists used to be a single flat, always-priced array (a plain reference

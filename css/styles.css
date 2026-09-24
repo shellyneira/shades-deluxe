@@ -366,7 +366,6 @@ table.sheet tr.draftrow:hover td { background: var(--bg); }
 /* The only loud thing on the board. Money that silently priced at zero has earned
    the right to shout. */
 .badge.test { background: #efe9df; color: var(--muted); border: 1px dashed var(--line-strong); }
-.btn.test-toggle.on { background: var(--gold); border-color: var(--gold); color: #fff; }
 
 /* price breakdown — the "show your working" panel */
 .price-explain { cursor: pointer; border-bottom: 1px dotted var(--line-strong); }

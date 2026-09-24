@@ -1,5 +1,5 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
-import { el, select, input, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
+import { el, select, input, checkbox, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
 import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
@@ -83,11 +83,11 @@ function editor(q) {
     el('div', { class: 'row' }, [
       // One click, and this quote stops counting as business: it leaves every
       // dashboard number and never takes an invoice number.
-      el('button', {
-        class: 'btn test-toggle' + (q.isTest ? ' on' : ''),
-        title: q.isTest ? 'This is a practice quote — it is excluded from the dashboard' : 'Mark as a practice quote, excluded from the dashboard',
-        onclick: () => { q.isTest = !q.isTest; save(); renderQuotes(); toast(q.isTest ? 'Marked as a test — kept out of your numbers' : 'Back to a real quote'); },
-      }, [q.isTest ? '✓ Test quote' : 'Mark as test']),
+      (() => {
+        const box = checkbox('Is Test', q.isTest, (v) => { q.isTest = v; save(); renderQuotes(); toast(v ? 'Marked as a test — kept out of your numbers' : 'Back to a real quote'); });
+        box.title = q.isTest ? 'This is a practice quote — it is excluded from the dashboard' : 'Mark as a practice quote, excluded from the dashboard';
+        return box;
+      })(),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
       el('button', { class: 'btn', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list' }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
     ]),

@@ -344,12 +344,17 @@ export function explainLine(line, state) {
 const FRACTION_TEXT = { 0.125: '1/8', 0.25: '1/4', 0.375: '3/8', 0.5: '1/2', 0.625: '5/8', 0.75: '3/4', 0.875: '7/8' };
 const FIELD_LABEL = { system: 'System', style: 'Style', headrail: 'Headrail', bottomRail: 'Bottom rail' };
 
+// Printed abbreviations — editable in Settings → Documents so relabeling a Lists
+// option (e.g. renaming "Wall" or "Chain") never leaves the printed page saying
+// something the dropdown no longer does. Defaults match what was hardcoded before.
+export const DEFAULT_ABBREV = { controlRH: 'C-RH', controlLH: 'C-LH', sideChannelShort: 'S/CH' };
+
 // Space-saving: the System field already says Manual/Motor Battery, so Control only
 // needs to convey the hand side — chain vs motor is redundant on the document.
-function controlText(ctrl) {
+function controlText(ctrl, abbrev) {
   if (!ctrl) return '';
-  if (/RH/i.test(ctrl)) return 'C-RH';
-  if (/LH/i.test(ctrl)) return 'C-LH';
+  if (/RH/i.test(ctrl)) return abbrev.controlRH;
+  if (/LH/i.test(ctrl)) return abbrev.controlLH;
   return '';
 }
 
@@ -358,47 +363,53 @@ function controlText(ctrl) {
 // listed here — they were hardcoded once before and a new one needed a code change
 // every time; `descFields()` below appends one for each of those automatically, so
 // Settings → Documents always offers exactly what the worksheet currently has.
-const BUILTIN_DESC_FIELDS = [
-  // The table name (Roller #3, Zebra #5, Heavy Fabric...) is an internal price-tier
-  // label, not something to print anywhere — Product/Fabric already say what it is,
-  // for every category. Off by default (Settings → Documents); a plain toggle like
-  // every other field here, no per-category special-casing.
-  { key: 'table', label: 'Shade type', fmt: (l) => l.table },
-  { key: 'product', label: 'Product', fmt: (l) => l.product },
-  { key: 'fabric', label: 'Fabric', fmt: (l) => l.fabric },
-  { key: 'color', label: 'Color', fmt: (l) => l.color },
-  // System/Track share the worksheet's merged column, so they sit together here too,
-  // ahead of Control — matches that column's position (left of Ctrl) on the worksheet.
-  { key: 'system', label: 'System', fmt: (l) => (l.system ? l.system.replace('Batt.', 'Battery') : '') },
-  { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
-  { key: 'control', label: 'Control', fmt: (l) => controlText(l.control) },
-  { key: 'style', label: 'Style', fmt: (l) => l.style },
-  { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : '') },
-  { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : '') },
-  { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : '') },
-  { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
-  { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
-  // `compact` is only set for DYMO labels — the sticker is tiny, so this one gets an
-  // abbreviation there while Client Quote/Work Order keep the full word.
-  { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with S/CH' : 'with Side Channels') : '') },
-  // Wall vs. ceiling mount only matters to the maker — the client quote just says "with Brackets".
-  { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork ? ' - ' + (l.mount === 'Wall' ? 'WALL' : 'CEILING') : ''}` : '') },
-  { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
-  { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
-  // Was silently missing entirely — Work Order needs it (the maker has to know which),
-  // the client quote never should (only the price matters to them).
-  { key: 'mount', label: 'Mount', fmt: (l) => (l.mount === 'Wall' ? 'Wall Mount' : l.mount === 'Ceiling' ? 'Ceiling Mount' : '') },
-];
+function builtinDescFields(abbrev) {
+  return [
+    // The table name (Roller #3, Zebra #5, Heavy Fabric...) is an internal price-tier
+    // label, not something to print anywhere — Product/Fabric already say what it is,
+    // for every category. Off by default (Settings → Documents); a plain toggle like
+    // every other field here, no per-category special-casing.
+    { key: 'table', label: 'Shade type', fmt: (l) => l.table },
+    { key: 'product', label: 'Product', fmt: (l) => l.product },
+    { key: 'fabric', label: 'Fabric', fmt: (l) => l.fabric },
+    { key: 'color', label: 'Color', fmt: (l) => l.color },
+    // System/Track share the worksheet's merged column, so they sit together here too,
+    // ahead of Control — matches that column's position (left of Ctrl) on the worksheet.
+    // Prints whatever Lists → Systems actually says, not a hardcoded expansion of it.
+    { key: 'system', label: 'System', fmt: (l) => l.system || '' },
+    { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
+    { key: 'control', label: 'Control', fmt: (l) => controlText(l.control, abbrev) },
+    { key: 'style', label: 'Style', fmt: (l) => l.style },
+    { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : '') },
+    { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : '') },
+    { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : '') },
+    { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
+    { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
+    // `compact` is only set for DYMO labels — the sticker is tiny, so this one gets an
+    // abbreviation there while Client Quote/Work Order keep the full word.
+    { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with ' + abbrev.sideChannelShort : 'with Side Channels') : '') },
+    // Wall vs. ceiling mount only matters to the maker — the client quote just says
+    // "with Brackets". Prints the Lists value itself (uppercased), not a hardcoded
+    // WALL/CEILING pair that would go stale the moment Mount is renamed in Lists.
+    { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork && l.mount ? ' - ' + l.mount.toUpperCase() : ''}` : '') },
+    { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
+    { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
+    // Was silently missing entirely — Work Order needs it (the maker has to know which),
+    // the client quote never should (only the price matters to them).
+    { key: 'mount', label: 'Mount', fmt: (l) => (l.mount ? l.mount + ' Mount' : '') },
+  ];
+}
 
 // Built-ins plus one entry per per-category custom list (Lists screen), in the order
 // the user dragged them into in Settings → Documents — any field not in that saved
 // order (a field that existed before ordering was added, or a category created since)
 // is appended at the end, so it shows up rather than silently vanishing.
 export function descFields(state) {
+  const abbrev = { ...DEFAULT_ABBREV, ...(state.abbrev || {}) };
   const custom = (state.customLists || []).filter((l) => l.perCategory).map((l) => ({
     key: 'custom_' + l.id, label: l.name, fmt: (line) => line['custom_' + l.id] || '',
   }));
-  const all = [...BUILTIN_DESC_FIELDS, ...custom];
+  const all = [...builtinDescFields(abbrev), ...custom];
   const order = state.docFieldOrder;
   if (!order || !order.length) return all;
   const byKey = new Map(all.map((f) => [f.key, f]));

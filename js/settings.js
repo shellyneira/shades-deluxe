@@ -4,6 +4,28 @@ import { getState, save, exportJSON, importJSON, resetToDefaults } from './store
 import { dbEnabled } from './db.js';
 import { descFields, TRACK_RATE_LABELS } from './pricing.js';
 
+// Short forms printed on documents — e.g. Control prints "C-RH" instead of the full
+// Lists value, because the System field next to it already says Manual/Motor. These
+// used to be hardcoded strings baked into pricing.js; a shop that writes them
+// differently (or in another language) had no way to change them.
+function abbreviationsPanel(s) {
+  const a = s.abbrev;
+  const field = (label, key, hint) => el('label', { class: 'field', style: 'flex:1 1 200px' }, [
+    el('span', { style: 'display:block;min-height:28px' }, [label]),
+    el('input', { type: 'text', value: a[key], oninput: (e) => { a[key] = e.target.value; save(); } }),
+    el('span', { class: 'hint', style: 'font-weight:500;text-transform:none;letter-spacing:0' }, [hint]),
+  ]);
+  return el('div', { class: 'panel' }, [
+    el('h2', {}, ['Abbreviations']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Short forms used in printed documents. Change these instead of editing code if your shop writes them differently.']),
+    el('div', { class: 'row' }, [
+      field('Control — right hand', 'controlRH', 'Printed on Client Quote / Work Order when Control ends in RH.'),
+      field('Control — left hand', 'controlLH', 'Printed when Control ends in LH.'),
+      field('Side channels (sticker)', 'sideChannelShort', 'Short form used only on DYMO stickers — full "Side Channels" elsewhere.'),
+    ]),
+  ]);
+}
+
 // Drag a row to reorder — one shared order, used by every document, so dragging in
 // Settings never raises "does this affect just this document?" The list itself
 // comes from descFields(), which already includes any category the user has added
@@ -166,6 +188,7 @@ export function renderSettings() {
       el('label', { class: 'field', style: 'margin-top:14px' }, ['Payment & terms', terms]),
     ]),
     ratesPanel(s),
+    abbreviationsPanel(s),
     fieldOrderPanel(s),
     documentsPanel(s),
     el('div', { class: 'panel' }, [
