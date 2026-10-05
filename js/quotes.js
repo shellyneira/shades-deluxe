@@ -470,7 +470,9 @@ function sheet(q, rerender) {
       if (c.listMissing) p.td.append(el('span', { class: 'offtag', title: `This size is off the ${p.item.table} chart, so the shade itself is not priced — only the charges typed on this line are. Extend the chart in Price Tables.` }, ['no list']));
       // An untitled em-dash is why a row with a markup typed into it reads as a dead
       // app. Say what is missing instead of saying nothing.
-      p.node.title = c.list == null
+      p.node.title = c.list == null && isDrapery(p.item, s.tables)
+        ? (hasDims ? 'Type the fabric price per yard in the "Fabric $/yd" column — drapery is priced from it. Price Tables only holds the rates (fullness, labor, markup).' : 'Enter width, height and Fabric $/yd to price this drapery')
+        : c.list == null
         ? (hasDims ? `Off the ${p.item.table} chart — this is the typed charges only, NOT a full price` : 'Enter width and height — charges are added on top of the list price, so there is nothing to price yet')
         : `List ${money(c.list)}`;
       p.client.textContent = c.unit == null ? '—' : money0((c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0));
