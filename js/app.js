@@ -4,7 +4,7 @@ import { initCloud, startLiveSync, onStateChange } from './store.js';
 import { authRequired, ensureSession, login, logout, userEmail } from './auth.js';
 import { renderDashboard } from './dashboard.js';
 import { renderQuotes, quoteRoute, applyQuoteRoute, dropMissingQuote } from './quotes.js';
-import { renderTables, tablesRoute, applyTablesRoute } from './tables.js';
+import { renderTables, tablesRoute, applyTablesRoute, dropMissingTable } from './tables.js';
 import { renderLists } from './lists.js';
 import { renderSettings } from './settings.js';
 import { initPresence } from './presence.js';
@@ -21,17 +21,26 @@ const ROUTES = {
 
 let current = 'dashboard';
 
+const safeDecode = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
 const splitHash = () => {
-  const [view, ...parts] = location.hash.slice(1).split('/').map(decodeURIComponent);
+  const [view, ...parts] = location.hash.slice(1).split('/').map(safeDecode);
   return [view, parts];
 };
 const buildHash = (view) => [view, ...(ROUTES[view]?.get() || [])].map(encodeURIComponent).join('/');
 
 // pushState (unlike assigning location.hash) doesn't fire hashchange, and each
-// in-app navigation still gets its own history entry, so Back works.
+// in-app navigation still gets its own history entry, so Back works. Fixing up a
+// URL we were handed (empty, malformed, a vanished quote) must replace instead,
+// or Back would land on the bad URL and re-push forever.
+let canonicalizing = false;
 function syncHash() {
   const next = buildHash(current);
-  if (location.hash.slice(1) !== next) history.pushState(null, '', '#' + next);
+  if (location.hash.slice(1) === next) return;
+  history[canonicalizing ? 'replaceState' : 'pushState'](null, '', '#' + next);
+}
+function fromUrl(fn) {
+  canonicalizing = true;
+  try { fn(); } finally { canonicalizing = false; }
 }
 
 // `parts` is null for a tab click: the tab keeps whatever it was showing.
@@ -53,7 +62,10 @@ let redrawPending = false;
 function redraw() {
   if (redrawPending) return;
   redrawPending = true;
-  requestAnimationFrame(() => { redrawPending = false; VIEWS[current](); });
+  requestAnimationFrame(() => {
+    redrawPending = false;
+    fromUrl(() => { dropMissingQuote(); dropMissingTable(); VIEWS[current](); });
+  });
 }
 
 function renderLogin() {
@@ -94,11 +106,11 @@ function addLogout() {
 function startApp() {
   addLogout();
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
-  window.addEventListener('hashchange', () => { go(...splitHash()); dropMissingQuote(); VIEWS[current](); });
+  window.addEventListener('hashchange', () => fromUrl(() => { go(...splitHash()); dropMissingQuote(); dropMissingTable(); VIEWS[current](); }));
   onStateChange((reason) => { if (reason === 'remote') redraw(); });
-  go(...splitHash());
+  fromUrl(() => go(...splitHash()));
   initPresence();
-  initCloud().then(() => { startLiveSync(); dropMissingQuote(); redraw(); });
+  initCloud().then(() => { startLiveSync(); redraw(); });
 }
 
 async function boot() {

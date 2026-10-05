@@ -9,9 +9,15 @@ import { DRAPERY_STYLES, DRAPERY_RATE_LABELS } from './pricing.js';
 let active = null;
 
 // Which price table is open — read by presence.js.
-export const activeTable = () => active;
+export const activeTable = () => {
+  const names = Object.keys(getState().tables);
+  return names.includes(active) ? active : names[0] || null;
+};
 export const tablesRoute = () => (active ? [active] : []);
 export function applyTablesRoute([name] = []) { active = name || null; }
+// A table named in the URL may not be in the store until the cloud pull lands, so
+// renderTables falls back without forgetting it; this runs once data has settled.
+export function dropMissingTable() { if (active && !getState().tables[active]) active = null; }
 
 // Deterministic color per category so new ones (Drapery, Outdoor, ...) just work
 // without editing CSS — index into a small fixed palette, not name-keyed classes.
@@ -24,10 +30,10 @@ export function categoryColor(cat) {
 export function renderTables() {
   const s = getState();
   const names = Object.keys(s.tables);
-  if (!active || !names.includes(active)) active = names[0] || null;
+  const shown = names.includes(active) ? active : names[0] || null;
 
   const chip = (n) => el('button', {
-    class: 'ptab' + (n === active ? ' active' : ''),
+    class: 'ptab' + (n === shown ? ' active' : ''),
     style: `--cat-color:${categoryColor(s.tables[n].category)}`,
     draggable: true,
     ondragstart: (e) => e.dataTransfer.setData('text/plain', n),
@@ -58,7 +64,7 @@ export function renderTables() {
         el('div', {}, [el('h2', {}, ['Price Tables']), el('div', { class: 'hint' }, ['Each table keeps its own prices. Pick one, edit any cell — it saves as you type. Drag a chip onto another category to move it there.'])]),
       ]),
       groups,
-      active ? (s.tables[active].kind === 'formula' ? formulaEditor(active) : gridEditor(active)) : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['📊']), 'No price tables yet. Click “＋ New table”.']),
+      shown ? (s.tables[shown].kind === 'formula' ? formulaEditor(shown) : gridEditor(shown)) : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['📊']), 'No price tables yet. Click “＋ New table”.']),
     ]),
   ]));
 }
