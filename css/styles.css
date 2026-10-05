@@ -33,6 +33,7 @@ main { max-width: 1200px; margin: 26px auto; padding: 0 22px 90px; }
 .panel h2 { margin: 0; font-size: 20px; letter-spacing: -.3px; }
 .panel h3 { margin: 0 0 14px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
 .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.row + .row { margin-top: 20px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 
 /* ---------- forms ---------- */
@@ -769,3 +770,6 @@ label.check.price-switch:hover { background: var(--bg); color: var(--ink); }
 .toolbar { align-items: center; }
 .toolbar label.check { padding-bottom: 0; text-transform: uppercase; letter-spacing: .5px; font-size: 11.5px; font-weight: 700; color: var(--muted); }
 .field-chip-x { display: inline-flex; align-items: center; justify-content: center; }
+
+/* every form control the same height, so a row of mixed fields lines up */
+.field input:not([type="checkbox"]), .field .dd { height: 44px; padding-top: 0; padding-bottom: 0; }
