@@ -1,5 +1,6 @@
 // Bootstrap + tab router + login gate.
 import { el, onAfterMount } from './dom.js';
+import { pathSegments, pathFor } from './url.js';
 import { initCloud, startLiveSync, onStateChange } from './store.js';
 import { authRequired, ensureSession, login, logout, userEmail } from './auth.js';
 import { renderDashboard } from './dashboard.js';
@@ -11,7 +12,7 @@ import { initPresence } from './presence.js';
 
 const VIEWS = { dashboard: renderDashboard, quotes: renderQuotes, tables: renderTables, lists: renderLists, settings: renderSettings };
 
-// The URL hash is the source of truth for where you are: #view/part/part. Views that
+// The URL path is the source of truth for where you are: /view/part/part. Views that
 // have a place inside them (an open quote, a price table) expose it as route parts,
 // so a reload or a shared link lands on the same screen.
 const ROUTES = {
@@ -21,22 +22,21 @@ const ROUTES = {
 
 let current = 'dashboard';
 
-const safeDecode = (x) => { try { return decodeURIComponent(x); } catch { return x; } };
-const splitHash = () => {
-  const [view, ...parts] = location.hash.slice(1).split('/').map(safeDecode);
-  return [view, parts];
+const splitUrl = () => {
+  const [view, ...parts] = pathSegments();
+  return [view || 'dashboard', parts];
 };
-const buildHash = (view) => [view, ...(ROUTES[view]?.get() || [])].map(encodeURIComponent).join('/');
+const segmentsFor = (view) => (view === 'dashboard' ? [] : [view, ...(ROUTES[view]?.get() || [])]);
 
-// pushState (unlike assigning location.hash) doesn't fire hashchange, and each
-// in-app navigation still gets its own history entry, so Back works. Fixing up a
-// URL we were handed (empty, malformed, a vanished quote) must replace instead,
-// or Back would land on the bad URL and re-push forever.
+// pushState doesn't fire popstate, and each in-app navigation still gets its own
+// history entry, so Back works. Fixing up a URL we were handed (empty, malformed, a
+// vanished quote) must replace instead, or Back would land on the bad URL and
+// re-push forever.
 let canonicalizing = false;
-function syncHash() {
-  const next = buildHash(current);
-  if (location.hash.slice(1) === next) return;
-  history[canonicalizing ? 'replaceState' : 'pushState'](null, '', '#' + next);
+function syncUrl() {
+  const next = pathFor(segmentsFor(current));
+  if (location.pathname === next || decodeURI(location.pathname) === decodeURI(next)) return;
+  history[canonicalizing ? 'replaceState' : 'pushState'](null, '', next);
 }
 function fromUrl(fn) {
   canonicalizing = true;
@@ -45,7 +45,7 @@ function fromUrl(fn) {
 
 // `parts` is null for a tab click: the tab keeps whatever it was showing.
 // Every render, including in-view navigation like opening a quote, re-syncs the URL.
-onAfterMount(syncHash);
+onAfterMount(syncUrl);
 
 function go(view, parts = null) {
   if (!VIEWS[view]) { view = 'dashboard'; parts = []; }
@@ -106,9 +106,9 @@ function addLogout() {
 function startApp() {
   addLogout();
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
-  window.addEventListener('hashchange', () => fromUrl(() => { go(...splitHash()); dropMissingQuote(); dropMissingTable(); VIEWS[current](); }));
+  window.addEventListener('popstate', () => fromUrl(() => { go(...splitUrl()); dropMissingQuote(); dropMissingTable(); VIEWS[current](); }));
   onStateChange((reason) => { if (reason === 'remote') redraw(); });
-  fromUrl(() => go(...splitHash()));
+  fromUrl(() => go(...splitUrl()));
   initPresence();
   initCloud().then(() => { startLiveSync(); redraw(); });
 }

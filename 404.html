@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><title>Shades Deluxe</title>
+<script>
+  // GitHub Pages has no rewrites: send any deep link to index.html, which restores the path.
+  (function () {
+    var base = location.hostname.slice(-10) === '.github.io' ? '/' + location.pathname.split('/')[1] + '/' : '/';
+    var rest = location.pathname.slice(base.length);
+    location.replace(base + '?/' + rest.replace(/&/g, '~and~') + location.hash);
+  })();
+</script></head><body></body></html>

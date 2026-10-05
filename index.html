@@ -4,6 +4,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    // Deep links: 404.html bounces unknown paths here as /?/quotes/q_1; put the real path back.
+    (function () {
+      var gh = location.hostname.slice(-10) === '.github.io';
+      var base = gh ? '/' + location.pathname.split('/')[1] + '/' : '/';
+      var q = location.search;
+      if (q.charAt(1) === '/') history.replaceState(null, '', base + q.slice(2).replace(/~and~/g, '&') + location.hash);
+      document.write('<base href="' + base + '">');
+    })();
+  </script>
   <title>Shades Deluxe — Quotes</title>
   <link rel="icon" href="assets/logo.png" />
   <link rel="stylesheet" href="css/styles.css" />

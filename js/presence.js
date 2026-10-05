@@ -4,6 +4,7 @@
 //   • a coloured ring, with a name tag, around the exact field someone else has
 //     focused — the same path trick that keeps our own caret alive across renders
 //   • per-quote markers in the list and a banner inside a shared quote
+import { pathSegments } from './url.js';
 import { el, nodePath, nodeAtPath, onAfterMount } from './dom.js';
 import { trackPresence, onPresence, onStatus, onLive, broadcastLive, getPeers, myColor } from './realtime.js';
 import { onSyncState } from './store.js';
@@ -59,7 +60,7 @@ function describe(view) {
 // Runs after every render, so navigating anywhere republishes where we are without
 // each view having to remember to announce itself.
 function updateContext() {
-  const view = location.hash.slice(1).split('/')[0] || 'dashboard';
+  const view = pathSegments()[0] || 'dashboard';
   const next = { view, ...describe(view), field, fieldLabel, name: displayName() };
   if (JSON.stringify(next) === JSON.stringify(ctx)) return;
   ctx = next;

@@ -16,9 +16,10 @@ export function openQuote(id, view = 'edit') { sub = { view, quoteId: id }; }
 
 // URL <-> screen. A reload lands before the cloud pull, so a quote that isn't in
 // the store yet keeps its place in `sub`; dropMissingQuote() runs once data settled.
-export const quoteRoute = () => (sub.quoteId ? [sub.view, sub.quoteId] : []);
-export function applyQuoteRoute([view, id] = []) {
-  sub = (view === 'edit' || view === 'invoice') && id ? { view, quoteId: id } : { view: 'list', quoteId: null };
+// /quotes/<id> is the worksheet, /quotes/<id>/invoice the customer document.
+export const quoteRoute = () => (sub.quoteId ? (sub.view === 'invoice' ? [sub.quoteId, 'invoice'] : [sub.quoteId]) : []);
+export function applyQuoteRoute([id, doc] = []) {
+  sub = id ? { view: doc === 'invoice' ? 'invoice' : 'edit', quoteId: id } : { view: 'list', quoteId: null };
 }
 export function dropMissingQuote() {
   if (sub.quoteId && !getQuote(sub.quoteId)) sub = { view: 'list', quoteId: null };
