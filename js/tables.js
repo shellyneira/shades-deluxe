@@ -2,7 +2,8 @@
 // category (Roller, Zebra, or whatever you name) — drag a table's chip onto another
 // group to recategorize it. Create, rename, duplicate, delete tables and edit each
 // width×length grid.
-import { el, mount, toast, confirmAction } from './dom.js';
+import { el, mount, toast } from './dom.js';
+import { dropdown, confirmAction, labeled, iconButton } from './ui.js';
 import { getState, save, deletePriceTableCloudRow } from './store.js';
 import { DRAPERY_STYLES, DRAPERY_RATE_LABELS } from './pricing.js';
 
@@ -21,7 +22,7 @@ export function dropMissingTable() { if (active && !getState().tables[active]) a
 
 // Deterministic color per category so new ones (Drapery, Outdoor, ...) just work
 // without editing CSS — index into a small fixed palette, not name-keyed classes.
-const PALETTE = ['#b9552f', '#3a6ea5', '#3f7d5f', '#8e44ad', '#c99a3f', '#c0392b', '#16a085', '#7f6a4a'];
+const PALETTE = [2, 1, 3, 4, 5, 6, 7, 9].map((n) => `var(--id-${n})`);
 export function categoryColor(cat) {
   const i = getState().categories.indexOf(cat);
   return PALETTE[(i < 0 ? 0 : i) % PALETTE.length];
@@ -55,7 +56,7 @@ export function renderTables() {
       }, [el('span', { class: 'ptab-label' }, [cat]), ...names.filter((n) => s.tables[n].category === cat).map(chip)]);
       return group;
     }),
-    el('button', { class: 'ptab new', onclick: openCreateModal }, ['＋ New table']),
+    el('button', { class: 'ptab new', onclick: openCreateModal }, labeled('plus', 'New table')),
   ]);
 
   mount(el('div', {}, [
@@ -64,7 +65,7 @@ export function renderTables() {
         el('div', {}, [el('h2', {}, ['Price Tables']), el('div', { class: 'hint' }, ['Each table keeps its own prices. Pick one, edit any cell — it saves as you type. Drag a chip onto another category to move it there.'])]),
       ]),
       groups,
-      shown ? (s.tables[shown].kind === 'formula' ? formulaEditor(shown) : gridEditor(shown)) : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['📊']), 'No price tables yet. Click “＋ New table”.']),
+      shown ? (s.tables[shown].kind === 'formula' ? formulaEditor(shown) : gridEditor(shown)) : el('div', { class: 'empty' }, [el('div', { class: 'big' }, labeled('chart', '', 40)), 'No price tables yet. Click “New table”.']),
     ]),
   ]));
 }
@@ -78,9 +79,12 @@ function openCreateModal() {
   const showErr = (msg) => { err.textContent = msg; err.style.display = ''; };
 
   const newCatInp = el('input', { type: 'text', placeholder: 'New category name', style: 'display:none;margin-top:8px' });
-  const catSelect = el('select', {
-    onchange: (e) => { addingNew = e.target.value === '__new__'; newCatInp.style.display = addingNew ? '' : 'none'; },
-  }, [...s.categories.map((c) => el('option', { value: c }, [c])), el('option', { value: '__new__' }, ['+ Add new category…'])]);
+  let category = s.categories[0];
+  const catSelect = dropdown({
+    options: [...s.categories.map((c) => ({ value: c, label: c })), { value: '__new__', label: '+ Add new category…' }],
+    value: category,
+    onChange: (v) => { category = v; addingNew = v === '__new__'; newCatInp.style.display = addingNew ? '' : 'none'; },
+  });
 
   const close = () => overlay.remove();
   const create = () => {
@@ -88,7 +92,7 @@ function openCreateModal() {
     const name = nameInp.value.trim();
     if (!name) return showErr('Enter a table name first');
     if (s.tables[name]) return showErr('A table with that name already exists');
-    let cat = catSelect.value;
+    let cat = category;
     if (addingNew) {
       cat = newCatInp.value.trim();
       if (!cat) return showErr('Enter a category name');
@@ -144,19 +148,19 @@ function tableActions(name) {
       s.minPrice[nn] = s.minPrice[name]; delete s.minPrice[name];
       s.quotes.forEach((q) => q.items.forEach((it) => { if (it.table === name) it.table = nn; }));
       save(); deletePriceTableCloudRow(name); active = nn; renderTables(); toast('Renamed');
-    } }, ['✎ Rename']),
+    } }, labeled('pencil', 'Rename')),
     el('button', { class: 'btn small', onclick: () => {
       let nn = name + ' copy'; let i = 2;
       while (s.tables[nn]) nn = name + ' copy ' + i++;
       s.tables[nn] = structuredClone(s.tables[name]);
       s.minPrice[nn] = s.minPrice[name] || 0;
       save(); active = nn; renderTables(); toast('Duplicated');
-    } }, ['⧉ Duplicate']),
+    } }, labeled('copy', 'Duplicate')),
     el('button', { class: 'btn small', style: 'color:var(--danger)', onclick: () => {
       if (!confirm(`Delete the "${name}" price table? Existing quotes keep their saved prices.`)) return;
       delete s.tables[name]; delete s.minPrice[name];
       save(); deletePriceTableCloudRow(name); active = null; renderTables(); toast('Deleted');
-    } }, ['🗑 Delete']),
+    } }, labeled('trash', 'Delete')),
   ]);
 }
 
@@ -196,32 +200,32 @@ function gridEditor(name) {
   const s = getState();
   const table = s.tables[name];
 
-  const numInput = (value, onChange) => el('input', {
-    type: 'number', value: value ?? '',
+  const numInput = (value, onChange, className = '') => el('input', {
+    type: 'number', value: value ?? '', class: className, placeholder: className ? '—' : '',
     oninput: (e) => { onChange(e.target.value === '' ? null : Number(e.target.value)); save(); },
   });
 
-  const headCells = [el('th', { class: 'corner' }, ['L \\ W'])];
+  const headCells = [el('th', { class: 'corner' }, [el('span', {}, ['Width →']), el('span', {}, ['Length ↓'])])];
   table.widths.forEach((w, ci) => {
     headCells.push(el('th', {}, [
       numInput(w, (v) => (table.widths[ci] = v)),
-      el('div', { class: 'delcol', title: 'Delete this width column', onclick: () => { if (confirmAction(`Delete the ${w ?? ''}" width column and all its prices?`)) { table.widths.splice(ci, 1); table.rows.forEach((r) => r.prices.splice(ci, 1)); save(); renderTables(); } } }, ['✕']),
+      iconButton('x', 'Delete this width column', 'danger', async () => { if (await confirmAction(`Delete the ${w ?? ''}" width column and all its prices?`)) { table.widths.splice(ci, 1); table.rows.forEach((r) => r.prices.splice(ci, 1)); save(); renderTables(); } }, 13),
     ]));
   });
-  headCells.push(el('th', { class: 'corner' }, ['']));
+  headCells.push(el('th', {}, []));
 
   const bodyRows = table.rows.map((row, ri) => {
     const cells = [el('td', { class: 'rowhead' }, [numInput(row.length, (v) => (row.length = v))])];
-    row.prices.forEach((p, ci) => cells.push(el('td', {}, [numInput(p, (v) => (row.prices[ci] = v))])));
-    cells.push(el('td', {}, [el('button', { class: 'icon', title: 'Delete this length row', onclick: () => { if (confirmAction(`Delete the ${row.length ?? ''}" length row and all its prices?`)) { table.rows.splice(ri, 1); save(); renderTables(); } } }, ['✕'])]));
+    row.prices.forEach((p, ci) => cells.push(el('td', {}, [numInput(p, (v) => (row.prices[ci] = v), 'cell-price')])));
+    cells.push(el('td', { class: 'del' }, [iconButton('x', 'Delete this length row', 'danger', async () => { if (await confirmAction(`Delete the ${row.length ?? ''}" length row and all its prices?`)) { table.rows.splice(ri, 1); save(); renderTables(); } }, 14)]));
     return el('tr', {}, cells);
   });
 
   const grid = el('table', { class: 'grid' }, [el('thead', {}, [el('tr', {}, headCells)]), el('tbody', {}, bodyRows)]);
 
   const controls = el('div', { class: 'row', style: 'margin-top:16px;align-items:flex-end' }, [
-    el('button', { class: 'btn small', onclick: () => { table.rows.push({ length: null, prices: table.widths.map(() => null) }); save(); renderTables(); } }, ['＋ Add length (row)']),
-    el('button', { class: 'btn small', onclick: () => { table.widths.push(null); table.rows.forEach((r) => r.prices.push(null)); save(); renderTables(); } }, ['＋ Add width (column)']),
+    el('button', { class: 'btn small', onclick: () => { table.rows.push({ length: null, prices: table.widths.map(() => null) }); save(); renderTables(); } }, labeled('plus', 'Add length (row)', 15)),
+    el('button', { class: 'btn small', onclick: () => { table.widths.push(null); table.rows.forEach((r) => r.prices.push(null)); save(); renderTables(); } }, labeled('plus', 'Add width (column)', 15)),
   ]);
 
   return el('div', { class: 'tbl-card', style: `--cat-color:${categoryColor(table.category)}` }, [
@@ -230,7 +234,7 @@ function gridEditor(name) {
       tableActions(name),
     ]),
     summary(name, table),
-    el('div', { class: 'scroll' }, [grid]),
+    el('div', { class: 'grid-wrap' }, [grid]),
     el('p', { class: 'hint', style: 'margin:10px 0 0' }, ['Widths run left→right, lengths top→bottom. A shade uses the first width ≥ its size and the first length ≥ its size.']),
     controls,
   ]);

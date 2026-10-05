@@ -1,7 +1,8 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
-import { el, select, input, checkbox, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
+import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
+import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, offChartReason, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
+import { computeLine, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -64,7 +65,7 @@ function list() {
       s.quotes.filter((q) => !q.isTest).length + ' total'
       + (s.quotes.some((q) => q.isTest) ? ` · ${s.quotes.filter((q) => q.isTest).length} test` : ''),
     ])]),
-    el('button', { class: 'btn primary', onclick: () => open(newQuote().id) }, ['＋ New Quote']),
+    el('button', { class: 'btn primary', onclick: () => open(newQuote().id) }, labeled('plus', 'New quote')),
   ]);
 
   const hasTests = s.quotes.some((q) => q.isTest);
@@ -90,7 +91,7 @@ function list() {
         el('div', { class: 'total' }, [money(t.total)]),
       ]);
     }))
-    : el('div', { class: 'empty' }, [el('div', { class: 'big' }, ['🪟']), s.quotes.length ? 'No quotes in this filter.' : 'No quotes yet. Click “New Quote” to start.']);
+    : el('div', { class: 'empty' }, [el('div', { class: 'big' }, labeled('window', '', 40)), s.quotes.length ? 'No quotes in this filter.' : 'No quotes yet. Click “New Quote” to start.']);
 
   return el('div', { class: 'panel' }, [head, filters, body]);
 }
@@ -101,18 +102,18 @@ function editor(q) {
   const set = (fn) => { fn(); save(); };
 
   const toolbar = el('div', { class: 'section-head' }, [
-    el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list', quoteId: null }; renderQuotes(); } }, ['← All quotes']),
-    el('div', { class: 'row' }, [
+    el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list', quoteId: null }; renderQuotes(); } }, labeled('arrowLeft', 'All quotes')),
+    el('div', { class: 'row toolbar' }, [
       // One click, and this quote stops counting as business: it leaves every
       // dashboard number and never takes an invoice number.
       (() => {
-        const box = checkbox('Is Test', q.isTest, (v) => { q.isTest = v; save(); renderQuotes(); toast(v ? 'Marked as a test — kept out of your numbers' : 'Back to a real quote'); });
+        const box = checkbox('Is test', q.isTest, (v) => { q.isTest = v; save(); renderQuotes(); toast(v ? 'Marked as a test — kept out of your numbers' : 'Back to a real quote'); });
         box.title = q.isTest ? 'This is a practice quote — it is excluded from the dashboard' : 'Mark as a practice quote, excluded from the dashboard';
         return box;
       })(),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); const d = duplicateQuote(q.id); open(d.id); toast(`Duplicated as quote #${d.number}`); } }, ['Duplicate']),
-      el('button', { class: 'btn', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list', quoteId: null }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
+      el('button', { class: 'btn', style: 'color:var(--danger)', onclick: async () => { if (await confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list', quoteId: null }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
     ]),
   ]);
 
@@ -125,10 +126,10 @@ function editor(q) {
     ]),
     el('div', { class: 'row' }, [
       input('Address', q.client.address, (v) => set(() => (q.client.address = v)), { class: 'grow' }),
-      input('Quote date', q.date, (v) => set(() => (q.date = v)), { type: 'date' }),
-      input('Install date', q.installDate, (v) => set(() => (q.installDate = v)), { type: 'date' }),
-      input('Delivery date', q.deliveryDate, (v) => set(() => (q.deliveryDate = v)), { type: 'date' }),
-      select('Stage', STAGES, q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
+      dateField('Quote date', q.date, (v) => set(() => (q.date = v))),
+      dateField('Install date', q.installDate, (v) => set(() => (q.installDate = v))),
+      dateField('Delivery date', q.deliveryDate, (v) => set(() => (q.deliveryDate = v))),
+      selectField('Stage', STAGES, q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
     ]),
   ]);
 
@@ -173,7 +174,7 @@ function showBreakdown(item, s) {
           el('h3', { style: 'margin:0' }, ['How this price is calculated']),
           el('div', { class: 'bd-sub' }, [[item.location, item.table, sizeText(item)].filter(Boolean).join(' · ')]),
         ]),
-        el('button', { class: 'icon', onclick: close, title: 'Close' }, ['✕']),
+        iconButton('x', 'Close', '', close, 16),
       ]),
       body,
     ]),
@@ -261,6 +262,7 @@ function columns(o, tables, categories, customLists) {
       keyFor: (it) => (isDrapery(it, tables) ? 'track' : 'system'),
       opts: (it) => (isDrapery(it, tables) ? opt(draperyStyleOf(it, tables)?.hasTrack ? ['Motorized', 'Manual'] : []) : opt(o.systems)),
       hideWhen: (it) => isDrapery(it, tables) && !draperyStyleOf(it, tables)?.hasTrack,
+      naWhy: 'This drapery style has no track',
     },
     { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
     { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
@@ -269,7 +271,7 @@ function columns(o, tables, categories, customLists) {
     { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
     // Reverse roll: the fabric comes off the back of the tube instead of the front.
     // A Roller/Zebra build detail only — no such thing on Drapery.
-    { key: 'reverse', label: 'Reverse', kind: 'check', w: 66, hideWhen: forDrapery },
+    { key: 'reverse', label: 'Reverse', kind: 'check', w: 66, hideWhen: forDrapery, naWhy: 'Reverse roll is a Roller/Zebra option — not for drapery' },
     { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
     { key: 'cassette', label: 'Cassette', kind: 'check', w: 66 },
     { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
@@ -280,9 +282,9 @@ function columns(o, tables, categories, customLists) {
     { key: 'installation', label: 'Ins', kind: 'num', w: 58, placeholder: (it) => String(draperyAutoInstall(it, tables[it.table]) || '0') },
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
     { key: 'mount', label: 'Mount', kind: 'select', opts: opt(o.mount), w: 90 },
-    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0' },
-    { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining },
-    { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0', prefix: '−' },
+    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0', hideWhen: (it) => !forDrapery(it), naWhy: 'Fabric price per yard only applies to drapery — Roller and Zebra are priced from their chart' },
+    { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining, naWhy: 'Lining only applies to drapery styles that come lined (Heavy Fabric, Grommet Panel)' },
+    { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
     // Shared across Roller/Zebra/Drapery (unlike Product/Fabric, which are per-category)
     // and multi-valued — a line can carry any number of priced accessories.
@@ -294,12 +296,6 @@ function columns(o, tables, categories, customLists) {
 }
 
 const FRAC_OPTS = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
-
-// One accessories popover at a time, and it must survive a row re-render — so it
-// lives on <body> and is torn down by name rather than by closure.
-function closePop() {
-  for (const n of document.querySelectorAll('.multisel-pop')) n.remove();
-}
 
 // Hover help for each worksheet column header — says what it is and where in Settings/Lists it's set.
 const COL_HELP = {
@@ -336,24 +332,13 @@ const COL_HELP = {
 function cell(col, item, onChange) {
   const style = `width:${col.w}px`;
   if (col.hideWhen && col.hideWhen(item)) {
-    return el('td', { class: 'c', style, title: 'Not applicable to this line' }, [el('span', { class: 'muted' }, ['—'])]);
+    return el('td', { class: 'c na', style, title: col.naWhy || 'Not applicable to this line' }, [el('span', { class: 'muted' }, ['—'])]);
   }
   if (col.kind === 'tablegroup') {
-    const sel = el('select', { style, onchange: (e) => onChange(col.key, e.target.value) });
     const cur = String(item[col.key] ?? '');
-    let found = false;
-    for (const { label, names } of col.groups) {
-      if (!names.length) continue;
-      const group = el('optgroup', { label });
-      for (const name of names) {
-        const o = el('option', { value: name }, [name]);
-        if (name === cur) { o.selected = true; found = true; }
-        group.append(o);
-      }
-      sel.append(group);
-    }
-    if (cur && !found) sel.append(el('option', { value: cur, selected: true }, [cur])); // table renamed/deleted elsewhere — keep it visible
-    return el('td', {}, [sel]);
+    const options = col.groups.flatMap(({ label, names }) => names.map((name) => ({ value: name, label: name, group: label })));
+    if (cur && !options.some((o) => o.value === cur)) options.push({ value: cur, label: cur }); // table renamed/deleted elsewhere — keep it visible
+    return el('td', {}, [dropdown({ options, value: cur, style, onChange: (v) => onChange(col.key, v) })]);
   }
   if (col.kind === 'check') {
     const box = el('input', { type: 'checkbox', onchange: (e) => onChange(col.key, e.target.checked) });
@@ -361,13 +346,8 @@ function cell(col, item, onChange) {
     return el('td', { class: 'c' }, [el('div', { class: 'ck' }, [box])]);
   }
   if (col.kind === 'frac') {
-    const sel = el('select', { style, onchange: (e) => onChange(col.key, FRAC_OPTS[e.target.selectedIndex]) });
-    FRAC_OPTS.forEach((f, i) => {
-      const o = el('option', { value: f }, [FRACTION_LABEL[f] || String(f)]);
-      if (f === (Number(item[col.key]) || 0)) o.selected = true;
-      sel.append(o);
-    });
-    return el('td', {}, [sel]);
+    const options = FRAC_OPTS.map((f) => ({ value: f, label: FRACTION_LABEL[f] || String(f) }));
+    return el('td', {}, [dropdown({ options, value: Number(item[col.key]) || 0, style, onChange: (v) => onChange(col.key, Number(v)) })]);
   }
   if (col.kind === 'text') {
     const inp = el('input', {
@@ -390,81 +370,21 @@ function cell(col, item, onChange) {
     return el('td', {}, [inp]);
   }
   if (col.kind === 'multiselect') {
-    // NOT a <select multiple>. That renders as an inline list box in every browser —
-    // never the native popup every other column gets — so this one column looked
-    // broken next to Lining, and picking two needed an undiscoverable Cmd-click.
-    // A button plus a checkbox popover reads like the other cells and says how to
-    // multi-select by showing checkboxes.
     const options = (typeof col.opts === 'function' ? col.opts(item) : col.opts) || [];
-    const btn = el('button', { type: 'button', class: 'multisel', style, title: '' });
-    const paint = () => {
-      const c = item[col.key] || [];
-      btn.textContent = c.length === 0 ? '—' : (c.length === 1 ? c[0] : `${c.length} selected`);
-      btn.classList.toggle('empty', c.length === 0);
-      btn.title = c.length ? c.join(', ') : 'None selected';
-    };
-    paint();
-    btn.onclick = () => {
-      if (document.querySelector('.multisel-pop')) { closePop(); return; }
-      // .sheet-wrap clips overflow-y, so an absolutely positioned panel inside the
-      // cell would be cut off. Anchor a fixed one to the button instead.
-      const r = btn.getBoundingClientRect();
-      const pop = el('div', { class: 'multisel-pop' });
-      if (!options.length) pop.append(el('div', { class: 'multisel-empty' }, ['No accessories yet — add them in Lists']));
-      for (const opt of options) {
-        const on = (item[col.key] || []).includes(opt.name);
-        const box = el('input', { type: 'checkbox' });
-        box.checked = on;
-        const row = el('label', { class: 'multisel-item' }, [
-          box, el('span', {}, [opt.name]),
-          opt.price > 0 ? el('em', {}, [money(opt.price)]) : null,
-        ]);
-        box.onchange = () => {
-          const picked = new Set(item[col.key] || []);
-          if (box.checked) picked.add(opt.name); else picked.delete(opt.name);
-          // Store in the list's own order, so the printed description is stable
-          // regardless of the order they were clicked.
-          onChange(col.key, options.map((o) => o.name).filter((n) => picked.has(n)));
-          paint();
-        };
-        pop.append(row);
-      }
-      document.body.append(pop);
-      const h = pop.offsetHeight;
-      const below = window.innerHeight - r.bottom;
-      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
-      pop.style.top = (below < h + 12 && r.top > h + 12 ? r.top - h - 4 : r.bottom + 4) + 'px';
-      pop.style.minWidth = r.width + 'px';
-      setTimeout(() => {
-        document.addEventListener('mousedown', function away(e) {
-          if (pop.contains(e.target) || btn.contains(e.target)) return;
-          closePop(); document.removeEventListener('mousedown', away);
-        });
-      }, 0);
-      // Fixed position detaches on scroll/resize — close rather than float wrong.
-      window.addEventListener('scroll', closePop, { once: true, capture: true });
-      window.addEventListener('resize', closePop, { once: true });
-      document.addEventListener('keydown', function esc(e) {
-        if (e.key === 'Escape') { closePop(); document.removeEventListener('keydown', esc); }
-      });
-    };
-    return el('td', {}, [btn]);
+    return el('td', {}, [multiDropdown({
+      options, values: item[col.key], style, money, emptyHint: 'No accessories yet — add them in Lists',
+      onChange: (names) => onChange(col.key, names),
+    })]);
   }
   // select — options may be plain strings, priced objects {name, price}, or a
   // function of the row item (table-dependent product/fabric lists). `keyFor`
   // lets one column write to different fields per row (System vs Track).
   const key = col.keyFor ? col.keyFor(item) : col.key;
-  const sel = el('select', { style, onchange: (e) => onChange(key, e.target.value) });
   const options = (typeof col.opts === 'function' ? col.opts(item) : col.opts).map((o) => (typeof o === 'string' ? { name: o, price: 0 } : o));
   const cur = String(item[key] ?? '');
   if (cur && !options.some((o) => o.name === cur)) options.push({ name: cur, price: 0 }); // keep a value not in the filtered set
-  for (const opt of options) {
-    const label = opt.price > 0 ? `${opt.name} (${money(opt.price)})` : opt.name;
-    const o = el('option', { value: opt.name }, [label || ' ']);
-    if (opt.name === cur) o.selected = true;
-    sel.append(o);
-  }
-  return el('td', {}, [sel]);
+  const choices = options.map((o) => ({ value: o.name, label: o.price > 0 ? `${o.name} (${money(o.price)})` : o.name }));
+  return el('td', {}, [dropdown({ options: choices, value: cur, style, onChange: (v) => onChange(key, v) })]);
 }
 
 function sheet(q, rerender) {
@@ -483,9 +403,9 @@ function sheet(q, rerender) {
       const hasDims = p.item.width && p.item.height;
       p.node.textContent = c.unit != null ? money(c.unit) : '—';
       p.node.classList.toggle('off', !!c.listMissing);
-      // Tint the size cell(s) that caused it, so the eye lands on what to change.
-      const bad = c.listMissing ? offChartReason(s.tables[p.item.table], p.item.width, p.item.widthFrac, p.item.height, p.item.heightFrac).fields : [];
-      for (const k of ['width', 'height']) p.dims?.[k]?.classList.toggle('off-dim', bad.includes(k));
+      // Tint the cell(s) that caused a problem, so the eye lands on what to change.
+      const bad = lineIssues(p.item, s, { committed: p.committed }).flatMap((i) => i.fields);
+      for (const [k, td] of Object.entries(p.dims || {})) td?.classList.toggle('off-dim', bad.includes(k));
       p.td.querySelector('.offtag')?.remove();
       // DISABLED table minimum (see pricing.js header): restore with the pricing.js blocks.
       // p.td.querySelector('.mintag')?.remove();
@@ -521,12 +441,13 @@ function sheet(q, rerender) {
     const tax = roundWhole(taxable * rate / 100);
     // Sized but unpriceable — an unsized draft row is not a finding, it is a row
     // nobody has filled in yet.
-    const offLines = priced.filter((p) => p.c.listMissing);
-    totalsRefs.offRow.style.display = offLines.length ? '' : 'none';
-    totalsRefs.off.textContent = offLines.length === 1 ? '1 line' : offLines.length + ' lines';
-    totalsRefs.offList.replaceChildren(...offLines.map((p) => {
+    const flagged = priced.flatMap((p) => {
       const idx = q.items.indexOf(p.it);
-      const t = s.tables[p.it.table];
+      return lineIssues(p.it, s, { committed: idx >= 0 }).map((issue) => ({ p, idx, issue }));
+    });
+    totalsRefs.offRow.style.display = flagged.length ? '' : 'none';
+    totalsRefs.off.textContent = flagged.length === 1 ? '1 line' : flagged.length + ' lines';
+    totalsRefs.offList.replaceChildren(...flagged.map(({ p, idx, issue }) => {
       const what = [idx < 0 ? 'New line' : 'Line ' + (idx + 1), p.it.location, p.it.table].filter(Boolean).join(' · ');
       return el('button', {
         class: 'off-line', type: 'button',
@@ -537,9 +458,9 @@ function sheet(q, rerender) {
           tr.classList.add('flash');
           setTimeout(() => tr.classList.remove('flash'), 1800);
         },
-      }, [el('strong', {}, [what]), ' — ', offChartReason(t, p.it.width, p.it.widthFrac, p.it.height, p.it.heightFrac).text]);
+      }, [el('strong', {}, [what]), ' — ', issue.text]);
     }));
-    totalsRefs.offRow.title = 'These lines are off their price chart. The charges typed on them ARE in the total above, but the shade itself is not priced — so the total is an UNDERCOUNT, not a quote. Extend the chart in Price Tables, or change the size.';
+    totalsRefs.offRow.title = 'These lines are not priced in full. Charges typed on them are in the total above, but the shade itself is not — so the total is an UNDERCOUNT, not a quote.';
     totalsRefs.minRow.style.display = minApplied ? '' : 'none';
     if (minApplied) totalsRefs.min.textContent = '+' + money0(minOrder - afterDiscount);
     totalsRefs.sub.textContent = money0(sub);
@@ -590,24 +511,24 @@ function sheet(q, rerender) {
     const priceTd = el('td', { class: 'r price', onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
     const clientNode = el('span', {}, ['—']);
     const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
-    priceCells.push({ get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
+    priceCells.push({ committed: !draftRow, get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
     const cells = cols.map((col) => cell(col, item, onChange));
     const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
     if (insInput) insCells.push({ get item() { return live(); }, input: insInput });
     const dimCell = (key) => cells[cols.findIndex((c) => c.key === key)];
-    priceCells[priceCells.length - 1].dims = { width: dimCell('width'), height: dimCell('height') };
+    priceCells[priceCells.length - 1].dims = { width: dimCell('width'), height: dimCell('height'), fabricPrice: dimCell('fabricPrice') };
     cells.push(priceTd);
     cells.push(clientTd);
     if (draftRow) {
       cells.push(el('td', { style: 'white-space:nowrap' }, [
-        el('button', { class: 'icon', style: 'color:var(--accent);font-weight:800', title: 'Add this line', onclick: () => addLine() }, ['✓']),
-        el('button', { class: 'icon', title: 'Clear this row', onclick: () => { if (isRowEmpty(live()) || confirmAction('Clear this row?')) { q._draft = blankLine(s); save(); rerender(); } } }, ['↺']),
+        iconButton('check', 'Add this line', 'ok', () => addLine()),
+        iconButton('undo', 'Clear this row', '', async () => { if (isRowEmpty(live()) || await confirmAction('Clear this row? What you typed in it will be lost.', 'Clear row')) { q._draft = blankLine(s); save(); rerender(); } }),
       ]));
       return el('tr', { class: 'draftrow' }, cells);
     }
     cells.push(el('td', { style: 'white-space:nowrap' }, [
-      el('button', { class: 'icon', style: 'color:var(--muted)', title: 'Duplicate', onclick: () => { q.items.splice(idx + 1, 0, { ...live() }); save(); rerender(); } }, ['⎘']),
-      el('button', { class: 'icon', title: 'Remove', onclick: () => { if (confirmAction('Delete this line?')) { q.items.splice(idx, 1); save(); rerender(); } } }, ['✕']),
+      iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(idx + 1, 0, { ...live() }); save(); rerender(); }),
+      iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(idx, 1); save(); rerender(); } }),
     ]));
     return el('tr', {}, cells);
   };
@@ -652,7 +573,7 @@ function sheet(q, rerender) {
   // the job. Say so next to the number rather than leaving the gap to be noticed.
   totalsRefs.offList = el('div', { class: 'off-list' }, []);
   totalsRefs.offRow = el('div', { class: 'off-block', style: 'display:none' }, [
-    el('div', { class: 'line', style: 'color:var(--danger)' }, [el('span', {}, ['Not priced — size is off the price chart']), (totalsRefs.off = el('span', {}, ['—']))]),
+    el('div', { class: 'line', style: 'color:var(--danger)' }, [el('span', {}, ['Not fully priced — fix before sending']), (totalsRefs.off = el('span', {}, ['—']))]),
     totalsRefs.offList,
   ]);
   totalsRefs.revenue = el('span', {}, ['—']);
@@ -688,7 +609,7 @@ function sheet(q, rerender) {
     ]),
     el('div', { class: 'sheet-wrap' }, [table]),
     el('div', { class: 'addbar' }, [
-      el('button', { class: 'btn primary', onclick: addLine }, ['＋ Add line']),
+      el('button', { class: 'btn primary', onclick: addLine }, labeled('plus', 'Add line')),
       el('span', { class: 'hint' }, ['or press Enter']),
     ]),
     totals,
@@ -729,7 +650,7 @@ function docText(q, s, isWork) {
 // sheet when the device offers it (phones). Always a visible menu — no silent no-op.
 function shareButton(q, s, isWork) {
   const wrap = el('div', { style: 'position:relative;display:inline-block' });
-  const btn = el('button', { class: 'btn small', title: 'Share this document' }, ['↗ Share']);
+  const btn = el('button', { class: 'btn small', title: 'Share this document' }, labeled('share', 'Share'));
   const text = () => docText(q, s, isWork);
   const title = `${s.company.name} — ${isWork ? 'Work Order' : 'Quote'} #${q.number}`;
   const pdfFile = () => new File([textToPdfBlob(text().split('\n'))], `${isWork ? 'work-order' : 'quote'}-${q.number}.pdf`, { type: 'application/pdf' });
@@ -748,9 +669,9 @@ function shareButton(q, s, isWork) {
     const enc = () => encodeURIComponent(text());
     const item = (label, fn) => el('button', { class: 'share-item', onclick: () => { fn(); menu.remove(); } }, [label]);
     const menu = el('div', { class: 'share-menu' }, [
-      item('💬 WhatsApp (attach the PDF)', () => window.open('https://wa.me/?text=' + enc(), '_blank')),
-      item('✉️ Email (attach the PDF)', () => { window.location.href = `mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc()}`; }),
-      item('📋 Copy text', async () => { try { await navigator.clipboard.writeText(text()); toast('Copied'); } catch { toast('Copy failed'); } }),
+      item(labeled('chat', 'WhatsApp (attach the PDF)'), () => window.open('https://wa.me/?text=' + enc(), '_blank')),
+      item(labeled('mail', 'Email (attach the PDF)'), () => { window.location.href = `mailto:${q.client.email || ''}?subject=${encodeURIComponent(title)}&body=${enc()}`; }),
+      item(labeled('clipboard', 'Copy text'), async () => { try { await navigator.clipboard.writeText(text()); toast('Copied'); } catch { toast('Copy failed'); } }),
     ]);
     wrap.append(menu);
     setTimeout(() => document.addEventListener('click', function h(e) { if (!wrap.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
@@ -766,12 +687,12 @@ function invoice(q) {
   const isWork = invMode === 'work';
 
   const toolbar = el('div', { class: 'section-head no-print' }, [
-    el('button', { class: 'btn ghost', onclick: () => open(q.id, 'edit') }, ['← Back to worksheet']),
+    el('button', { class: 'btn ghost', onclick: () => open(q.id, 'edit') }, labeled('arrowLeft', 'Back to worksheet')),
     el('div', { class: 'subtabs', style: 'margin:0' }, [
       el('button', { class: 'subtab' + (invMode === 'client' ? ' active' : ''), onclick: () => { invMode = 'client'; renderQuotes(); } }, ['Client Quote']),
       el('button', { class: 'subtab' + (invMode === 'work' ? ' active' : ''), onclick: () => { invMode = 'work'; renderQuotes(); } }, ['Work Order']),
       el('button', { class: 'subtab' + (invMode === 'labels' ? ' active' : ''), onclick: () => { invMode = 'labels'; renderQuotes(); } }, ['Labels']),
-      el('button', { class: 'btn primary small', onclick: () => window.print() }, ['🖨 Print / Save PDF']),
+      el('button', { class: 'btn primary small', onclick: () => window.print() }, labeled('printer', 'Print / Save PDF')),
     ]),
   ]);
 

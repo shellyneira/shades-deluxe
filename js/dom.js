@@ -22,17 +22,6 @@ export function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-// Labeled <select>. options: array of strings. Returns the wrapping <label>.
-export function select(labelText, options, value, onChange, extraClass = '') {
-  const sel = el('select', { onchange: (e) => onChange(e.target.value) });
-  for (const opt of options) {
-    const o = el('option', { value: opt }, [String(opt)]);
-    if (String(opt) === String(value)) o.selected = true;
-    sel.append(o);
-  }
-  return el('label', { class: 'field ' + extraClass }, [labelText, sel]);
-}
-
 export function input(labelText, value, onChange, opts = {}) {
   const inp = el('input', {
     type: opts.type || 'text',
@@ -49,11 +38,6 @@ export function checkbox(labelText, checked, onChange) {
   const box = el('input', { type: 'checkbox', onchange: (e) => onChange(e.target.checked) });
   box.checked = !!checked;
   return el('label', { class: 'field check' }, [box, labelText]);
-}
-
-// Guard for irreversible actions (delete / overwrite). Returns true if confirmed.
-export function confirmAction(message) {
-  return window.confirm(message);
 }
 
 /* ---- element paths ----
@@ -120,7 +104,7 @@ function captureFocus(root) {
   const scroll = captureScroll(root);
   const page = { x: window.scrollX, y: window.scrollY };
   const a = document.activeElement;
-  if (!a || !root.contains(a) || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return { scroll, page };
+  if (!a || !root.contains(a) || !(/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) || a.classList.contains('dd'))) return { scroll, page };
   const path = nodePath(a, root);
   if (!path) return { scroll, page };
   const sel = /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'number' && a.type !== 'date' && a.type !== 'checkbox';

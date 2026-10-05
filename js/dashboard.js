@@ -11,6 +11,7 @@ import { el, mount, FRACTION_LABEL } from './dom.js';
 import { getState } from './store.js';
 import { quoteTotals, computeLine, money, money0 } from './pricing.js';
 import { openQuote } from './quotes.js';
+import { labeled, iconSvg, ICON } from './ui.js';
 
 const STAGES = ['Quote', 'Accepted', '50% Paid', '100% Paid'];
 const stagePct = (st) => (st === '100% Paid' ? 1 : st === '50% Paid' ? 0.5 : 0);
@@ -18,8 +19,8 @@ const isInvoice = (st) => st !== 'Quote';
 
 // One muted, low-chroma family for the whole board. Saturated primaries next to this
 // warm paper read as alarms; data that is merely *different* should not shout.
-const STAGE_COLOR = { Quote: '#9a9086', Accepted: '#4a6d8c', '50% Paid': '#c99a3f', '100% Paid': '#5e8c6a' };
-const SERIES = ['#b9552f', '#4a6d8c', '#5e8c6a', '#c99a3f', '#8a6a9e', '#4a8c8c'];
+const STAGE_COLOR = { Quote: 'var(--dv-quote)', Accepted: 'var(--dv-accepted)', '50% Paid': 'var(--dv-half)', '100% Paid': 'var(--dv-paid)' };
+const SERIES = [1, 2, 3, 4, 5, 6].map((n) => `var(--dv-${n})`);
 
 function metrics(s) {
   // Practice quotes are excluded from every number on this board — that is the
@@ -115,7 +116,7 @@ function metrics(s) {
 /* ---------------- pieces ---------------- */
 
 const tile = (label, value, sub, accent) => el('div', { class: 'kpi', style: `--accent:${accent}` }, [
-  el('div', { class: 'kpi-label' }, [label]),
+  el('div', { class: 'kpi-label' }, [el('span', { class: 'kpi-dot' }, []), label]),
   el('div', { class: 'kpi-value' }, [value]),
   el('div', { class: 'kpi-sub' }, [sub]),
 ]);
@@ -173,8 +174,8 @@ function monthChart(monthly) {
     ]),
     el('div', { class: 'cols axis-x' }, monthly.map((m) => el('div', { class: 'col-label' }, [m.label]))),
     el('div', { class: 'legend-inline' }, [
-      el('span', { class: 'sw', style: 'background:#5e8c6a' }, []), 'Invoiced',
-      el('span', { class: 'sw', style: 'background:#cfc7ba;margin-left:16px' }, []), 'Still quoted',
+      el('span', { class: 'sw', style: 'background:var(--dv-paid)' }, []), 'Invoiced',
+      el('span', { class: 'sw', style: 'background:var(--dv-open);margin-left:16px' }, []), 'Still quoted',
     ]),
   ]);
 }
@@ -188,7 +189,7 @@ function ranked(items, fmt) {
     el('div', { class: 'hbar-label', title: i.label }, [i.label]),
     el('div', { class: 'hbar-track' }, [el('div', {
       class: 'hbar-fill',
-      style: `width:${(i.value / max) * 100}%;background:color-mix(in srgb, var(--brand) ${100 - idx * 14}%, #d8d0c3)`,
+      style: `width:${(i.value / max) * 100}%;background:color-mix(in srgb, var(--brand) ${100 - idx * 14}%, var(--line-strong))`,
     }, [])]),
     el('div', { class: 'hbar-val' }, [fmt(i)]),
   ])));
@@ -207,9 +208,9 @@ function donut(mix) {
   }).join('');
   const wrap = el('div', { class: 'donut-wrap' }, []);
   wrap.innerHTML = `<svg viewBox="0 0 140 140" width="128" height="128">`
-    + `<circle cx="70" cy="70" r="52" fill="none" stroke="#efe9df" stroke-width="18"/>${segs}`
-    + `<text x="70" y="67" text-anchor="middle" font-size="14" font-weight="800" fill="#211d18">${money0(total)}</text>`
-    + `<text x="70" y="83" text-anchor="middle" font-size="8.5" letter-spacing="1" fill="#8c8579">TOTAL</text></svg>`;
+    + `<circle cx="70" cy="70" r="52" fill="none" stroke="var(--line-soft)" stroke-width="18"/>${segs}`
+    + `<text x="70" y="67" text-anchor="middle" font-size="14" font-weight="800" fill="var(--ink)">${money0(total)}</text>`
+    + `<text x="70" y="83" text-anchor="middle" font-size="8.5" letter-spacing="1" fill="var(--muted)">TOTAL</text></svg>`;
   return el('div', { class: 'donut' }, [
     wrap,
     el('div', { class: 'legend-rows grow' }, mix.map((m) =>
@@ -225,12 +226,12 @@ function collection(m) {
   const pct = (m.collected / m.invoiced) * 100;
   return el('div', {}, [
     el('div', { class: 'stack tall' }, [
-      el('div', { class: 'stack-seg', style: `width:${pct}%;background:#5e8c6a`, title: 'Collected ' + money(m.collected) }, []),
-      el('div', { class: 'stack-seg', style: `width:${100 - pct}%;background:#e0d6c6`, title: 'Outstanding ' + money(m.outstanding) }, []),
+      el('div', { class: 'stack-seg', style: `width:${pct}%;background:var(--dv-paid)`, title: 'Collected ' + money(m.collected) }, []),
+      el('div', { class: 'stack-seg', style: `width:${100 - pct}%;background:var(--dv-owed)`, title: 'Outstanding ' + money(m.outstanding) }, []),
     ]),
     el('div', { class: 'legend-rows' }, [
-      legendRow('#5e8c6a', 'Collected', Math.round(pct) + '%', money(m.collected)),
-      legendRow('#e0d6c6', 'Still owed', Math.round(100 - pct) + '%', money(m.outstanding)),
+      legendRow('var(--dv-paid)', 'Collected', Math.round(pct) + '%', money(m.collected)),
+      legendRow('var(--dv-owed)', 'Still owed', Math.round(100 - pct) + '%', money(m.outstanding)),
     ]),
   ]);
 }
@@ -265,7 +266,7 @@ function unpricedWarning(unpriced) {
   const detail = unpricedExpanded ? el('div', { class: 'alert-detail' }, unpriced.map((u) => el('div', { class: 'alert-quote' }, [
     el('div', { class: 'alert-quote-head' }, [
       el('span', {}, [`#${u.number} ${u.name}`]),
-      el('button', { class: 'btn small ghost', onclick: () => goToQuote(u.id) }, ['Edit →']),
+      el('button', { class: 'btn small', onclick: () => goToQuote(u.id) }, labeled('arrowRight', 'Edit quote', 15)),
     ]),
     ...u.lines.map((l) => el('div', { class: 'alert-line' }, [
       l.table, l.location ? ' · ' + l.location : '', l.wdNumber ? ' · ' + l.wdNumber : '', ' — ', dimLabel(l),
@@ -273,17 +274,17 @@ function unpricedWarning(unpriced) {
   ]))) : null;
 
   return el('div', { class: 'alert' }, [
-    el('span', { class: 'alert-mark' }, ['!']),
+    (() => { const m = el('span', { class: 'alert-mark' }, []); m.innerHTML = iconSvg(ICON.alert, 20); return m; })(),
     el('div', { style: 'flex:1' }, [
-      el('div', { class: 'row', style: 'justify-content:space-between;gap:12px' }, [
+      el('div', { class: 'alert-head' }, [
         el('div', {}, [
           el('strong', {}, [`${lineCount} line${lineCount > 1 ? 's' : ''} on ${unpriced.length} quote${unpriced.length > 1 ? 's' : ''} ${lineCount > 1 ? 'have' : 'has'} no price`]),
           el('div', { class: 'alert-sub' }, [`The size falls outside its price table, so it counts as $0 here — and prints as $0.00 on the client's quote. ${who}${unpriced.length > 4 ? '…' : ''}`]),
         ]),
         el('button', {
-          class: 'btn small ghost', style: 'flex:none',
+          class: 'btn small' + (unpricedExpanded ? ' open' : ''), style: 'flex:none',
           onclick: () => { unpricedExpanded = !unpricedExpanded; renderDashboard(); },
-        }, [unpricedExpanded ? 'Hide details ▴' : 'Show details ▾']),
+        }, [...labeled('chevron', unpricedExpanded ? 'Hide details' : 'Show details', 15)]),
       ]),
       detail,
     ]),
@@ -310,10 +311,10 @@ export function renderDashboard() {
     ]),
     unpricedWarning(m.unpriced),
     el('div', { class: 'kpi-row' }, [
-      tile('Open pipeline', money(m.pipeline), `${m.openCount} not yet accepted · excl. tax`, '#4a6d8c'),
-      tile('Invoiced', money(m.invoiced), `Est. profit ${money(m.profit)} · ${m.margin}% margin · excl. tax`, '#5e8c6a'),
-      tile('Collected', money(m.collected), `${m.conversion}% of quotes became invoices`, '#b9552f'),
-      tile('Outstanding', money(m.outstanding), 'Invoiced, not yet paid', '#c99a3f'),
+      tile('Open pipeline', money(m.pipeline), `${m.openCount} not yet accepted · excl. tax`, 'var(--dv-accepted)'),
+      tile('Invoiced', money(m.invoiced), `Est. profit ${money(m.profit)} · ${m.margin}% margin · excl. tax`, 'var(--dv-paid)'),
+      tile('Collected', money(m.collected), `${m.conversion}% of quotes became invoices`, 'var(--dv-1)'),
+      tile('Outstanding', money(m.outstanding), 'Invoiced, not yet paid', 'var(--dv-half)'),
     ]),
     el('div', { class: 'dash-grid' }, [
       card('Where the money sits', 'by stage', stageBar(m.byStage), true),

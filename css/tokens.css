@@ -1,0 +1,125 @@
+/* Design tokens — the only place a color is allowed to be written down.
+   Every token is light-dark(light value, dark value): one declaration, two themes.
+   Everything else in the app reads var(--token). Which side applies is decided by
+   `color-scheme` on <html> (set from the theme toggle), and printing always forces
+   the light side, so a document prints as ink on white whatever the screen shows. */
+
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --radius: 14px;
+  --radius-sm: 9px;
+
+  /* surfaces: cool greys; dark steps up in lightness the closer a layer is to the reader */
+  --bg: light-dark(#f3f4f7, #121418);
+  --panel: light-dark(#fcfcfd, #1a1d22);
+  --surface: light-dark(#fff, #242830);        /* inputs, buttons, chips */
+  --surface-sunken: light-dark(#f1f2f6, #1f2228);
+  --surface-hover: light-dark(#f6f7fa, #2a2e36);
+  --field: light-dark(#f6f7fa, #21252c);       /* resting fill of worksheet fields */
+  --draft: light-dark(#eef0f9, #232834);       /* the "new line" row */
+  --focus-fill: light-dark(#fff, #2b303a);
+
+  /* text */
+  --ink: light-dark(#181a20, #e6e8ee);
+  --ink-soft: light-dark(#454a55, #c3c8d4);
+  --muted: light-dark(#7b8190, #8f96a5);
+  --faint: light-dark(#bcc1cc, #565c6a);
+  --on-ink: light-dark(#fff, #121418);         /* text on an --ink fill */
+  --on-brand: light-dark(#fff, #0f1029);       /* text on brand / status / identity fills */
+  --ink-hover: light-dark(#000, #fff);
+
+  /* lines */
+  --line: light-dark(#e4e6ec, #2a2e36);
+  --line-strong: light-dark(#d3d7e0, #3a3f4a);
+  --line-soft: light-dark(#eceef3, #242830);
+  --line-field: light-dark(#e6e8ef, #2f343d);
+
+  /* brand: the logo's blue, softened for UI; the neutrals are cool so they sit with it */
+  --brand: light-dark(#3a40d8, #838aff);
+  --brand-dark: light-dark(#2c31b8, #9ca1ff);
+  --brand-tint: light-dark(#eceefd, #272a52);
+  --gold: light-dark(#c99a3f, #d6ae5c);
+  /* green means "yes / confirmed" and nothing else, so brand blue is never mistaken for it */
+  --accent: light-dark(#3f7d5f, #6cb591);
+  --accent-dark: light-dark(#336650, #82c8a4);
+
+  /* status */
+  --danger: light-dark(#c8332b, #f08978);
+  --danger-tint: light-dark(#fbe6e4, #3a2326);
+  --danger-tint-strong: light-dark(#f5d4d1, #4a2b2f);
+  --danger-line: light-dark(#f0bfba, #6a3b40);
+  --success: light-dark(#2f6a4f, #78c7a1);
+  --success-tint: light-dark(#e1f1e8, #1f3128);
+  --warn: light-dark(#9a6a12, #e3b866);
+  --warn-tint: light-dark(#fbf0dc, #352c1c);
+  --info: light-dark(#6b4fa5, #b9a3ee);
+  --info-tint: light-dark(#ede9f8, #2b2940);
+  --neutral-tint: light-dark(#eef0f4, #2a2e36);
+  --flash: light-dark(#fbe3a8, #54421a);
+  --stripe: light-dark(#eef0f4, #272b33);      /* hatching on not-applicable cells */
+
+  /* overlays, shadows, tooltip */
+  --overlay: light-dark(rgba(18, 20, 28, .5), rgba(0, 0, 0, .6));
+  --overlay-soft: light-dark(rgba(20, 24, 40, .35), rgba(0, 0, 0, .5));
+  --on-ink-wash: light-dark(rgba(255, 255, 255, .2), rgba(0, 0, 0, .15));
+  --shadow-a: light-dark(rgba(20, 24, 40, .05), rgba(0, 0, 0, .3));
+  --shadow-b: light-dark(rgba(20, 24, 40, .07), rgba(0, 0, 0, .22));
+  --shadow-c: light-dark(rgba(20, 24, 40, .14), rgba(0, 0, 0, .45));
+  --shadow-pill-c: light-dark(rgba(20, 24, 40, .18), rgba(0, 0, 0, .45));
+  --shadow-peer-c: light-dark(rgba(20, 24, 40, .25), rgba(0, 0, 0, .45));
+  --shadow-cursor: light-dark(rgba(20, 24, 40, .3), rgba(0, 0, 0, .5));
+  --shadow: 0 1px 2px var(--shadow-a), 0 8px 24px var(--shadow-b);
+  --shadow-lg: 0 12px 40px var(--shadow-c);
+  --shadow-pill: 0 1px 3px var(--shadow-pill-c);
+  --shadow-peer: 0 1px 3px var(--shadow-peer-c);
+  --tip-bg: light-dark(#1f222a, #e6e8ee);
+  --tip-ink: light-dark(#fff, #181a20);
+
+  /* dashboard data colors, in the order they are assigned */
+  --dv-quote: light-dark(#8f96a5, #9ca3b2);
+  --dv-accepted: light-dark(#4a6d8c, #7aa2cb);
+  --dv-half: light-dark(#c99a3f, #d6ae5c);
+  --dv-paid: light-dark(#5e8c6a, #7fb593);
+  --dv-1: var(--brand);
+  --dv-2: light-dark(#4a8c8c, #6bb3b3);
+  --dv-3: light-dark(#5e8c6a, #7fb593);
+  --dv-4: light-dark(#c99a3f, #d6ae5c);
+  --dv-5: light-dark(#8a6a9e, #b08ec6);
+  --dv-6: light-dark(#b9552f, #df8460);
+  --dv-open: light-dark(#cdd1da, #474d59);
+  --dv-owed: light-dark(#dde0e7, #3a3f4a);
+
+  /* identity colors — a person's cursor/avatar, a price-table category. Mid-tones,
+     so white text and the page both read on them in either theme. */
+  --id-1: #3a6ea5;
+  --id-2: #b9552f;
+  --id-3: #3f7d5f;
+  --id-4: #8e44ad;
+  --id-5: #b88a2f;
+  --id-6: #c0392b;
+  --id-7: #16a085;
+  --id-8: #d9713c;
+  --id-9: #7f6a4a;
+  --on-id: #fff;
+
+  /* documents (invoice, work order, labels) follow the theme on screen */
+  --paper: light-dark(#fff, #1a1d22);
+  --paper-ink: light-dark(#000, #e6e8ee);
+  --paper-ink-1: light-dark(#111418, #e6e8ee);
+  --paper-ink-2: light-dark(#3f444c, #c3c8d4);
+  --paper-ink-3: light-dark(#6b7280, #8f96a5);
+  --paper-hair: light-dark(#e7e9ec, #2a2e36);
+  --paper-wash: light-dark(#f6f7f8, #242830);
+  --paper-success: light-dark(#2f6a4f, #78c7a1);
+}
+
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* Paper is paper: a print or PDF is always the light side. Doing it in CSS (not by
+   flipping the theme in script) means the screen never flashes light behind the
+   print dialog. */
+@media print {
+  :root, :root[data-theme="dark"], :root[data-theme="light"] { color-scheme: light !important; }
+}

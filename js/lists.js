@@ -1,7 +1,8 @@
 // Lists editor — the dropdown option lists. Products, Fabrics and any category
 // created here can be split one-list-per-product-type (Roller/Zebra/Drapery/...);
 // everything else is one shared list.
-import { el, mount, confirmAction, toast } from './dom.js';
+import { el, mount, toast } from './dom.js';
+import { confirmAction, labeled, iconSvg, ICON } from './ui.js';
 import { getState, save } from './store.js';
 
 const LABELS = {
@@ -28,8 +29,9 @@ function chip(arr, i, priced, onChange) {
   const it = arr[i];
   const remove = el('button', {
     class: 'field-chip-x', title: `Remove “${it.name}”`, type: 'button',
-    onclick: () => { if (confirmAction(`Remove “${it.name}”?`)) { arr.splice(i, 1); onChange(); } },
-  }, ['✕']);
+    onclick: async () => { if (await confirmAction(`Remove “${it.name}”?`, 'Remove')) { arr.splice(i, 1); onChange(); } },
+  }, []);
+  remove.innerHTML = iconSvg(ICON.x, 12);
   if (!priced) return el('span', { class: 'field-chip' }, [it.name, remove]);
   const price = el('input', {
     type: 'number', min: '0', step: '0.01', value: it.price || 0, class: 'field-chip-price',
@@ -122,7 +124,7 @@ function newCategoryForm(onDone) {
     el('label', { class: 'field', style: 'margin-bottom:14px' }, ['Category name', nameInput]),
     ...groups,
     el('div', { class: 'row', style: 'margin-top:16px;gap:10px' }, [
-      el('button', { class: 'btn primary', onclick: create }, ['✓ Create category']),
+      el('button', { class: 'btn primary', onclick: create }, labeled('check', 'Create category')),
       el('button', { class: 'btn ghost', onclick: onDone }, ['Cancel']),
     ]),
   ]);
@@ -157,8 +159,12 @@ export function renderLists() {
       hint: list.perCategory ? 'One list per product type — shown on the worksheet after Color.' : 'One shared list.',
       groups, priced: list.priced, onChange: () => { save(); renderLists(); },
       headerActions: [
+        el('label', { class: 'check price-switch', title: 'Give each option an optional $ amount that is added to the line price' }, [
+          (() => { const b = el('input', { type: 'checkbox', onchange: (e) => { list.priced = e.target.checked; save(); renderLists(); } }); b.checked = !!list.priced; return b; })(),
+          'Prices',
+        ]),
         el('button', { class: 'btn small ghost', onclick: () => { const nn = prompt('Rename category:', list.name); if (nn?.trim()) { list.name = nn.trim(); save(); renderLists(); } } }, ['Rename']),
-        el('button', { class: 'btn small ghost', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete the “${list.name}” category? Any quotes already using it keep their old value, but it disappears from the dropdown.`)) { s.customLists = s.customLists.filter((l) => l !== list); save(); renderLists(); } } }, ['Delete']),
+        el('button', { class: 'btn small ghost', style: 'color:var(--danger)', onclick: async () => { if (await confirmAction(`Delete the “${list.name}” category? Any quotes already using it keep their old value, but it disappears from the dropdown.`)) { s.customLists = s.customLists.filter((l) => l !== list); save(); renderLists(); } } }, ['Delete']),
       ],
     });
   });

@@ -1,5 +1,6 @@
 // Settings — company info, document field visibility, backup/export and reset.
-import { el, mount, input, toast, confirmAction } from './dom.js';
+import { el, mount, input, toast } from './dom.js';
+import { confirmAction, labeled } from './ui.js';
 import { getState, save, exportJSON, importJSON, resetToDefaults } from './store.js';
 import { dbEnabled } from './db.js';
 import { descFields, TRACK_RATE_LABELS } from './pricing.js';
@@ -160,9 +161,9 @@ export function renderSettings() {
   terms.value = co.terms;
 
   const fileInput = el('input', {
-    type: 'file', accept: 'application/json', style: 'display:none', onchange: (e) => {
+    type: 'file', accept: 'application/json', style: 'display:none', onchange: async (e) => {
       const f = e.target.files[0]; if (!f) return;
-      if (!confirmAction('Restore this backup? It replaces ALL current data (tables, lists, quotes) and cannot be undone.')) { e.target.value = ''; return; }
+      if (!(await confirmAction('Restore this backup? It replaces ALL current data (tables, lists, quotes) and cannot be undone.', 'Restore backup'))) { e.target.value = ''; return; }
       const r = new FileReader();
       r.onload = () => { try { importJSON(r.result); toast('Backup restored'); renderSettings(); } catch { toast('Invalid file'); } };
       r.readAsText(f);
@@ -194,7 +195,7 @@ export function renderSettings() {
     el('div', { class: 'panel' }, [
       el('h2', {}, ['Backup & data']),
       dbEnabled()
-        ? el('p', { class: 'muted' }, ['✅ Connected to the cloud — everything saves to your Supabase database automatically and syncs across devices. Backups are optional; keep one if you like an extra copy.'])
+        ? el('p', { class: 'muted' }, [...labeled('cloud', ''), ' Connected to the cloud — everything saves to your Supabase database automatically and syncs across devices. Backups are optional; keep one if you like an extra copy.'])
         : el('p', { class: 'muted' }, ['Everything is stored in this browser. Download a backup regularly, and use it to move data to another computer. (Connect Supabase to sync automatically and stop needing manual backups.)']),
       el('div', { class: 'row' }, [
         el('button', { class: 'btn primary', onclick: downloadBackup }, ['⬇ Download backup']),

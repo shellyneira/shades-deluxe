@@ -5,6 +5,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script>
+    // Theme before first paint, so a dark-theme reload never flashes light.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('sd-theme'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <script>
     // Deep links: 404.html bounces unknown paths here as /?/quotes/q_1; put the real path back.
     (function () {
       var gh = location.hostname.slice(-10) === '.github.io';
@@ -16,6 +25,7 @@
   </script>
   <title>Shades Deluxe — Quotes</title>
   <link rel="icon" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/tokens.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 

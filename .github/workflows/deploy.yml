@@ -29,7 +29,7 @@ jobs:
           mkdir dist
           cp -R index.html 404.html css js assets dist/
           sed -i -E "s#(from '\./[a-z-]+\.js)'#\1?v=$V'#g" dist/js/*.js
-          sed -i -E "s#(js/app\.js|css/styles\.css)\"#\1?v=$V\"#" dist/index.html
+          sed -i -E "s#(js/app\.js|css/(tokens|styles)\.css)\"#\1?v=$V\"#" dist/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

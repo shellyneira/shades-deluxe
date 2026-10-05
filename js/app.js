@@ -1,6 +1,8 @@
 // Bootstrap + tab router + login gate.
 import { el, onAfterMount } from './dom.js';
 import { pathSegments, pathFor } from './url.js';
+import { initTheme, themeToggle } from './theme.js';
+import { initUI } from './ui.js';
 import { initCloud, startLiveSync, onStateChange } from './store.js';
 import { authRequired, ensureSession, login, logout, userEmail } from './auth.js';
 import { renderDashboard } from './dashboard.js';
@@ -34,6 +36,8 @@ const segmentsFor = (view) => (view === 'dashboard' ? [] : [view, ...(ROUTES[vie
 // re-push forever.
 let canonicalizing = false;
 function syncUrl() {
+  // Preparing a quote gets the whole window, like a spreadsheet; documents keep their page width.
+  document.body.classList.toggle('wide-sheet', current === 'quotes' && quoteRoute().length === 1);
   const next = pathFor(segmentsFor(current));
   if (location.pathname === next || decodeURI(location.pathname) === decodeURI(next)) return;
   history[canonicalizing ? 'replaceState' : 'pushState'](null, '', next);
@@ -111,6 +115,13 @@ function addLogout() {
   }, ['Log out']));
 }
 
+function addThemeToggle() {
+  const bar = document.querySelector('.topbar');
+  const logout = bar.querySelector('.logout-btn');
+  const btn = themeToggle();
+  if (logout) logout.before(btn); else bar.append(btn);
+}
+
 function startApp() {
   addLogout();
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
@@ -119,10 +130,13 @@ function startApp() {
   migrateLegacyHash();
   fromUrl(() => go(...splitUrl()));
   initPresence();
+  addThemeToggle(); // after presence, so it sits right beside Log out
   initCloud().then(() => { startLiveSync(); redraw(); });
 }
 
 async function boot() {
+  initTheme();
+  initUI();
   if (authRequired() && !(await ensureSession())) { renderLogin(); return; }
   startApp();
 }

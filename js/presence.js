@@ -38,6 +38,10 @@ function labelInitials(name, others) {
   return baseInitials(name, 4);
 }
 
+const shorten = (t) => (t.length > 34 ? t.slice(0, 33) + '…' : t);
+// Dropdowns are buttons now, but to a collaborator they are still fields.
+const isField = (t) => /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.classList.contains('dd');
+
 /* ---------------- context: which screen am I on ---------------- */
 
 // `scope` is what two people must have in common for a field ring to mean anything:
@@ -183,7 +187,7 @@ function sendTypingPing() {
 // name tucked under its tip, in the same colour as their avatar.
 function cursorNode(peer, pt) {
   return el('div', { class: 'peer-cursor', style: `--who:${peer.color};left:${pt.left}px;top:${pt.top}px` }, [
-    el('span', { class: 'cursor-arrow', html: '<svg width="18" height="20" viewBox="0 0 18 20"><path d="M2 1.5 15.5 11 9.4 12.1 6.6 18.2Z" fill="var(--who)" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>' }, []),
+    el('span', { class: 'cursor-arrow', html: '<svg width="18" height="20" viewBox="0 0 18 20"><path d="M2 1.5 15.5 11 9.4 12.1 6.6 18.2Z" fill="var(--who)" stroke="var(--panel)" stroke-width="1.3" stroke-linejoin="round"/></svg>' }, []),
     el('span', { class: 'cursor-name' }, [peer.name]),
   ]);
 }
@@ -317,11 +321,11 @@ export function initPresence() {
   // around it; anyone elsewhere just sees it in the avatar tooltip.
   document.addEventListener('focusin', (e) => {
     const t = e.target;
-    if (!/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
-    setField(nodePath(t), shorten(t.closest('label')?.textContent.trim() || t.placeholder || t.type));
+    if (!isField(t)) return;
+    setField(nodePath(t), shorten(t.closest('label')?.textContent.trim() || t.placeholder || t.type || ''));
   });
   document.addEventListener('focusout', (e) => {
-    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) setField(null);
+    if (isField(e.target)) setField(null);
   });
 
   onAfterMount(() => { updateContext(); scheduleDecorate(); });

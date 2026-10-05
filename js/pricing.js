@@ -97,6 +97,21 @@ export function offChartReason(table, width, widthFrac, height, heightFrac) {
   return { text: `the chart has no price filled in for ${w}" × ${h}"`, fields: ['width', 'height'] };
 }
 
+// Everything wrong with a line that stops it being priced in full, each with the
+// fields that caused it (so the sheet can tint them). Internal only — never printed.
+// `committed` is false for the draft row: a half-typed drapery has no fabric price
+// yet and that is not a finding.
+export function lineIssues(line, state, { committed = true } = {}) {
+  if (!(Number(line.width) && Number(line.height))) return [];
+  const table = state.tables[line.table];
+  if (table?.kind === 'formula') {
+    return committed && !Number(line.fabricPrice)
+      ? [{ text: 'Fabric $/yd is missing — drapery is priced from it', fields: ['fabricPrice'] }] : [];
+  }
+  return computeLine(line, state).listMissing
+    ? [offChartReason(table, line.width, line.widthFrac, line.height, line.heightFrac)] : [];
+}
+
 // Drapery pricing (ported from "Calculo de tela y precios.xlsx") — every number here
 // is a formula of a few real inputs (width, height, fabric $/yd, lining, fullness),
 // unlike Roller/Zebra's opaque per-width×height list price. So instead of baking a

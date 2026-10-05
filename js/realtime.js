@@ -25,7 +25,8 @@ const TABLES = ['app_state', 'quotes', 'price_tables', 'option_lists'];
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
 const userKey = () => getSession()?.user?.id || getSession()?.user?.email || CLIENT_ID;
 
-const COLORS = ['#3a6ea5', '#b9552f', '#3f7d5f', '#8e44ad', '#c99a3f', '#c0392b', '#16a085', '#d9713c'];
+// Token references, not hex: peers get the same name and each paints it in their own theme.
+const COLORS = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `var(--id-${n})`);
 // Same person -> same color on every screen, so "the blue one is Maria" holds.
 function colorFor(id) {
   let h = 0;
