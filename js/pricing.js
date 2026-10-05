@@ -8,6 +8,15 @@
 //   Side Ch. (V)    = height / 12 * 4.5 * 2       when enabled
 //   Client price(AB)= L/Price + Fascia + SideCh + Installation + Brackets
 //
+// DISABLED — PER-TABLE MINIMUM PRICE (kept below, commented out, so it can be restored).
+// This was a judgment call beyond the sheet: each table carried a minimum price
+// (Values!O/P: 300/400/550/600) applied as a floor on the unit price. The user never
+// confirmed it, nothing in the UI could edit it, and it silently overcharged: a Zebra
+// 52x50 listing at $372 was quoted at $600 with no explanation. Dangerous, so it is OFF.
+// To restore: uncomment the three marked blocks (here, the 'Table minimum' step in
+// explainLine, and the `min` tag in quotes.js), AND add a Price Tables UI to edit
+// state.minPrice, AND confirm the rule with the user first. state.minPrice data is
+// still stored and synced, just unused.
 
 const FALLBACK_RATES = { fascia: 4.5, cassette: 4.5, sideChannel: 4.5, costFactor: 0.43 };
 
@@ -232,6 +241,21 @@ export function computeLine(line, state) {
   const markup = Number(line.markup) || 0; // extra profit the user adds on this line
   const motor = Number(line.motorPrice) || 0; // per-line motor charge
   const lineDisc = Number(line.discount) || 0; // per-item discount
+  // THE PER-TABLE MINIMUM WAS INERT. state.minPrice is seeded with real floors
+  // (Roller #3 $300, Roller #5 $400, Zebra #3 $550, Zebra #5 $600), carried through
+  // rename/duplicate/delete and synced to the cloud — and nothing ever read it, so
+  // every shade that priced below its table's floor was quoted under it. quotes.js
+  // has been rendering a `min` tag off `c.floored` and a "minimum applied" tooltip
+  // off `c.floor` the whole time; computeLine simply never returned either.
+  //
+  // The floor is on the SHADE, not on the line: extras sit on top of it, which is
+  // what the tooltip already says ("List X · minimum Y applied"). Cost stays on the REAL
+  // list price — a floor is revenue, not material, and charging it to cost would
+  // quietly inflate the material line and understate the margin.
+  // DISABLED (see header). Restore these three lines and change `list` to `listUsed` below:
+  // const floor = Number((state.minPrice || {})[line.table]) || 0;
+  // const floored = list != null && floor > 0 && list < floor;
+  // const listUsed = floored ? floor : list;
   const base = (list || 0) + fascia + cassette + sideChannel + installation + brackets + extras + markup + motor - lineDisc;
   // OFF THE CHART STILL CHARGES WHAT WAS TYPED. A size the grid cannot reach used to
   // make the WHOLE line null, so an installation, a motor and a markup entered by
@@ -296,6 +320,12 @@ export function explainLine(line, state) {
       const rowIdx = table.rows.findIndex((r) => Number(r.length) >= eh);
       const row = rowIdx >= 0 ? table.rows[rowIdx].length : '?';
       steps.push({ kind: 'base', label: 'List price', detail: `${line.table} \u2192 first width \u2265 ${ew}" is ${col}", first length \u2265 ${eh}" is ${row}"`, amount: c.list });
+      // Without this the steps stop adding up to what is charged, which is the one
+      // promise this function makes.
+      // DISABLED table minimum (see header); also add `floored, floor` back to computeLine's return:
+      // if (c.floored) {
+      //   steps.push({ kind: 'add', label: 'Table minimum', detail: `${line.table} does not sell below ${money(c.floor)} \u2014 raise the size or lower the minimum in Price Tables`, amount: round2(c.floor - c.list) });
+      // }
     }
     if (c.fascia) steps.push({ kind: 'add', label: 'Fascia', detail: `${w}" \u00f7 12 \u00d7 ${money(rates.fascia)} per foot`, amount: round2(c.fascia) });
     if (c.cassette) steps.push({ kind: 'add', label: 'Cassette', detail: `${w}" \u00f7 12 \u00d7 ${money(rates.cassette)} per foot`, amount: round2(c.cassette) });

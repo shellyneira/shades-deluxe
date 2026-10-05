@@ -87,6 +87,7 @@ function openCreateModal() {
       if (!s.categories.includes(cat)) s.categories.push(cat);
     }
     s.tables[name] = { category: cat, widths: [36, 48, 60, 72], rows: [30, 48, 60, 72, 84].map((l) => ({ length: l, prices: [null, null, null, null] })) };
+    s.minPrice[name] = 0;
     save();
     active = name;
     close();
@@ -132,6 +133,7 @@ function tableActions(name) {
       if (!nn || nn === name) return;
       if (s.tables[nn]) return toast('Name already used');
       s.tables = Object.fromEntries(Object.entries(s.tables).map(([k, v]) => [k === name ? nn : k, v]));
+      s.minPrice[nn] = s.minPrice[name]; delete s.minPrice[name];
       s.quotes.forEach((q) => q.items.forEach((it) => { if (it.table === name) it.table = nn; }));
       save(); deletePriceTableCloudRow(name); active = nn; renderTables(); toast('Renamed');
     } }, ['✎ Rename']),
@@ -139,11 +141,12 @@ function tableActions(name) {
       let nn = name + ' copy'; let i = 2;
       while (s.tables[nn]) nn = name + ' copy ' + i++;
       s.tables[nn] = structuredClone(s.tables[name]);
+      s.minPrice[nn] = s.minPrice[name] || 0;
       save(); active = nn; renderTables(); toast('Duplicated');
     } }, ['⧉ Duplicate']),
     el('button', { class: 'btn small', style: 'color:var(--danger)', onclick: () => {
       if (!confirm(`Delete the "${name}" price table? Existing quotes keep their saved prices.`)) return;
-      delete s.tables[name];
+      delete s.tables[name]; delete s.minPrice[name];
       save(); deletePriceTableCloudRow(name); active = null; renderTables(); toast('Deleted');
     } }, ['🗑 Delete']),
   ]);

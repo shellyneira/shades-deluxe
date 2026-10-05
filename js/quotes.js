@@ -201,7 +201,7 @@ const draperyStyleOf = (it, tables) => (isDrapery(it, tables) ? DRAPERY_STYLES[t
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
 // `hideWhen(item)` greys a cell out for rows where the field is meaningless.
-function columns(o, tables, categories, customLists) {
+function columns(o, tables, categories, customLists, manufacturers = []) {
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
   // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
@@ -219,6 +219,8 @@ function columns(o, tables, categories, customLists) {
   }));
   return [
     { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
+    // Blank = whoever makes this category (Settings → Manufacturers); pick one to send just this line elsewhere.
+    ...(manufacturers.length ? [{ key: 'manufacturer', label: 'Maker', kind: 'select', opts: opt(manufacturers.map((m) => m.name).filter(Boolean)), w: 110 }] : []),
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
     { key: 'location', label: 'Location', kind: 'select', opts: opt(o.locations), w: 116 },
     { key: 'wdNumber', label: 'W/D #', kind: 'select', opts: opt(o.wdNumbers), w: 92 },
@@ -446,7 +448,7 @@ function cell(col, item, onChange) {
 
 function sheet(q, rerender) {
   const s = getState();
-  const cols = columns(s.options, s.tables, s.categories, s.customLists);
+  const cols = columns(s.options, s.tables, s.categories, s.customLists, s.manufacturers);
   const draft = q._draft || (q._draft = blankLine(s));
 
   const priceCells = []; // {getItem, node}
@@ -461,6 +463,9 @@ function sheet(q, rerender) {
       p.node.textContent = c.unit != null ? money(c.unit) : '—';
       p.node.classList.toggle('off', !!c.listMissing);
       p.td.querySelector('.offtag')?.remove();
+      // DISABLED table minimum (see pricing.js header): restore with the pricing.js blocks.
+      // p.td.querySelector('.mintag')?.remove();
+      // if (c.floored) p.td.append(el('span', { class: 'mintag', title: `Table minimum ${money(c.floor)} for ${p.item.table} — raise the size or lower the minimum in Price Tables` }, ['min']));
       // The amount shown IS charged now, so the tag has to say what it is missing
       // rather than the price cell reading as a complete one.
       if (c.listMissing) p.td.append(el('span', { class: 'offtag', title: `This size is off the ${p.item.table} chart, so the shade itself is not priced — only the charges typed on this line are. Extend the chart in Price Tables.` }, ['no list']));
@@ -727,7 +732,7 @@ function invoice(q) {
   if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
 
   const makers = s.manufacturers || [];
-  const makerOf = (l) => makers.find((m) => m.categories.includes(s.tables[l.table]?.category));
+  const makerOf = (l) => (l.manufacturer && makers.find((m) => m.name === l.manufacturer)) || makers.find((m) => m.categories.includes(s.tables[l.table]?.category));
   const itemsFor = (id) => q.items.filter((l) => (id === '_none' ? !makerOf(l) : makerOf(l)?.id === id));
   const unassigned = itemsFor('_none').length;
   if (isWork && makers.length && woMaker !== 'all' && woMaker !== 'each' && woMaker !== '_none' && !makers.some((m) => m.id === woMaker)) woMaker = 'all';

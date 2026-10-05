@@ -64,12 +64,14 @@ function seedDrapery(state) {
     if (!state.tables[name] && state.tables[oldName]) {
       // One-time rename for tables already seeded under the old prefixed name.
       state.tables[name] = state.tables[oldName]; delete state.tables[oldName];
+      state.minPrice[name] = state.minPrice[oldName]; delete state.minPrice[oldName];
       (state.quotes || []).forEach((q) => q.items.forEach((it) => { if (it.table === oldName) it.table = name; }));
       deleteTableRow(oldName).catch(() => {});
       continue;
     }
     if (state.tables[name]) continue;
     state.tables[name] = { category: 'Drapery', kind: 'formula', style, rates: {} };
+    state.minPrice[name] = 0;
   }
   // One-time migrations for tables already created under older field names.
   for (const table of Object.values(state.tables)) {
@@ -96,6 +98,7 @@ function freshState() {
     company: { ...DEFAULT_COMPANY },
     categories: ['Roller', 'Zebra'],
     tables: structuredClone(SEED.tables),
+    minPrice: { ...SEED.minPrice },
     options: structuredClone(SEED.options),
     docConfig: structuredClone(DEFAULT_DOC_CONFIG),
     docFieldOrder: [],
@@ -153,7 +156,6 @@ function normalize(state) {
     name: m.name || '',
     categories: Array.isArray(m.categories) ? m.categories : [],
   }));
-  delete state.minPrice;
   state.minimumOrder = Number(state.minimumOrder) || 0;
   state.defaultInstallation = Number(state.defaultInstallation) || 0;
   state.taxRate = state.taxRate == null ? 7 : Number(state.taxRate) || 0;
@@ -292,16 +294,16 @@ function setSyncState(s) {
 }
 function notify(reason) { listeners.forEach((fn) => { try { fn(reason); } catch (e) { console.warn(e); } }); }
 
-// Price tables and options/customLists are split into per-row payloads
+// Price tables/minPrice and options/customLists are split into per-row payloads
 // ({id, data}) so each table/list is its own database row (see db.js).
 function tableRows(s) {
-  return Object.entries(s.tables).map(([id, grid]) => ({ id, data: { grid } }));
+  return Object.entries(s.tables).map(([id, grid]) => ({ id, data: { grid, minPrice: s.minPrice[id] ?? 0 } }));
 }
 function listRows(s) {
   return [...Object.entries(s.options).map(([id, data]) => ({ id, data })), { id: 'customLists', data: s.customLists }];
 }
 function configOf(s) {
-  const { quotes, tables, options, customLists, ...config } = s;
+  const { quotes, tables, minPrice, options, customLists, ...config } = s;
   return config;
 }
 
@@ -333,7 +335,7 @@ function scheduleSync() {
     const changedLists = changedSince(lastPushedList, listRows(state));
     setSyncState('saving');
     Promise.all([
-      pushState({ ...config, quotes: [], tables: {}, options: {}, customLists: [] }),
+      pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
       pushQuotes(changedQuotes),
       pushTables(changedTables),
       pushLists(changedLists),
@@ -404,7 +406,7 @@ export function save() {
       quotes,
       tables: changedSince(lastSentTable, tableRows(state)),
       lists: changedSince(lastSentList, listRows(state)),
-      config: configChanged ? { ...config, quotes: [], tables: {}, options: {}, customLists: [] } : null,
+      config: configChanged ? { ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] } : null,
     };
     if (quotes.length || pendingBroadcast.tables.length || pendingBroadcast.lists.length || configChanged) scheduleBroadcast();
     else pendingBroadcast = null;
@@ -442,8 +444,9 @@ function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], c
   }
   for (const r of tables) {
     if (!r?.id || !r.data) continue;
-    if (fingerprint(state.tables[r.id]) === fingerprint(r.data.grid)) continue;
+    if (fingerprint({ grid: state.tables[r.id], minPrice: state.minPrice[r.id] ?? 0 }) === fingerprint(r.data)) continue;
     state.tables[r.id] = r.data.grid;
+    state.minPrice[r.id] = r.data.minPrice || 0;
     changed = true;
   }
   for (const r of lists) {
@@ -454,7 +457,7 @@ function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], c
     changed = true;
   }
   if (config) {
-    const { quotes: _q, tables: _t, options: _o, customLists: _c, ...rest } = config;
+    const { quotes: _q, tables: _t, minPrice: _m, options: _o, customLists: _c, ...rest } = config;
     if (fingerprint(configOf(state)) !== fingerprint(rest)) { Object.assign(state, rest); changed = true; }
   }
   if (!changed) return;
@@ -521,7 +524,7 @@ export async function pullAll() {
   const tables = (remoteTables || []).map((r) => ({ id: r.id, data: r.data }));
   const lists = (remoteLists || []).map((r) => ({ id: r.id, data: r.data }));
   if (!tables.length && remote?.tables) {
-    for (const [id, grid] of Object.entries(remote.tables)) tables.push({ id, data: { grid } });
+    for (const [id, grid] of Object.entries(remote.tables)) tables.push({ id, data: { grid, minPrice: remote.minPrice?.[id] || 0 } });
   }
   if (!lists.length && remote?.options) {
     for (const [id, data] of Object.entries(remote.options)) lists.push({ id, data });
@@ -543,7 +546,7 @@ export async function initCloud() {
     if (await pullAll()) { reconcileUpwards(); return true; }
     const { quotes, ...config } = state;
     await Promise.all([
-      pushState({ ...config, quotes: [], tables: {}, options: {}, customLists: [] }),
+      pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
       pushQuotes(quotes),
       pushTables(tableRows(state)),
       pushLists(listRows(state)),
