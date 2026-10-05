@@ -152,7 +152,7 @@ function manufacturersPanel(s) {
   const rerender = () => { save(); renderSettings(); };
   const card = (m) => el('div', { class: 'field-subcard' }, [
     el('div', { class: 'row', style: 'align-items:center;margin-bottom:10px' }, [
-      input('Manufacturer', m.name, (v) => { s.quotes.forEach((q) => q.items.forEach((l) => { if (l.manufacturer && l.manufacturer === m.name) l.manufacturer = v; })); m.name = v; save(); }, { class: 'grow' }),
+      input('Manufacturer', m.name, (v) => { m.name = v; save(); }, { class: 'grow' }),
       el('button', { class: 'btn ghost', title: 'Remove', onclick: () => { s.manufacturers = s.manufacturers.filter((x) => x !== m); rerender(); } }, ['✕']),
     ]),
     el('div', { class: 'hint', style: 'margin-bottom:8px' }, ['Makes these:']),
@@ -166,7 +166,7 @@ function manufacturersPanel(s) {
   ]);
   return el('div', { class: 'panel' }, [
     el('h2', {}, ['Manufacturers']),
-    el('p', { class: 'muted', style: 'margin-top:0' }, ['Who makes what. Tick every category a manufacturer makes — any mix (Zebra + Roller, Roller + Drapery, all three…). If two manufacturers both tick a category, its lines print on both orders. On a quote, the Maker column sends a single line to one manufacturer only.']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Who makes what. Tick every category a manufacturer makes — any mix (Zebra + Roller, Roller + Drapery, all three…). If two manufacturers both tick a category, its lines print on both orders.']),
     s.manufacturers.length ? el('div', { class: 'field-subcard-grid' }, s.manufacturers.map(card)) : null,
     el('button', { class: 'btn', style: 'margin-top:12px', onclick: () => { s.manufacturers.push({ id: `mf_${Date.now().toString(36)}`, name: '', categories: [] }); rerender(); } }, ['＋ Add manufacturer']),
   ]);

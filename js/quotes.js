@@ -202,7 +202,7 @@ const draperyStyleOf = (it, tables) => (isDrapery(it, tables) ? DRAPERY_STYLES[t
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
 // `hideWhen(item)` greys a cell out for rows where the field is meaningless.
-function columns(o, tables, categories, customLists, manufacturers = []) {
+function columns(o, tables, categories, customLists) {
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
   // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
@@ -220,8 +220,6 @@ function columns(o, tables, categories, customLists, manufacturers = []) {
   }));
   return [
     { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
-    // Blank = whoever makes this category (Settings → Manufacturers); pick one to send just this line elsewhere.
-    ...(manufacturers.length ? [{ key: 'manufacturer', label: 'Maker', kind: 'select', opts: opt(manufacturers.map((m) => m.name).filter(Boolean)), w: 110 }] : []),
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
     { key: 'location', label: 'Location', kind: 'select', opts: opt(o.locations), w: 116 },
     { key: 'wdNumber', label: 'W/D #', kind: 'select', opts: opt(o.wdNumbers), w: 92 },
@@ -449,7 +447,7 @@ function cell(col, item, onChange) {
 
 function sheet(q, rerender) {
   const s = getState();
-  const cols = columns(s.options, s.tables, s.categories, s.customLists, s.manufacturers);
+  const cols = columns(s.options, s.tables, s.categories, s.customLists);
   const draft = q._draft || (q._draft = blankLine(s));
 
   const priceCells = []; // {getItem, node}
@@ -652,7 +650,7 @@ function sheet(q, rerender) {
 }
 
 /* ---------------- printable documents (Client quote + Work order) ---------------- */
-let woMaker = 'all'; // work-order scope: 'all' (one order per manufacturer, stacked) | manufacturer id | '_none'
+let woSel = new Set(); // work-order manufacturers shown (ids, or '_none'); empty = all of them
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
 const sizeText = (l) => {
@@ -733,13 +731,10 @@ function invoice(q) {
   if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
 
   const makers = s.manufacturers || [];
-  const makersOf = (l) => {
-    const forced = l.manufacturer && makers.find((m) => m.name === l.manufacturer);
-    return forced ? [forced] : makers.filter((m) => m.categories.includes(s.tables[l.table]?.category));
-  };
+  const makersOf = (l) => makers.filter((m) => m.categories.includes(s.tables[l.table]?.category));
   const itemsFor = (id) => q.items.filter((l) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id)));
   const unassigned = itemsFor('_none').length;
-  if (isWork && makers.length && woMaker !== 'all' && woMaker !== '_none' && !makers.some((m) => m.id === woMaker)) woMaker = 'all';
+  for (const id of [...woSel]) if (id !== '_none' && !makers.some((m) => m.id === id)) woSel.delete(id);
   const makerBar = isWork && makers.length ? el('div', { class: 'maker-bar no-print' }, [
     el('span', { class: 'hint' }, ['Work order for']),
     ...[
@@ -747,8 +742,15 @@ function invoice(q) {
       ...makers.map((m) => [m.id, m.name || 'Unnamed', itemsFor(m.id).length]),
       ...(unassigned ? [['_none', 'No manufacturer', unassigned]] : []),
     ].map(([id, label, n]) => el('button', {
-      class: 'chip-btn' + (woMaker === id ? ' active' : '') + (id === '_none' ? ' warn' : '') + (n === 0 ? ' empty' : ''),
-      onclick: () => { woMaker = id; renderQuotes(); },
+      class: 'chip-btn' + ((id === 'all' ? !woSel.size : woSel.has(id)) ? ' active' : '') + (id === '_none' ? ' warn' : '') + (n === 0 ? ' empty' : ''),
+      onclick: () => {
+        if (id === 'all') woSel.clear();
+        else if (woSel.has(id)) woSel.delete(id);
+        else woSel.add(id);
+        // Ticking every manufacturer is the same thing as All.
+        if (woSel.size === makers.length + (unassigned ? 1 : 0)) woSel.clear();
+        renderQuotes();
+      },
     }, [label, n == null ? null : el('span', { class: 'n' }, [String(n)])])),
   ]) : null;
 
@@ -833,10 +835,11 @@ function invoice(q) {
 
   let docs;
   if (!isWork || !makers.length) docs = [build(q.items, null)];
-  else if (woMaker === 'all') {
-    docs = makers.map((m) => [m, itemsFor(m.id)]).filter(([, it]) => it.length).map(([m, it]) => build(it, m));
-    if (unassigned) docs.push(build(itemsFor('_none'), { name: 'No manufacturer assigned' }));
-  } else docs = [build(itemsFor(woMaker), makers.find((m) => m.id === woMaker) || { name: 'No manufacturer assigned' })];
+  else {
+    const picked = (id) => !woSel.size || woSel.has(id);
+    docs = makers.filter((m) => picked(m.id)).map((m) => [m, itemsFor(m.id)]).filter(([, it]) => it.length).map(([m, it]) => build(it, m));
+    if (unassigned && picked('_none')) docs.push(build(itemsFor('_none'), { name: 'No manufacturer assigned' }));
+  }
   if (!docs.length) docs = [el('div', { class: 'empty' }, ['No items are assigned to a manufacturer yet. Assign categories in Settings → Manufacturers.'])];
 
   return el('div', {}, [toolbar, makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
