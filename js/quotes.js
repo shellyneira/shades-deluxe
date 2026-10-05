@@ -16,10 +16,22 @@ export function openQuote(id, view = 'edit') { sub = { view, quoteId: id }; }
 
 // URL <-> screen. A reload lands before the cloud pull, so a quote that isn't in
 // the store yet keeps its place in `sub`; dropMissingQuote() runs once data settled.
-// /quotes/<id> is the worksheet, /quotes/<id>/invoice the customer document.
-export const quoteRoute = () => (sub.quoteId ? (sub.view === 'invoice' ? [sub.quoteId, 'invoice'] : [sub.quoteId]) : []);
-export function applyQuoteRoute([id, doc] = []) {
-  sub = id ? { view: doc === 'invoice' ? 'invoice' : 'edit', quoteId: id } : { view: 'list', quoteId: null };
+// /quotes/<id> is the worksheet; /quotes/<id>/<doc> a printable document:
+// invoice (client quote), work-order[/<Category,Category>] or labels.
+const DOC_SEGMENT = { client: 'invoice', work: 'work-order', labels: 'labels' };
+const DOC_MODE = Object.fromEntries(Object.entries(DOC_SEGMENT).map(([mode, seg]) => [seg, mode]));
+export const quoteRoute = () => {
+  if (!sub.quoteId) return [];
+  if (sub.view !== 'invoice') return [sub.quoteId];
+  return [sub.quoteId, DOC_SEGMENT[invMode], ...(invMode === 'work' && woSel.size ? [[...woSel].join(',')] : [])];
+};
+export function applyQuoteRoute([id, doc, cats] = []) {
+  if (!id) { sub = { view: 'list', quoteId: null }; return; }
+  if (!DOC_MODE[doc]) { sub = { view: 'edit', quoteId: id }; return; }
+  sub = { view: 'invoice', quoteId: id };
+  invMode = DOC_MODE[doc];
+  woSel = new Set(invMode === 'work' && cats ? cats.split(',') : []);
+  woCombine = false;
 }
 export function dropMissingQuote() {
   if (sub.quoteId && !getQuote(sub.quoteId)) sub = { view: 'list', quoteId: null };
