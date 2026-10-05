@@ -662,7 +662,7 @@ function sheet(q, rerender) {
 }
 
 /* ---------------- printable documents (Client quote + Work order) ---------------- */
-let woSel = new Set(); // work-order manufacturers shown (ids, or '_none'); empty = all of them
+let woSel = new Set(); // work-order manufacturers combined into one order (ids, or '_none'); empty = everything
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
 const sizeText = (l) => {
@@ -847,12 +847,13 @@ function invoice(q) {
 
   let docs;
   if (!isWork || !makers.length) docs = [build(q.items, null)];
+  else if (!woSel.size) docs = [build(q.items, null)];
   else {
-    const picked = (id) => !woSel.size || woSel.has(id);
-    docs = makers.filter((m) => picked(m.id)).map((m) => [m, itemsFor(m.id)]).filter(([, it]) => it.length).map(([m, it]) => build(it, m));
-    if (unassigned && picked('_none')) docs.push(build(itemsFor('_none'), { name: 'No manufacturer assigned' }));
+    const names = [...woSel].map((id) => (id === '_none' ? 'No manufacturer' : makers.find((m) => m.id === id)?.name || 'Unnamed'));
+    const items = q.items.filter((l) => [...woSel].some((id) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id))));
+    docs = items.length ? [build(items, { name: names.join(' + ') })] : [];
   }
-  if (!docs.length) docs = [el('div', { class: 'empty' }, ['No items are assigned to a manufacturer yet. Assign categories in Settings → Manufacturers.'])];
+  if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection. Assign categories in Settings → Manufacturers.'])];
 
   return el('div', {}, [toolbar, makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
 }
