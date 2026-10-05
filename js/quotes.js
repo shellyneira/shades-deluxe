@@ -23,15 +23,15 @@ const DOC_MODE = Object.fromEntries(Object.entries(DOC_SEGMENT).map(([mode, seg]
 export const quoteRoute = () => {
   if (!sub.quoteId) return [];
   if (sub.view !== 'invoice') return [sub.quoteId];
-  return [sub.quoteId, DOC_SEGMENT[invMode], ...(invMode === 'work' && woSel.size ? [[...woSel].join(',')] : [])];
+  return [sub.quoteId, DOC_SEGMENT[invMode], ...(invMode === 'work' && woSel ? [[...woSel].join(',')] : [])];
 };
 export function applyQuoteRoute([id, doc, cats] = []) {
   if (!id) { sub = { view: 'list', quoteId: null }; return; }
   if (!DOC_MODE[doc]) { sub = { view: 'edit', quoteId: id }; return; }
   sub = { view: 'invoice', quoteId: id };
   invMode = DOC_MODE[doc];
-  woSel = new Set(invMode === 'work' && cats ? cats.split(',') : []);
-  woCombine = false;
+  woSel = invMode === 'work' && cats ? new Set(cats.split(',')) : null;
+  woSeparate = false;
 }
 export function dropMissingQuote() {
   if (sub.quoteId && !getQuote(sub.quoteId)) sub = { view: 'list', quoteId: null };
@@ -674,8 +674,8 @@ function sheet(q, rerender) {
 }
 
 /* ---------------- printable documents (Client quote + Work order) ---------------- */
-let woCombine = false; // several product types selected: one merged order instead of one each
-let woSel = new Set(); // product types shown on the work order; empty = everything on one order
+let woSeparate = false; // several product types ticked: one order each instead of one merged order
+let woSel = null; // product types ticked on the work order; null = all of them
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
 const sizeText = (l) => {
@@ -758,22 +758,20 @@ function invoice(q) {
   const catOf = (l) => s.tables[l.table]?.category;
   const cats = s.categories.filter((c) => q.items.some((l) => catOf(l) === c));
   const itemsFor = (c) => q.items.filter((l) => catOf(l) === c);
-  for (const c of [...woSel]) if (!cats.includes(c)) woSel.delete(c);
+  const picked = woSel ? cats.filter((c) => woSel.has(c)) : cats;
   const makerBar = isWork && cats.length > 1 ? el('div', { class: 'maker-bar no-print' }, [
     el('span', { class: 'hint' }, ['Work order for']),
-    ...[['all', 'All', q.items.length], ...cats.map((c) => [c, c, itemsFor(c).length])].map(([id, label, n]) => el('button', {
-      class: 'chip-btn' + ((id === 'all' ? !woSel.size : woSel.has(id)) ? ' active' : ''),
+    ...cats.map((c) => el('button', {
+      class: 'chip-btn' + (picked.includes(c) ? ' active' : ''),
       onclick: () => {
-        if (id === 'all') { woSel.clear(); woCombine = false; }
-        else if (woSel.has(id)) woSel.delete(id);
-        else woSel.add(id);
-        if (woSel.size === cats.length) woSel.clear(); // every product ticked is the same as All
+        const next = picked.includes(c) ? picked.filter((x) => x !== c) : [...picked, c];
+        if (next.length) woSel = new Set(next); // always keep at least one ticked
         renderQuotes();
       },
-    }, [label, el('span', { class: 'n' }, [String(n)])])),
-    woSel.size > 1 ? el('label', { class: 'field check', style: 'margin-left:8px' }, [
-      (() => { const b = el('input', { type: 'checkbox', onchange: (e) => { woCombine = e.target.checked; renderQuotes(); } }); b.checked = woCombine; return b; })(),
-      'All on one order',
+    }, [c, el('span', { class: 'n' }, [String(itemsFor(c).length)])])),
+    picked.length > 1 ? el('label', { class: 'field check', style: 'margin-left:8px' }, [
+      (() => { const b = el('input', { type: 'checkbox', onchange: (e) => { woSeparate = e.target.checked; renderQuotes(); } }); b.checked = woSeparate; return b; })(),
+      'Separate order for each',
     ]) : null,
   ]) : null;
 
@@ -857,12 +855,10 @@ function invoice(q) {
   };
 
   let docs;
-  const ids = [...woSel];
-  if (!isWork || !ids.length) docs = [build(q.items, null)];
-  else if (woCombine && ids.length > 1) {
-    const items = q.items.filter((l) => ids.includes(catOf(l)));
-    docs = items.length ? [build(items, { name: ids.join(' + ') })] : [];
-  } else docs = ids.map((c) => [c, itemsFor(c)]).filter(([, it]) => it.length).map(([c, it]) => build(it, { name: c }));
+  if (!isWork || picked.length < 2 || !woSeparate) {
+    const items = !isWork || picked.length === cats.length ? q.items : q.items.filter((l) => picked.includes(catOf(l)));
+    docs = [build(items, !isWork || picked.length === cats.length ? null : { name: picked.join(' + ') })];
+  } else docs = picked.map((c) => build(itemsFor(c), { name: c }));
   if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection.'])];
 
   return el('div', {}, [toolbar, makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
