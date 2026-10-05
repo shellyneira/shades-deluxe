@@ -662,6 +662,7 @@ function sheet(q, rerender) {
 }
 
 /* ---------------- printable documents (Client quote + Work order) ---------------- */
+let woCombine = false; // several manufacturers selected: one merged order instead of one each
 let woSel = new Set(); // work-order manufacturers combined into one order (ids, or '_none'); empty = everything
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
@@ -756,7 +757,7 @@ function invoice(q) {
     ].map(([id, label, n]) => el('button', {
       class: 'chip-btn' + ((id === 'all' ? !woSel.size : woSel.has(id)) ? ' active' : '') + (id === '_none' ? ' warn' : '') + (n === 0 ? ' empty' : ''),
       onclick: () => {
-        if (id === 'all') woSel.clear();
+        if (id === 'all') { woSel.clear(); woCombine = false; }
         else if (woSel.has(id)) woSel.delete(id);
         else woSel.add(id);
         // Ticking every manufacturer is the same thing as All.
@@ -764,6 +765,10 @@ function invoice(q) {
         renderQuotes();
       },
     }, [label, n == null ? null : el('span', { class: 'n' }, [String(n)])])),
+    woSel.size > 1 ? el('label', { class: 'field check', style: 'margin-left:8px' }, [
+      (() => { const b = el('input', { type: 'checkbox', onchange: (e) => { woCombine = e.target.checked; renderQuotes(); } }); b.checked = woCombine; return b; })(),
+      'Combine into one order',
+    ]) : null,
   ]) : null;
 
   const meta = (label, val) => el('div', { class: 'mrow' }, [el('span', { class: 'ml' }, [label]), el('span', { class: 'mv' }, [val])]);
@@ -849,9 +854,15 @@ function invoice(q) {
   if (!isWork || !makers.length) docs = [build(q.items, null)];
   else if (!woSel.size) docs = [build(q.items, null)];
   else {
-    const names = [...woSel].map((id) => (id === '_none' ? 'No manufacturer' : makers.find((m) => m.id === id)?.name || 'Unnamed'));
-    const items = q.items.filter((l) => [...woSel].some((id) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id))));
-    docs = items.length ? [build(items, { name: names.join(' + ') })] : [];
+    const has = (l, id) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id));
+    const nameOf = (id) => (id === '_none' ? 'No manufacturer' : makers.find((m) => m.id === id)?.name || 'Unnamed');
+    const ids = [...woSel];
+    if (woCombine && ids.length > 1) {
+      const items = q.items.filter((l) => ids.some((id) => has(l, id)));
+      docs = items.length ? [build(items, { name: ids.map(nameOf).join(' + ') })] : [];
+    } else {
+      docs = ids.map((id) => [id, q.items.filter((l) => has(l, id))]).filter(([, it]) => it.length).map(([id, it]) => build(it, { name: nameOf(id) }));
+    }
   }
   if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection. Assign categories in Settings → Manufacturers.'])];
 
