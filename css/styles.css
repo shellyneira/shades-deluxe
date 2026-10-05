@@ -666,3 +666,9 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 @media print { .presence-layer, .presence-bar, .peer-banner, .peer-cursor { display: none !important; } }
 
 @media screen and (max-width: 1000px) { .kpi-row { grid-template-columns: 1fr 1fr; } .dash-grid { grid-template-columns: 1fr; } .dash-card.wide { grid-column: span 1; } }
+
+.off-block .off-list { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 8px; }
+.off-line { text-align: left; background: #f7e5e0; color: var(--danger); border: 0; border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.off-line:hover { background: #f2d6cd; }
+table.sheet tr.flash td { animation: row-flash 1.8s ease-out; }
+@keyframes row-flash { 0%, 40% { background: #fbe3a8; } 100% { background: transparent; } }

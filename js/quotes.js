@@ -1,7 +1,7 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, select, input, checkbox, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
 import { getState, save, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
+import { computeLine, offChartReason, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -503,7 +503,7 @@ function sheet(q, rerender) {
     // number is never a surprising $0 while a priced line sits in the draft row.
     // Mirror the client invoice: whole-dollar amounts + tax, so the worksheet matches.
     // Live q._draft, not the `draft` this sheet captured — same reason the rows do it.
-    const priced = [...q.items, q._draft || draft].map((it) => ({ c: computeLine(it, s), qty: Number(it.qty) || 1 }));
+    const priced = [...q.items, q._draft || draft].map((it) => ({ it, c: computeLine(it, s), qty: Number(it.qty) || 1 }));
     const sub = priced.reduce((a, p) => a + roundWhole(p.c.unit || 0) * p.qty, 0);
     const afterDiscount = sub - roundWhole(Number(q.discount) || 0);
     // The worksheet used to ignore the minimum order entirely, so the screen showed
@@ -518,10 +518,25 @@ function sheet(q, rerender) {
     const tax = roundWhole(taxable * rate / 100);
     // Sized but unpriceable — an unsized draft row is not a finding, it is a row
     // nobody has filled in yet.
-    const offChart = priced.filter((p) => p.c.listMissing).length;
-    totalsRefs.offRow.style.display = offChart > 0 ? '' : 'none';
-    totalsRefs.off.textContent = offChart + ' missing a list price';
-    totalsRefs.offRow.title = 'These lines are off their price chart. The charges typed on them ARE in the total above, but the shade itself is not priced — so the total is an UNDERCOUNT, not a quote. Extend the chart in Price Tables before sending.';
+    const offLines = priced.filter((p) => p.c.listMissing);
+    totalsRefs.offRow.style.display = offLines.length ? '' : 'none';
+    totalsRefs.off.textContent = offLines.length === 1 ? '1 line' : offLines.length + ' lines';
+    totalsRefs.offList.replaceChildren(...offLines.map((p) => {
+      const idx = q.items.indexOf(p.it);
+      const t = s.tables[p.it.table];
+      const what = [idx < 0 ? 'New line' : 'Line ' + (idx + 1), p.it.location, p.it.table].filter(Boolean).join(' · ');
+      return el('button', {
+        class: 'off-line', type: 'button',
+        onclick: () => {
+          const tr = priceCells.find((c) => c.item === p.it)?.node.closest('tr');
+          if (!tr) return;
+          tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          tr.classList.add('flash');
+          setTimeout(() => tr.classList.remove('flash'), 1800);
+        },
+      }, [el('strong', {}, [what]), ' — ', offChartReason(t, p.it.width, p.it.widthFrac, p.it.height, p.it.heightFrac)]);
+    }));
+    totalsRefs.offRow.title = 'These lines are off their price chart. The charges typed on them ARE in the total above, but the shade itself is not priced — so the total is an UNDERCOUNT, not a quote. Extend the chart in Price Tables, or change the size.';
     totalsRefs.minRow.style.display = minApplied ? '' : 'none';
     if (minApplied) totalsRefs.min.textContent = '+' + money0(minOrder - afterDiscount);
     totalsRefs.sub.textContent = money0(sub);
@@ -630,8 +645,10 @@ function sheet(q, rerender) {
   totalsRefs.minRow = el('div', { class: 'line', style: 'display:none' }, [el('span', {}, ['Minimum order']), totalsRefs.min]);
   // A line that is off the chart contributes $0, so the total silently understates
   // the job. Say so next to the number rather than leaving the gap to be noticed.
-  totalsRefs.offRow = el('div', { class: 'line', style: 'display:none;color:var(--danger)' }, [
-    el('span', {}, ['Lines missing a list price']), (totalsRefs.off = el('span', {}, ['—'])),
+  totalsRefs.offList = el('div', { class: 'off-list' }, []);
+  totalsRefs.offRow = el('div', { class: 'off-block', style: 'display:none' }, [
+    el('div', { class: 'line', style: 'color:var(--danger)' }, [el('span', {}, ['Not priced — size is off the price chart']), (totalsRefs.off = el('span', {}, ['—']))]),
+    totalsRefs.offList,
   ]);
   totalsRefs.revenue = el('span', {}, ['—']);
   totalsRefs.material = el('span', {}, ['—']);
