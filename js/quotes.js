@@ -483,6 +483,9 @@ function sheet(q, rerender) {
       const hasDims = p.item.width && p.item.height;
       p.node.textContent = c.unit != null ? money(c.unit) : '—';
       p.node.classList.toggle('off', !!c.listMissing);
+      // Tint the size cell(s) that caused it, so the eye lands on what to change.
+      const bad = c.listMissing ? offChartReason(s.tables[p.item.table], p.item.width, p.item.widthFrac, p.item.height, p.item.heightFrac).fields : [];
+      for (const k of ['width', 'height']) p.dims?.[k]?.classList.toggle('off-dim', bad.includes(k));
       p.td.querySelector('.offtag')?.remove();
       // DISABLED table minimum (see pricing.js header): restore with the pricing.js blocks.
       // p.td.querySelector('.mintag')?.remove();
@@ -534,7 +537,7 @@ function sheet(q, rerender) {
           tr.classList.add('flash');
           setTimeout(() => tr.classList.remove('flash'), 1800);
         },
-      }, [el('strong', {}, [what]), ' — ', offChartReason(t, p.it.width, p.it.widthFrac, p.it.height, p.it.heightFrac)]);
+      }, [el('strong', {}, [what]), ' — ', offChartReason(t, p.it.width, p.it.widthFrac, p.it.height, p.it.heightFrac).text]);
     }));
     totalsRefs.offRow.title = 'These lines are off their price chart. The charges typed on them ARE in the total above, but the shade itself is not priced — so the total is an UNDERCOUNT, not a quote. Extend the chart in Price Tables, or change the size.';
     totalsRefs.minRow.style.display = minApplied ? '' : 'none';
@@ -591,6 +594,8 @@ function sheet(q, rerender) {
     const cells = cols.map((col) => cell(col, item, onChange));
     const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
     if (insInput) insCells.push({ get item() { return live(); }, input: insInput });
+    const dimCell = (key) => cells[cols.findIndex((c) => c.key === key)];
+    priceCells[priceCells.length - 1].dims = { width: dimCell('width'), height: dimCell('height') };
     cells.push(priceTd);
     cells.push(clientTd);
     if (draftRow) {

@@ -672,3 +672,5 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 .off-line:hover { background: #f2d6cd; }
 table.sheet tr.flash td { animation: row-flash 1.8s ease-out; }
 @keyframes row-flash { 0%, 40% { background: #fbe3a8; } 100% { background: transparent; } }
+table.sheet td.off-dim { background: #f7e5e0; }
+table.sheet td.off-dim input, table.sheet td.off-dim select { background: transparent; color: var(--danger); font-weight: 600; }

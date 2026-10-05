@@ -86,12 +86,15 @@ export function lookupListPrice(table, width, widthFrac, height, heightFrac) {
 // Why a sized grid line has no list price — the person fixing it needs the cause and
 // the chart limit, not just a count. Only meaningful when lookupListPrice returned null.
 export function offChartReason(table, width, widthFrac, height, heightFrac) {
-  if (!table?.widths) return 'No price chart for this table';
+  if (!table?.widths) return { text: 'No price chart for this table', fields: [] };
   const w = effectiveDim(width, widthFrac), h = effectiveDim(height, heightFrac);
   const maxW = Math.max(...table.widths.map(Number)), maxH = Math.max(...table.rows.map((r) => Number(r.length)));
-  if (firstAtLeast(table.widths, w) === -1) return `width ${w}" is over the chart's max of ${maxW}"`;
-  if (firstAtLeast(table.rows.map((r) => r.length), h) === -1) return `height ${h}" is over the chart's max of ${maxH}"`;
-  return `the chart has no price filled in for ${w}" × ${h}"`;
+  const badW = firstAtLeast(table.widths, w) === -1, badH = firstAtLeast(table.rows.map((r) => r.length), h) === -1;
+  const fields = [badW && 'width', badH && 'height'].filter(Boolean);
+  if (badW && badH) return { text: `width ${w}" and height ${h}" are over the chart's max (${maxW}" × ${maxH}")`, fields };
+  if (badW) return { text: `width ${w}" is over the chart's max of ${maxW}"`, fields };
+  if (badH) return { text: `height ${h}" is over the chart's max of ${maxH}"`, fields };
+  return { text: `the chart has no price filled in for ${w}" × ${h}"`, fields: ['width', 'height'] };
 }
 
 // Drapery pricing (ported from "Calculo de tela y precios.xlsx") — every number here
