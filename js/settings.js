@@ -157,21 +157,16 @@ function manufacturersPanel(s) {
     ]),
     el('div', { class: 'hint', style: 'margin-bottom:8px' }, ['Makes these:']),
     el('div', { class: 'maker-bar', style: 'margin:0' }, s.categories.map((c) => {
-      const owner = s.manufacturers.find((x) => x.categories.includes(c));
-      const mine = owner === m;
+      const mine = m.categories.includes(c);
       return el('button', {
-        class: 'chip-btn' + (mine ? ' active' : ''), title: owner && !mine ? `Currently ${owner.name || 'another manufacturer'} — click to move here` : '',
-        onclick: () => {
-          s.manufacturers.forEach((x) => { x.categories = x.categories.filter((k) => k !== c); });
-          if (!mine) m.categories.push(c);
-          rerender();
-        },
-      }, [c, owner && !mine ? el('span', { class: 'n' }, [owner.name || '…']) : null]);
+        class: 'chip-btn' + (mine ? ' active' : ''),
+        onclick: () => { m.categories = mine ? m.categories.filter((k) => k !== c) : [...m.categories, c]; rerender(); },
+      }, [c]);
     })),
   ]);
   return el('div', { class: 'panel' }, [
     el('h2', {}, ['Manufacturers']),
-    el('p', { class: 'muted', style: 'margin-top:0' }, ['Who makes what. Each category has a default manufacturer (e.g. Roller and Drapery can share one). On a quote, the Maker column overrides it for a single line. The Work Order then splits into one order per manufacturer.']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Who makes what. Tick every category a manufacturer makes — any mix (Zebra + Roller, Roller + Drapery, all three…). If two manufacturers both tick a category, its lines print on both orders. On a quote, the Maker column sends a single line to one manufacturer only.']),
     s.manufacturers.length ? el('div', { class: 'field-subcard-grid' }, s.manufacturers.map(card)) : null,
     el('button', { class: 'btn', style: 'margin-top:12px', onclick: () => { s.manufacturers.push({ id: `mf_${Date.now().toString(36)}`, name: '', categories: [] }); rerender(); } }, ['＋ Add manufacturer']),
   ]);

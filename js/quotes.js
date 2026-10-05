@@ -732,8 +732,11 @@ function invoice(q) {
   if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
 
   const makers = s.manufacturers || [];
-  const makerOf = (l) => (l.manufacturer && makers.find((m) => m.name === l.manufacturer)) || makers.find((m) => m.categories.includes(s.tables[l.table]?.category));
-  const itemsFor = (id) => q.items.filter((l) => (id === '_none' ? !makerOf(l) : makerOf(l)?.id === id));
+  const makersOf = (l) => {
+    const forced = l.manufacturer && makers.find((m) => m.name === l.manufacturer);
+    return forced ? [forced] : makers.filter((m) => m.categories.includes(s.tables[l.table]?.category));
+  };
+  const itemsFor = (id) => q.items.filter((l) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id)));
   const unassigned = itemsFor('_none').length;
   if (isWork && makers.length && woMaker !== 'all' && woMaker !== 'each' && woMaker !== '_none' && !makers.some((m) => m.id === woMaker)) woMaker = 'all';
   const makerBar = isWork && makers.length ? el('div', { class: 'maker-bar no-print' }, [
