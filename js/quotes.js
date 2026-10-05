@@ -773,20 +773,21 @@ function invoice(q) {
   if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
 
   const catOf = (l) => s.tables[l.table]?.category;
-  const cats = s.categories.filter((c) => q.items.some((l) => catOf(l) === c));
+  const cats = s.categories.filter((c) => q.items.some((l) => catOf(l) === c)); // types this quote actually has
   const itemsFor = (c) => q.items.filter((l) => catOf(l) === c);
   const picked = woSel ? cats.filter((c) => woSel.has(c)) : cats;
   const makerBar = isWork && cats.length > 1 ? el('div', { class: 'maker-bar no-print' }, [
     el('span', { class: 'hint' }, ['Work order for']),
-    ...cats.map((c) => el('button', {
-      class: 'chip-btn' + (picked.includes(c) ? ' active' : ''),
+    ...s.categories.map((c) => el('button', {
+      class: 'chip-btn' + (picked.includes(c) ? ' active' : '') + (cats.includes(c) ? '' : ' empty'),
+      disabled: !cats.includes(c),
       onclick: () => {
         const next = picked.includes(c) ? picked.filter((x) => x !== c) : [...picked, c];
         if (next.length) woSel = new Set(next); // always keep at least one ticked
         renderQuotes();
       },
     }, [c, el('span', { class: 'n' }, [String(itemsFor(c).length)])])),
-    picked.length > 1 ? el('label', { class: 'field check', style: 'margin-left:8px' }, [
+    picked.length > 1 ? el('label', { style: 'display:inline-flex;align-items:center;gap:8px;margin-left:10px;font-size:13px;font-weight:600;cursor:pointer' }, [
       (() => { const b = el('input', { type: 'checkbox', onchange: (e) => { woSeparate = e.target.checked; renderQuotes(); } }); b.checked = woSeparate; return b; })(),
       'Separate order for each',
     ]) : null,

@@ -553,7 +553,7 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 .chip-btn .n { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--line); color: var(--muted); }
 .chip-btn.active { background: #111418; border-color: #111418; color: #fff; }
 .chip-btn.active .n { background: rgba(255,255,255,.2); color: #fff; }
-.chip-btn.empty:not(.active) { opacity: .5; }
+.chip-btn.empty:not(.active) { opacity: .5; cursor: default; }
 .chip-btn.warn:not(.active) { border-color: var(--danger); color: var(--danger); }
 .invoice-panel .invoice + .invoice { border-top: 2px dashed var(--line); }
 
