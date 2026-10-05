@@ -10,6 +10,8 @@ let active = null;
 
 // Which price table is open — read by presence.js.
 export const activeTable = () => active;
+export const tablesRoute = () => (active ? [active] : []);
+export function applyTablesRoute([name] = []) { active = name || null; }
 
 // Deterministic color per category so new ones (Drapery, Outdoor, ...) just work
 // without editing CSS — index into a small fixed palette, not name-keyed classes.

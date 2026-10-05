@@ -14,10 +14,19 @@ export const currentQuoteRef = () => sub;
 // still has to switch to that tab, since this module doesn't own the router.
 export function openQuote(id, view = 'edit') { sub = { view, quoteId: id }; }
 
+// URL <-> screen. A reload lands before the cloud pull, so a quote that isn't in
+// the store yet keeps its place in `sub`; dropMissingQuote() runs once data settled.
+export const quoteRoute = () => (sub.quoteId ? [sub.view, sub.quoteId] : []);
+export function applyQuoteRoute([view, id] = []) {
+  sub = (view === 'edit' || view === 'invoice') && id ? { view, quoteId: id } : { view: 'list', quoteId: null };
+}
+export function dropMissingQuote() {
+  if (sub.quoteId && !getQuote(sub.quoteId)) sub = { view: 'list', quoteId: null };
+}
+
 export function renderQuotes() {
   if (sub.view === 'edit' && getQuote(sub.quoteId)) return mount(editor(getQuote(sub.quoteId)));
   if (sub.view === 'invoice' && getQuote(sub.quoteId)) return mount(invoice(getQuote(sub.quoteId)));
-  sub = { view: 'list', quoteId: null };
   return mount(list());
 }
 
@@ -79,7 +88,7 @@ function editor(q) {
   const set = (fn) => { fn(); save(); };
 
   const toolbar = el('div', { class: 'section-head' }, [
-    el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list' }; renderQuotes(); } }, ['← All quotes']),
+    el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list', quoteId: null }; renderQuotes(); } }, ['← All quotes']),
     el('div', { class: 'row' }, [
       // One click, and this quote stops counting as business: it leaves every
       // dashboard number and never takes an invoice number.
@@ -90,7 +99,7 @@ function editor(q) {
       })(),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); const d = duplicateQuote(q.id); open(d.id); toast(`Duplicated as quote #${d.number}`); } }, ['Duplicate']),
-      el('button', { class: 'btn', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list' }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
+      el('button', { class: 'btn', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list', quoteId: null }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
     ]),
   ]);
 

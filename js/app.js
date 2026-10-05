@@ -1,22 +1,47 @@
 // Bootstrap + tab router + login gate.
-import { el } from './dom.js';
+import { el, onAfterMount } from './dom.js';
 import { initCloud, startLiveSync, onStateChange } from './store.js';
 import { authRequired, ensureSession, login, logout, userEmail } from './auth.js';
 import { renderDashboard } from './dashboard.js';
-import { renderQuotes } from './quotes.js';
-import { renderTables } from './tables.js';
+import { renderQuotes, quoteRoute, applyQuoteRoute, dropMissingQuote } from './quotes.js';
+import { renderTables, tablesRoute, applyTablesRoute } from './tables.js';
 import { renderLists } from './lists.js';
 import { renderSettings } from './settings.js';
 import { initPresence } from './presence.js';
 
 const VIEWS = { dashboard: renderDashboard, quotes: renderQuotes, tables: renderTables, lists: renderLists, settings: renderSettings };
 
+// The URL hash is the source of truth for where you are: #view/part/part. Views that
+// have a place inside them (an open quote, a price table) expose it as route parts,
+// so a reload or a shared link lands on the same screen.
+const ROUTES = {
+  quotes: { get: quoteRoute, set: applyQuoteRoute },
+  tables: { get: tablesRoute, set: applyTablesRoute },
+};
+
 let current = 'dashboard';
 
-function go(view) {
-  if (!VIEWS[view]) view = 'dashboard';
+const splitHash = () => {
+  const [view, ...parts] = location.hash.slice(1).split('/').map(decodeURIComponent);
+  return [view, parts];
+};
+const buildHash = (view) => [view, ...(ROUTES[view]?.get() || [])].map(encodeURIComponent).join('/');
+
+// pushState (unlike assigning location.hash) doesn't fire hashchange, and each
+// in-app navigation still gets its own history entry, so Back works.
+function syncHash() {
+  const next = buildHash(current);
+  if (location.hash.slice(1) !== next) history.pushState(null, '', '#' + next);
+}
+
+// `parts` is null for a tab click: the tab keeps whatever it was showing.
+// Every render, including in-view navigation like opening a quote, re-syncs the URL.
+onAfterMount(syncHash);
+
+function go(view, parts = null) {
+  if (!VIEWS[view]) { view = 'dashboard'; parts = []; }
   current = view;
-  location.hash = view;
+  if (parts) ROUTES[view]?.set(parts);
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
   VIEWS[view]();
 }
@@ -69,11 +94,11 @@ function addLogout() {
 function startApp() {
   addLogout();
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
-  window.addEventListener('hashchange', () => go(location.hash.slice(1)));
+  window.addEventListener('hashchange', () => { go(...splitHash()); dropMissingQuote(); VIEWS[current](); });
   onStateChange((reason) => { if (reason === 'remote') redraw(); });
-  go(location.hash.slice(1) || 'dashboard');
+  go(...splitHash());
   initPresence();
-  initCloud().then(() => { startLiveSync(); redraw(); });
+  initCloud().then(() => { startLiveSync(); dropMissingQuote(); redraw(); });
 }
 
 async function boot() {

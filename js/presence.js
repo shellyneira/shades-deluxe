@@ -59,7 +59,7 @@ function describe(view) {
 // Runs after every render, so navigating anywhere republishes where we are without
 // each view having to remember to announce itself.
 function updateContext() {
-  const view = location.hash.slice(1) || 'dashboard';
+  const view = location.hash.slice(1).split('/')[0] || 'dashboard';
   const next = { view, ...describe(view), field, fieldLabel, name: displayName() };
   if (JSON.stringify(next) === JSON.stringify(ctx)) return;
   ctx = next;
