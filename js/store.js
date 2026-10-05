@@ -622,6 +622,24 @@ export function newQuote() {
   return q;
 }
 
+export function duplicateQuote(id) {
+  const src = getQuote(id);
+  const q = {
+    ...structuredClone(src),
+    id: 'q_' + Date.now().toString(36),
+    number: state.nextQuoteNumber++,
+    date: new Date().toISOString().slice(0, 10),
+    installDate: '',
+    deliveryDate: '',
+    stage: 'Quote',
+    invoiceNumber: null,
+  };
+  q.items.forEach((it) => { if (it.id) it.id = 'i_' + Math.random().toString(36).slice(2, 10); });
+  state.quotes.unshift(q);
+  save();
+  return q;
+}
+
 export function getQuote(id) {
   return state.quotes.find((q) => q.id === id);
 }

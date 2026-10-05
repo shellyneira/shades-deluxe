@@ -563,8 +563,8 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 @media print {
   .invoice + .invoice { break-before: page; border: 0; }
   .invoice table.items tr.print-gap { display: table-row; }
-  .invoice table.items tr.print-gap td { height: 11mm; padding: 0; border: 0; }
-  .invoice table.items tfoot tr.print-gap td { height: 12mm; }
+  .invoice table.items tr.print-gap td { height: 8mm; padding: 0; border: 0; }
+  .invoice table.items tfoot tr.print-gap td { height: 8mm; }
   .no-print { display: none !important; }
   body, main { background: #fff; margin: 0; max-width: none; padding: 0; }
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
@@ -577,6 +577,7 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
   .invoice table.items td { padding: 8px 11px; }
   .invoice .sum { margin-top: 14px; }
   .invoice .terms { margin-top: 20px; break-inside: avoid; }
+  .invoice .sum { break-inside: avoid; break-after: avoid; }
   .invoice table.items tr { break-inside: avoid; }
   @page inv { margin: 0; }
   @page { margin: 12mm; }

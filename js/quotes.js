@@ -1,6 +1,6 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, select, input, checkbox, mount, toast, confirmAction, FRACTION_LABEL } from './dom.js';
-import { getState, save, newQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
+import { getState, save, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
 import { computeLine, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
@@ -89,6 +89,7 @@ function editor(q) {
         return box;
       })(),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
+      el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); const d = duplicateQuote(q.id); open(d.id); toast(`Duplicated as quote #${d.number}`); } }, ['Duplicate']),
       el('button', { class: 'btn', style: 'color:var(--danger)', onclick: () => { if (confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list' }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
     ]),
   ]);
@@ -651,7 +652,7 @@ function sheet(q, rerender) {
 }
 
 /* ---------------- printable documents (Client quote + Work order) ---------------- */
-let woMaker = 'all'; // work-order scope: 'all' | 'each' | manufacturer id | '_none'
+let woMaker = 'all'; // work-order scope: 'all' (one order per manufacturer, stacked) | manufacturer id | '_none'
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
 const sizeText = (l) => {
@@ -738,14 +739,13 @@ function invoice(q) {
   };
   const itemsFor = (id) => q.items.filter((l) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id)));
   const unassigned = itemsFor('_none').length;
-  if (isWork && makers.length && woMaker !== 'all' && woMaker !== 'each' && woMaker !== '_none' && !makers.some((m) => m.id === woMaker)) woMaker = 'all';
+  if (isWork && makers.length && woMaker !== 'all' && woMaker !== '_none' && !makers.some((m) => m.id === woMaker)) woMaker = 'all';
   const makerBar = isWork && makers.length ? el('div', { class: 'maker-bar no-print' }, [
     el('span', { class: 'hint' }, ['Work order for']),
     ...[
-      ['all', 'Everything', q.items.length],
+      ['all', 'All orders', q.items.length],
       ...makers.map((m) => [m.id, m.name || 'Unnamed', itemsFor(m.id).length]),
       ...(unassigned ? [['_none', 'No manufacturer', unassigned]] : []),
-      ['each', 'Print all, one per manufacturer', null],
     ].map(([id, label, n]) => el('button', {
       class: 'chip-btn' + (woMaker === id ? ' active' : '') + (id === '_none' ? ' warn' : '') + (n === 0 ? ' empty' : ''),
       onclick: () => { woMaker = id; renderQuotes(); },
@@ -833,9 +833,11 @@ function invoice(q) {
   };
 
   let docs;
-  if (!isWork || !makers.length || woMaker === 'all') docs = [build(q.items, null)];
-  else if (woMaker === 'each') docs = makers.map((m) => [m, itemsFor(m.id)]).filter(([, it]) => it.length).map(([m, it]) => build(it, m));
-  else docs = [build(itemsFor(woMaker), makers.find((m) => m.id === woMaker) || { name: 'No manufacturer assigned' })];
+  if (!isWork || !makers.length) docs = [build(q.items, null)];
+  else if (woMaker === 'all') {
+    docs = makers.map((m) => [m, itemsFor(m.id)]).filter(([, it]) => it.length).map(([m, it]) => build(it, m));
+    if (unassigned) docs.push(build(itemsFor('_none'), { name: 'No manufacturer assigned' }));
+  } else docs = [build(itemsFor(woMaker), makers.find((m) => m.id === woMaker) || { name: 'No manufacturer assigned' })];
   if (!docs.length) docs = [el('div', { class: 'empty' }, ['No items are assigned to a manufacturer yet. Assign categories in Settings → Manufacturers.'])];
 
   return el('div', {}, [toolbar, makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
