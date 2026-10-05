@@ -929,12 +929,6 @@ export const SEED = {
       ]
     }
   },
-  "minPrice": {
-    "Roller #3": 300,
-    "Roller #5": 400,
-    "Zebra #3": 550,
-    "Zebra #5": 600
-  },
   "options": {
     "locations": [
       "Entrance",

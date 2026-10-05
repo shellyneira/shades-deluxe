@@ -331,7 +331,6 @@ table.sheet .ck input { width: 18px; height: 18px; accent-color: var(--brand); }
 table.sheet td.r, table.sheet td.price { text-align: right; font-variant-numeric: tabular-nums; padding-right: 10px; white-space: nowrap; }
 table.sheet td.price strong { color: var(--ink); }
 table.sheet td.price strong.off { color: var(--warn); font-weight: 600; font-size: 11.5px; }
-table.sheet td.price .mintag { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--warn); background: #fbf0dc; border-radius: 4px; padding: 1px 4px; vertical-align: middle; cursor: help; }
 /* The price beside this tag IS charged — it is just missing the shade itself. */
 table.sheet td.price .offtag { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--danger); background: #f7e5e0; border-radius: 4px; padding: 1px 4px; vertical-align: middle; cursor: help; }
 table.sheet tr.draftrow td { background: var(--bg); border-top: 2px solid var(--line-strong); }
@@ -548,13 +547,30 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 .hint { color: var(--muted); font-size: 13px; }
 .divider { height: 1px; background: var(--line); margin: 20px 0; border: 0; }
 
+.invoice table.items tr.print-gap { display: none; }
+.maker-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
+.chip-btn { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font: inherit; font-size: 13px; font-weight: 600; color: var(--ink, inherit); cursor: pointer; }
+.chip-btn .n { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--line); color: var(--muted); }
+.chip-btn.active { background: #111418; border-color: #111418; color: #fff; }
+.chip-btn.active .n { background: rgba(255,255,255,.2); color: #fff; }
+.chip-btn.empty:not(.active) { opacity: .5; }
+.chip-btn.warn:not(.active) { border-color: var(--danger); color: var(--danger); }
+.invoice .maker-banner { margin: 4px 0 20px; padding: 10px 16px; background: #111418; color: #fff; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: baseline; }
+.invoice .maker-banner span { font-size: 10.5px; letter-spacing: 1.5px; font-weight: 700; opacity: .7; }
+.invoice .maker-banner strong { font-size: 20px; letter-spacing: .3px; }
+.invoice-panel .invoice + .invoice { border-top: 2px dashed var(--line); }
+
 @media print {
+  .invoice + .invoice { break-before: page; border: 0; }
+  .invoice table.items tr.print-gap { display: table-row; }
+  .invoice table.items tr.print-gap td { height: 11mm; padding: 0; border: 0; }
+  .invoice table.items tfoot tr.print-gap td { height: 12mm; }
   .no-print { display: none !important; }
   body, main { background: #fff; margin: 0; max-width: none; padding: 0; }
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
   /* margin:0 page leaves the browser no room to inject its URL/date/page footer */
   html, body, main { height: auto !important; min-height: 0 !important; }
-  .invoice { padding: 9mm 10mm; max-width: none; page: inv; }
+  .invoice { padding: 9mm 10mm 0; max-width: none; page: inv; }
   /* compact so a short quote always fits ONE page (Edge is stricter than Chrome) */
   .invoice .head { margin-bottom: 18px; padding-bottom: 14px; }
   .invoice .parties { margin-bottom: 16px; }

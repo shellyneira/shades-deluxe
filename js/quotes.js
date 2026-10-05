@@ -460,9 +460,7 @@ function sheet(q, rerender) {
       const hasDims = p.item.width && p.item.height;
       p.node.textContent = c.unit != null ? money(c.unit) : '—';
       p.node.classList.toggle('off', !!c.listMissing);
-      p.td.querySelector('.mintag')?.remove();
       p.td.querySelector('.offtag')?.remove();
-      if (c.floored) p.td.append(el('span', { class: 'mintag', title: `Table minimum ${money(c.floor)} for ${p.item.table} — raise the size or lower the minimum in Price Tables` }, ['min']));
       // The amount shown IS charged now, so the tag has to say what it is missing
       // rather than the price cell reading as a complete one.
       if (c.listMissing) p.td.append(el('span', { class: 'offtag', title: `This size is off the ${p.item.table} chart, so the shade itself is not priced — only the charges typed on this line are. Extend the chart in Price Tables.` }, ['no list']));
@@ -470,7 +468,7 @@ function sheet(q, rerender) {
       // app. Say what is missing instead of saying nothing.
       p.node.title = c.list == null
         ? (hasDims ? `Off the ${p.item.table} chart — this is the typed charges only, NOT a full price` : 'Enter width and height — charges are added on top of the list price, so there is nothing to price yet')
-        : (c.floored ? `List ${money(c.list)} · minimum ${money(c.floor)} applied` : `List ${money(c.list)}`);
+        : `List ${money(c.list)}`;
       p.client.textContent = c.unit == null ? '—' : money0((c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0));
     }
     // Subtotal reflects committed lines PLUS the row currently being filled, so the
@@ -648,6 +646,7 @@ function sheet(q, rerender) {
 }
 
 /* ---------------- printable documents (Client quote + Work order) ---------------- */
+let woMaker = 'all'; // work-order scope: 'all' | 'each' | manufacturer id | '_none'
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
 const sizeText = (l) => {
@@ -727,8 +726,27 @@ function invoice(q) {
 
   if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
 
+  const makers = s.manufacturers || [];
+  const makerOf = (l) => makers.find((m) => m.categories.includes(s.tables[l.table]?.category));
+  const itemsFor = (id) => q.items.filter((l) => (id === '_none' ? !makerOf(l) : makerOf(l)?.id === id));
+  const unassigned = itemsFor('_none').length;
+  if (isWork && makers.length && woMaker !== 'all' && woMaker !== 'each' && woMaker !== '_none' && !makers.some((m) => m.id === woMaker)) woMaker = 'all';
+  const makerBar = isWork && makers.length ? el('div', { class: 'maker-bar no-print' }, [
+    el('span', { class: 'hint' }, ['Work order for']),
+    ...[
+      ['all', 'Everything', q.items.length],
+      ...makers.map((m) => [m.id, m.name || 'Unnamed', itemsFor(m.id).length]),
+      ...(unassigned ? [['_none', 'No manufacturer', unassigned]] : []),
+      ['each', 'Print all, one per manufacturer', null],
+    ].map(([id, label, n]) => el('button', {
+      class: 'chip-btn' + (woMaker === id ? ' active' : '') + (id === '_none' ? ' warn' : '') + (n === 0 ? ' empty' : ''),
+      onclick: () => { woMaker = id; renderQuotes(); },
+    }, [label, n == null ? null : el('span', { class: 'n' }, [String(n)])])),
+  ]) : null;
+
   const meta = (label, val) => el('div', { class: 'mrow' }, [el('span', { class: 'ml' }, [label]), el('span', { class: 'mv' }, [val])]);
 
+  const build = (items, maker) => {
   const head = el('div', { class: 'head' }, [
     el('div', { class: 'co' }, [
       el('img', { class: 'logo', src: 'assets/logo.png', alt: co.name }),
@@ -754,6 +772,8 @@ function invoice(q) {
     ? el('div', { class: 'delivery-banner' }, [el('span', {}, ['DELIVERY DATE: ']), el('strong', {}, [q.deliveryDate])])
     : null;
 
+  const makerBanner = maker ? el('div', { class: 'maker-banner' }, [el('span', {}, ['MANUFACTURER']), el('strong', {}, [maker.name || 'Unnamed'])]) : null;
+
   const bill = el('div', { class: 'parties' }, [
     el('div', { class: 'bill' }, [
       el('h4', {}, [isWork ? 'Client' : 'Bill To']),
@@ -766,10 +786,10 @@ function invoice(q) {
     ]) : null,
   ]);
 
-  const table = el('div', { class: 'inv-scroll' }, [isWork ? workTable(q, s) : clientTable(q, s)]);
+  const table = el('div', { class: 'inv-scroll' }, [isWork ? workTable(q, s, items) : clientTable(q, s)]);
 
-  const doc = el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
-    head, deliveryBanner, bill, table,
+  return el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
+    head, makerBanner, deliveryBanner, bill, table,
     isWork ? null : (() => {
       // Whole-dollar, adds up: products (install broken out if enabled) + install + tax.
       const showInstall = s.showInstall !== false;
@@ -802,8 +822,15 @@ function invoice(q) {
     })(),
     isWork ? null : el('div', { class: 'terms' }, [co.terms]),
   ]);
+  };
 
-  return el('div', {}, [toolbar, el('div', { class: 'panel invoice-panel' }, [doc])]);
+  let docs;
+  if (!isWork || !makers.length || woMaker === 'all') docs = [build(q.items, null)];
+  else if (woMaker === 'each') docs = makers.map((m) => [m, itemsFor(m.id)]).filter(([, it]) => it.length).map(([m, it]) => build(it, m));
+  else docs = [build(itemsFor(woMaker), makers.find((m) => m.id === woMaker) || { name: 'No manufacturer assigned' })];
+  if (!docs.length) docs = [el('div', { class: 'empty' }, ['No items are assigned to a manufacturer yet. Assign categories in Settings → Manufacturers.'])];
+
+  return el('div', {}, [toolbar, makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
 }
 
 // DYMO 30252 stickers (1⅛" × 3½"), one per shade, for the LabelWriter 550.
@@ -885,19 +912,20 @@ function clientTable(q, s) {
   });
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
   return el('table', { class: 'items' }, [
-    el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
+    el('thead', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })]), el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
     el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
+    el('tfoot', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })])]),
   ]);
 }
 
 // Work order: same Description style (fields chosen in Settings) PLUS dimensions,
 // NO prices. Few columns so it always fits a page / PDF.
-function workTable(q, s) {
+function workTable(q, s, items = q.items) {
   const cfg = s.docConfig.work;
   // Qty was missing entirely: a line reading "Living room x 6" printed as one row
   // with no quantity, and the shop built one shade.
   const cols = ['#', 'Qty', 'Location', 'Size (W×H)', 'Description', 'Notes'];
-  const rows = q.items.map((l, i) => el('tr', {}, [
+  const rows = items.map((l, i) => el('tr', {}, [
     el('td', { class: 'num' }, [String(i + 1)]),
     el('td', { class: 'num strong' }, [String(Number(l.qty) || 1)]),
     el('td', { class: 'strong' }, [l.location]),
@@ -906,7 +934,8 @@ function workTable(q, s) {
     el('td', { class: 'desc' }, [l.notes || '']),
   ]));
   return el('table', { class: 'items' }, [
-    el('thead', {}, [el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),
+    el('thead', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })]), el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),
     el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
+    el('tfoot', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })])]),
   ]);
 }
