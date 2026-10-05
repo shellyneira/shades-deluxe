@@ -38,6 +38,14 @@ function syncUrl() {
   if (location.pathname === next || decodeURI(location.pathname) === decodeURI(next)) return;
   history[canonicalizing ? 'replaceState' : 'pushState'](null, '', next);
 }
+// Bookmarks from the #view/... era: rewrite to the path form before routing.
+function migrateLegacyHash() {
+  if (location.hash.length < 2) return;
+  const [view, ...rest] = location.hash.slice(1).split('/').map((x) => { try { return decodeURIComponent(x); } catch { return x; } });
+  const parts = view === 'quotes' && (rest[0] === 'edit' || rest[0] === 'invoice')
+    ? [rest[1], ...(rest[0] === 'invoice' ? ['invoice'] : [])].filter(Boolean) : rest;
+  history.replaceState(null, '', pathFor(view && view !== 'dashboard' ? [view, ...parts] : []));
+}
 function fromUrl(fn) {
   canonicalizing = true;
   try { fn(); } finally { canonicalizing = false; }
@@ -108,6 +116,7 @@ function startApp() {
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
   window.addEventListener('popstate', () => fromUrl(() => { go(...splitUrl()); dropMissingQuote(); dropMissingTable(); VIEWS[current](); }));
   onStateChange((reason) => { if (reason === 'remote') redraw(); });
+  migrateLegacyHash();
   fromUrl(() => go(...splitUrl()));
   initPresence();
   initCloud().then(() => { startLiveSync(); redraw(); });
