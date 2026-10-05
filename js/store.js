@@ -151,11 +151,7 @@ function normalize(state) {
   // two existing values once so nothing on file changes meaning, then it's editable.
   if (!state.options.mount || !state.options.mount.length) state.options.mount = ['Ceiling', 'Wall'];
   for (const key of FLAT_PRICED_LISTS) state.options[key] = toPriced(state.options[key]);
-  state.manufacturers = (Array.isArray(state.manufacturers) ? state.manufacturers : []).map((m, i) => ({
-    id: m.id || `mf_${i}_${Math.random().toString(36).slice(2, 8)}`,
-    name: m.name || '',
-    categories: Array.isArray(m.categories) ? m.categories : [],
-  }));
+  delete state.manufacturers;
   state.minimumOrder = Number(state.minimumOrder) || 0;
   state.defaultInstallation = Number(state.defaultInstallation) || 0;
   state.taxRate = state.taxRate == null ? 7 : Number(state.taxRate) || 0;

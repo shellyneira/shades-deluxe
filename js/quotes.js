@@ -662,8 +662,8 @@ function sheet(q, rerender) {
 }
 
 /* ---------------- printable documents (Client quote + Work order) ---------------- */
-let woCombine = false; // several manufacturers selected: one merged order instead of one each
-let woSel = new Set(); // work-order manufacturers combined into one order (ids, or '_none'); empty = everything
+let woCombine = false; // several product types selected: one merged order instead of one each
+let woSel = new Set(); // product types shown on the work order; empty = everything on one order
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
 const sizeText = (l) => {
@@ -743,31 +743,25 @@ function invoice(q) {
 
   if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
 
-  const makers = s.manufacturers || [];
-  const makersOf = (l) => makers.filter((m) => m.categories.includes(s.tables[l.table]?.category));
-  const itemsFor = (id) => q.items.filter((l) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id)));
-  const unassigned = itemsFor('_none').length;
-  for (const id of [...woSel]) if (id !== '_none' && !makers.some((m) => m.id === id)) woSel.delete(id);
-  const makerBar = isWork && makers.length ? el('div', { class: 'maker-bar no-print' }, [
+  const catOf = (l) => s.tables[l.table]?.category;
+  const cats = s.categories.filter((c) => q.items.some((l) => catOf(l) === c));
+  const itemsFor = (c) => q.items.filter((l) => catOf(l) === c);
+  for (const c of [...woSel]) if (!cats.includes(c)) woSel.delete(c);
+  const makerBar = isWork && cats.length > 1 ? el('div', { class: 'maker-bar no-print' }, [
     el('span', { class: 'hint' }, ['Work order for']),
-    ...[
-      ['all', 'All orders', q.items.length],
-      ...makers.map((m) => [m.id, m.name || 'Unnamed', itemsFor(m.id).length]),
-      ...(unassigned ? [['_none', 'No manufacturer', unassigned]] : []),
-    ].map(([id, label, n]) => el('button', {
-      class: 'chip-btn' + ((id === 'all' ? !woSel.size : woSel.has(id)) ? ' active' : '') + (id === '_none' ? ' warn' : '') + (n === 0 ? ' empty' : ''),
+    ...[['all', 'All', q.items.length], ...cats.map((c) => [c, c, itemsFor(c).length])].map(([id, label, n]) => el('button', {
+      class: 'chip-btn' + ((id === 'all' ? !woSel.size : woSel.has(id)) ? ' active' : ''),
       onclick: () => {
         if (id === 'all') { woSel.clear(); woCombine = false; }
         else if (woSel.has(id)) woSel.delete(id);
         else woSel.add(id);
-        // Ticking every manufacturer is the same thing as All.
-        if (woSel.size === makers.length + (unassigned ? 1 : 0)) woSel.clear();
+        if (woSel.size === cats.length) woSel.clear(); // every product ticked is the same as All
         renderQuotes();
       },
-    }, [label, n == null ? null : el('span', { class: 'n' }, [String(n)])])),
+    }, [label, el('span', { class: 'n' }, [String(n)])])),
     woSel.size > 1 ? el('label', { class: 'field check', style: 'margin-left:8px' }, [
       (() => { const b = el('input', { type: 'checkbox', onchange: (e) => { woCombine = e.target.checked; renderQuotes(); } }); b.checked = woCombine; return b; })(),
-      'Combine into one order',
+      'All on one order',
     ]) : null,
   ]) : null;
 
@@ -787,7 +781,7 @@ function invoice(q) {
       el('div', { class: 't' }, [isWork ? 'WORK ORDER' : (isInvoiceStage(q.stage) ? 'INVOICE' : 'QUOTE')]),
       el('div', { class: 'doc-meta' }, [
         meta(isWork ? 'Order #' : (isInvoiceStage(q.stage) ? 'Invoice #' : 'Quote #'), String(isInvoiceStage(q.stage) && q.invoiceNumber ? q.invoiceNumber : q.number)),
-        maker ? meta('Manufacturer', maker.name || 'Unnamed') : null,
+        maker ? meta('For', maker.name) : null,
         meta('Date', q.date || '—'),
         q.installDate ? meta('Install', q.installDate) : null,
         q.deliveryDate ? meta('Delivery', q.deliveryDate) : null,
@@ -851,20 +845,13 @@ function invoice(q) {
   };
 
   let docs;
-  if (!isWork || !makers.length) docs = [build(q.items, null)];
-  else if (!woSel.size) docs = [build(q.items, null)];
-  else {
-    const has = (l, id) => (id === '_none' ? !makersOf(l).length : makersOf(l).some((m) => m.id === id));
-    const nameOf = (id) => (id === '_none' ? 'No manufacturer' : makers.find((m) => m.id === id)?.name || 'Unnamed');
-    const ids = [...woSel];
-    if (woCombine && ids.length > 1) {
-      const items = q.items.filter((l) => ids.some((id) => has(l, id)));
-      docs = items.length ? [build(items, { name: ids.map(nameOf).join(' + ') })] : [];
-    } else {
-      docs = ids.map((id) => [id, q.items.filter((l) => has(l, id))]).filter(([, it]) => it.length).map(([id, it]) => build(it, { name: nameOf(id) }));
-    }
-  }
-  if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection. Assign categories in Settings → Manufacturers.'])];
+  const ids = [...woSel];
+  if (!isWork || !ids.length) docs = [build(q.items, null)];
+  else if (woCombine && ids.length > 1) {
+    const items = q.items.filter((l) => ids.includes(catOf(l)));
+    docs = items.length ? [build(items, { name: ids.join(' + ') })] : [];
+  } else docs = ids.map((c) => [c, itemsFor(c)]).filter(([, it]) => it.length).map(([c, it]) => build(it, { name: c }));
+  if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection.'])];
 
   return el('div', {}, [toolbar, makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
 }

@@ -148,30 +148,6 @@ function ratesPanel(s) {
   ]);
 }
 
-function manufacturersPanel(s) {
-  const rerender = () => { save(); renderSettings(); };
-  const card = (m) => el('div', { class: 'field-subcard' }, [
-    el('div', { class: 'row', style: 'align-items:center;margin-bottom:10px' }, [
-      input('Manufacturer', m.name, (v) => { m.name = v; save(); }, { class: 'grow' }),
-      el('button', { class: 'btn ghost', title: 'Remove', onclick: () => { s.manufacturers = s.manufacturers.filter((x) => x !== m); rerender(); } }, ['✕']),
-    ]),
-    el('div', { class: 'hint', style: 'margin-bottom:8px' }, ['Makes these:']),
-    el('div', { class: 'maker-bar', style: 'margin:0' }, s.categories.map((c) => {
-      const mine = m.categories.includes(c);
-      return el('button', {
-        class: 'chip-btn' + (mine ? ' active' : ''),
-        onclick: () => { m.categories = mine ? m.categories.filter((k) => k !== c) : [...m.categories, c]; rerender(); },
-      }, [c]);
-    })),
-  ]);
-  return el('div', { class: 'panel' }, [
-    el('h2', {}, ['Manufacturers']),
-    el('p', { class: 'muted', style: 'margin-top:0' }, ['Who makes what. Tick every category a manufacturer makes — any mix (Zebra + Roller, Roller + Drapery, all three…). If two manufacturers both tick a category, its lines print on both orders.']),
-    s.manufacturers.length ? el('div', { class: 'field-subcard-grid' }, s.manufacturers.map(card)) : null,
-    el('button', { class: 'btn', style: 'margin-top:12px', onclick: () => { s.manufacturers.push({ id: `mf_${Date.now().toString(36)}`, name: '', categories: [] }); rerender(); } }, ['＋ Add manufacturer']),
-  ]);
-}
-
 export function renderSettings() {
   const s = getState();
   const co = s.company;
@@ -212,7 +188,6 @@ export function renderSettings() {
       el('label', { class: 'field', style: 'margin-top:14px' }, ['Payment & terms', terms]),
     ]),
     ratesPanel(s),
-    manufacturersPanel(s),
     abbreviationsPanel(s),
     fieldOrderPanel(s),
     documentsPanel(s),
