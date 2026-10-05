@@ -555,9 +555,6 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 .chip-btn.active .n { background: rgba(255,255,255,.2); color: #fff; }
 .chip-btn.empty:not(.active) { opacity: .5; }
 .chip-btn.warn:not(.active) { border-color: var(--danger); color: var(--danger); }
-.invoice .maker-banner { margin: 4px 0 20px; padding: 10px 16px; background: #111418; color: #fff; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: baseline; }
-.invoice .maker-banner span { font-size: 10.5px; letter-spacing: 1.5px; font-weight: 700; opacity: .7; }
-.invoice .maker-banner strong { font-size: 20px; letter-spacing: .3px; }
 .invoice-panel .invoice + .invoice { border-top: 2px dashed var(--line); }
 
 @media print {

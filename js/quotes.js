@@ -768,6 +768,7 @@ function invoice(q) {
       el('div', { class: 't' }, [isWork ? 'WORK ORDER' : (isInvoiceStage(q.stage) ? 'INVOICE' : 'QUOTE')]),
       el('div', { class: 'doc-meta' }, [
         meta(isWork ? 'Order #' : (isInvoiceStage(q.stage) ? 'Invoice #' : 'Quote #'), String(isInvoiceStage(q.stage) && q.invoiceNumber ? q.invoiceNumber : q.number)),
+        maker ? meta('Manufacturer', maker.name || 'Unnamed') : null,
         meta('Date', q.date || '—'),
         q.installDate ? meta('Install', q.installDate) : null,
         q.deliveryDate ? meta('Delivery', q.deliveryDate) : null,
@@ -779,8 +780,6 @@ function invoice(q) {
   const deliveryBanner = isWork && q.deliveryDate
     ? el('div', { class: 'delivery-banner' }, [el('span', {}, ['DELIVERY DATE: ']), el('strong', {}, [q.deliveryDate])])
     : null;
-
-  const makerBanner = maker ? el('div', { class: 'maker-banner' }, [el('span', {}, ['MANUFACTURER']), el('strong', {}, [maker.name || 'Unnamed'])]) : null;
 
   const bill = el('div', { class: 'parties' }, [
     el('div', { class: 'bill' }, [
@@ -797,7 +796,7 @@ function invoice(q) {
   const table = el('div', { class: 'inv-scroll' }, [isWork ? workTable(q, s, items) : clientTable(q, s)]);
 
   return el('div', { class: 'invoice' + (isWork ? ' work' : '') }, [
-    head, makerBanner, deliveryBanner, bill, table,
+    head, deliveryBanner, bill, table,
     isWork ? null : (() => {
       // Whole-dollar, adds up: products (install broken out if enabled) + install + tax.
       const showInstall = s.showInstall !== false;
