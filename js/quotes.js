@@ -51,8 +51,8 @@ function open(id, view = 'edit') {
 }
 
 /* ---------------- list ---------------- */
-// One lifecycle: Quote → Sent (still a quote) → Accepted/Deposit Paid/Paid (an invoice).
-const STAGE_CLASS = { Quote: 'quote', Accepted: 'accepted', '50% Invoice': 'half', '100% Invoice': 'paid' };
+// One lifecycle: Quote → 50% Invoice → 100% Invoice. Payment is tracked separately.
+const STAGE_CLASS = { Quote: 'quote', '50% Invoice': 'half', '100% Invoice': 'paid' };
 const stageClass = (st) => STAGE_CLASS[st] || 'quote';
 let filter = 'All';
 

@@ -26,7 +26,7 @@ const DEFAULT_COMPANY = {
 
 // Status = what the document is. Payment = how much of it has been collected; the
 // dashboard's Collected / Still owed read Payment, nothing else.
-export const STAGES = ['Quote', 'Accepted', '50% Invoice', '100% Invoice'];
+export const STAGES = ['Quote', '50% Invoice', '100% Invoice'];
 export const PAYMENTS = ['Not paid', '50% Paid', '100% Paid'];
 export const isInvoiceStage = (st) => STAGES.indexOf(st) >= 1;
 export const payPct = (q) => (isInvoiceStage(q.stage) ? (q.payment === '100% Paid' ? 1 : q.payment === '50% Paid' ? 0.5 : 0) : 0);
@@ -210,11 +210,11 @@ function normalize(state) {
     if (!q.stage) {
       q.stage = q.payment === 'Paid' ? '100% Paid'
         : q.payment === '50% paid' ? '50% Paid'
-        : q.status === 'won' ? 'Accepted' : 'Quote';
+        : q.status === 'won' ? '100% Invoice' : 'Quote';
     }
     // Earlier versions folded payment into the stage ('50% Paid', 'Deposit Paid'…). Status says
     // what the document is, Payment says how much has come in — split them apart.
-    const legacy = { Sent: ['Quote', 'Not paid'], 'Deposit Paid': ['50% Invoice', '50% Paid'], '50% Paid': ['50% Invoice', '50% Paid'], Paid: ['100% Invoice', '100% Paid'], '100% Paid': ['100% Invoice', '100% Paid'] }[q.stage];
+    const legacy = { Accepted: ['100% Invoice', 'Not paid'], Sent: ['Quote', 'Not paid'], 'Deposit Paid': ['50% Invoice', '50% Paid'], '50% Paid': ['50% Invoice', '50% Paid'], Paid: ['100% Invoice', '100% Paid'], '100% Paid': ['100% Invoice', '100% Paid'] }[q.stage];
     if (legacy) { q.stage = legacy[0]; q.payment = legacy[1]; }
     if (!PAYMENTS.includes(q.payment)) q.payment = 'Not paid';
     q.isTest = q.isTest === true;
@@ -618,10 +618,10 @@ export function newQuote() {
     deliveryDate: '',
     client: { name: '', address: '', phone: '', email: '' },
     discount: 0,
-    stage: 'Quote',      // Quote → Accepted → 50% Invoice → 100% Invoice
+    stage: 'Quote',      // Quote → 50% Invoice → 100% Invoice
     payment: 'Not paid',
     isTest: false,       // a practice quote: kept out of every business number
-    invoiceNumber: null, // assigned when it first becomes an invoice (Accepted+)
+    invoiceNumber: null, // assigned when it first becomes an invoice (50%/100% Invoice)
     items: [],
   };
   state.quotes.unshift(q);

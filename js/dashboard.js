@@ -17,7 +17,7 @@ const isInvoice = isInvoiceStage;
 
 // One muted, low-chroma family for the whole board. Saturated primaries next to this
 // warm paper read as alarms; data that is merely *different* should not shout.
-const STAGE_COLOR = { Quote: 'var(--dv-quote)', Accepted: 'var(--dv-accepted)', '50% Invoice': 'var(--dv-half)', '100% Invoice': 'var(--dv-paid)' };
+const STAGE_COLOR = { Quote: 'var(--dv-quote)', '50% Invoice': 'var(--dv-half)', '100% Invoice': 'var(--dv-paid)' };
 const SERIES = [1, 2, 3, 4, 5, 6].map((n) => `var(--dv-${n})`);
 
 function metrics(s) {
@@ -309,7 +309,7 @@ export function renderDashboard() {
     ]),
     unpricedWarning(m.unpriced),
     el('div', { class: 'kpi-row' }, [
-      tile('Open pipeline', money(m.pipeline), `${m.openCount} not yet accepted · excl. tax`, 'var(--dv-accepted)'),
+      tile('Open pipeline', money(m.pipeline), `${m.openCount} not yet invoiced · excl. tax`, 'var(--dv-accepted)'),
       tile('Invoiced', money(m.invoiced), `Est. profit ${money(m.profit)} · ${m.margin}% margin · excl. tax`, 'var(--dv-paid)'),
       tile('Collected', money(m.collected), `${m.conversion}% of quotes became invoices`, 'var(--dv-1)'),
       tile('Outstanding', money(m.outstanding), 'Invoiced, not yet paid', 'var(--dv-half)'),
