@@ -5,6 +5,9 @@
   (function () {
     var base = location.hostname.slice(-10) === '.github.io' ? '/' + location.pathname.split('/')[1] + '/' : '/';
     var rest = location.pathname.slice(base.length);
-    location.replace(base + '?/' + rest.replace(/&/g, '~and~') + location.hash);
+    // The throwaway &_= makes this a URL the browser has never cached, so index.html (and the
+    // asset versions it names) is always fresh — a hard refresh on a deep link only bypasses
+    // the cache for this 404 page, not for where it redirects.
+    location.replace(base + '?/' + rest.replace(/&/g, '~and~') + '&_=' + Date.now() + location.hash);
   })();
 </script></head><body></body></html>

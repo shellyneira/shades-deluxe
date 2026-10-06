@@ -19,7 +19,7 @@
       var gh = location.hostname.slice(-10) === '.github.io';
       var base = gh ? '/' + location.pathname.split('/')[1] + '/' : '/';
       var q = location.search;
-      if (q.charAt(1) === '/') history.replaceState(null, '', base + q.slice(2).replace(/~and~/g, '&') + location.hash);
+      if (q.charAt(1) === '/') history.replaceState(null, '', base + q.slice(2).split('&_=')[0].replace(/~and~/g, '&') + location.hash);
       document.write('<base href="' + base + '">');
     })();
   </script>
