@@ -1,9 +1,9 @@
 // Clients — one card per person, built from the quotes themselves (no separate record
 // to keep in sync): quotes sharing an email, phone number or name are the same client.
-// Editing a client's details happens on their quote; this screen is for finding them,
-// reaching them in one tap, and seeing everything they have ever been quoted or billed.
+// Details are editable here and written to every one of that client's quotes; editing a
+// quote's client changes what shows here, so the two can never disagree.
 import { el, mount, toast } from './dom.js';
-import { getState, newQuote } from './store.js';
+import { getState, newQuote, save } from './store.js';
 import { quoteTotals, money, money0 } from './pricing.js';
 import { openQuote, stageBadgeClass, isInvoiceStageName } from './quotes.js';
 import { labeled, iconSvg, ICON } from './ui.js';
@@ -56,8 +56,10 @@ function buildClients(s) {
     };
   }).sort((a, b) => b.last.localeCompare(a.last) || (a.name || '').localeCompare(b.name || ''));
 }
-const findClient = (clients, key) => clients.find((c) => c.keys.includes(key));
-const routeKey = (c) => c.keys[0];
+// The open client is identified by one of its quote ids, not by name/phone/email: those
+// are exactly what gets edited here, so they can't be what keeps the screen on the same person.
+const findClient = (clients, id) => clients.find((c) => c.rows.some((r) => r.q.id === id));
+const routeKey = (c) => c.rows[0].q.id;
 
 const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
 const mapsUrl = (a) => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a);
@@ -73,23 +75,28 @@ function action(icon, label, href, opts = {}) {
   return a;
 }
 
-function detailRow(icon, label, value, href, copyText) {
-  return el('div', { class: 'client-row' + (value ? '' : ' none') }, [
+function detailRow(c, icon, label, field, type = 'text') {
+  const value = c[field];
+  const inp = el('input', {
+    type, value, placeholder: 'Not on file', 'aria-label': label,
+    oninput: (e) => {
+      for (const r of c.rows) r.q.client[field] = e.target.value;
+      save();
+      renderClients();
+    },
+  });
+  const row = el('div', { class: 'client-row' }, [
     el('span', { class: 'client-row-ico' }, labeled(icon, '', 16)),
-    el('div', { class: 'client-row-main' }, [
-      el('div', { class: 'client-row-label' }, [label]),
-      value
-        ? (href ? el('a', { href, ...(href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {}) }, [value]) : el('span', {}, [value]))
-        : el('span', { class: 'muted' }, ['Not on file']),
-    ]),
-    value ? el('button', { class: 'row-act', type: 'button', title: 'Copy', 'aria-label': 'Copy ' + label, onclick: () => copy(copyText || value, label) }, []) : null,
+    el('label', { class: 'client-row-main' }, [el('div', { class: 'client-row-label' }, [label]), inp]),
+    el('button', { class: 'row-act', type: 'button', title: 'Copy', 'aria-label': 'Copy ' + label, onclick: () => value && copy(value, label) }, []),
   ]);
+  row.querySelector('button').innerHTML = iconSvg(ICON.copy, 15);
+  return row;
 }
 
 function detail(c) {
   const tel = digits(c.phone);
   const stat = (label, value, tone = '') => el('div', { class: 'client-stat ' + tone }, [el('div', { class: 'client-stat-v' }, [value]), el('div', { class: 'client-stat-l' }, [label])]);
-  const copyBtns = (node) => { node.querySelectorAll('button.row-act').forEach((b) => { b.innerHTML = iconSvg(ICON.copy, 15); }); return node; };
 
   const head = el('div', { class: 'client-head' }, [
     el('div', { class: 'client-avatar' }, [initials(c.name)]),
@@ -113,11 +120,12 @@ function detail(c) {
     action('pin', 'Directions', c.address ? mapsUrl(c.address) : null, { blank: true }),
   ]);
 
-  const info = copyBtns(el('div', { class: 'client-info' }, [
-    detailRow('phone', 'Phone', c.phone, tel ? 'tel:' + tel : null),
-    detailRow('mail', 'Email', c.email, c.email ? 'mailto:' + c.email.trim() : null),
-    detailRow('pin', 'Address', c.address, c.address ? mapsUrl(c.address) : null),
-  ]));
+  const info = el('div', { class: 'client-info' }, [
+    detailRow(c, 'user', 'Name', 'name'),
+    detailRow(c, 'phone', 'Phone', 'phone', 'tel'),
+    detailRow(c, 'mail', 'Email', 'email', 'email'),
+    detailRow(c, 'pin', 'Address', 'address'),
+  ]);
 
   const stats = el('div', { class: 'client-stats' }, [
     stat('Invoiced', money0(c.invoicedTotal)),
