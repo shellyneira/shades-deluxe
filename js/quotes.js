@@ -1,7 +1,7 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
 import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
-import { getState, save, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
+import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
 import { computeLine, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
@@ -15,7 +15,6 @@ export const currentQuoteRef = () => sub;
 // still has to switch to that tab, since this module doesn't own the router.
 export function openQuote(id, view = 'edit') { sub = { view, quoteId: id }; }
 export const stageBadgeClass = (st) => STAGE_CLASS[st] || 'quote';
-export const isInvoiceStageName = (st) => st === 'Accepted' || st === '50% Paid' || st === '100% Paid';
 
 // URL <-> screen. A reload lands before the cloud pull, so a quote that isn't in
 // the store yet keeps its place in `sub`; dropMissingQuote() runs once data settled.
@@ -53,12 +52,7 @@ function open(id, view = 'edit') {
 
 /* ---------------- list ---------------- */
 // One lifecycle: Quote → Sent (still a quote) → Accepted/Deposit Paid/Paid (an invoice).
-const STAGES = ['Quote', 'Accepted', '50% Paid', '100% Paid'];
-const stagePct = (st) => (st === '100% Paid' ? 1 : st === '50% Paid' ? 0.5 : 0);
-const isInvoiceStage = (st) => st === 'Accepted' || st === '50% Paid' || st === '100% Paid';
-const STAGE_CLASS = { Quote: 'quote', Accepted: 'accepted', '50% Paid': 'half', '100% Paid': 'paid' };
-// Stored values stay short; the picker spells out what each paid stage means.
-const STAGE_LABEL = { '50% Paid': '50% Paid (partial invoice)', '100% Paid': '100% Paid (full invoice)' };
+const STAGE_CLASS = { Quote: 'quote', Accepted: 'accepted', '50% Invoice': 'half', '100% Invoice': 'paid' };
 const stageClass = (st) => STAGE_CLASS[st] || 'quote';
 let filter = 'All';
 
@@ -88,6 +82,7 @@ function list() {
         el('div', { class: 'status' }, [
           q.isTest ? el('span', { class: 'badge test' }, ['TEST']) : null,
           el('span', { class: 'badge ' + stageClass(st) }, [st]),
+          payPct(q) > 0 ? el('span', { class: 'badge paid' }, [q.payment]) : null,
         ]),
         el('div', { class: 'muted' }, [num + ' · ' + (q.date || '')]),
         el('div', { class: 'big' }, [q.client.name || 'Untitled client']),
@@ -133,7 +128,8 @@ function editor(q) {
       dateField('Quote date', q.date, (v) => set(() => (q.date = v))),
       dateField('Install date', q.installDate, (v) => set(() => (q.installDate = v))),
       dateField('Delivery date', q.deliveryDate, (v) => set(() => (q.deliveryDate = v))),
-      selectField('Stage', STAGES.map((v) => ({ value: v, label: STAGE_LABEL[v] || v })), q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
+      selectField('Status', STAGES, q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
+      selectField('Payment', PAYMENTS, q.payment || 'Not paid', (v) => { q.payment = v; save(); renderQuotes(); }),
     ]),
   ]);
 
@@ -782,7 +778,7 @@ function invoice(q) {
       const taxable = afterDiscount + minTopUp;
       const tax = roundWhole(taxable * (Number(s.taxRate) || 0) / 100);
       const total = taxable + tax;
-      const pct = stagePct(q.stage);
+      const pct = payPct(q);
       const paid = roundWhole(total * pct);
       return el('div', { class: 'sum' }, [
         el('div', { class: 'sum-box' }, [

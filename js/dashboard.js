@@ -8,18 +8,16 @@
 //
 // No chart library: bars are divs, the rings are inline SVG.
 import { el, mount, FRACTION_LABEL } from './dom.js';
-import { getState } from './store.js';
+import { getState, STAGES, payPct, isInvoiceStage } from './store.js';
 import { quoteTotals, computeLine, money, money0 } from './pricing.js';
 import { openQuote } from './quotes.js';
 import { labeled, iconSvg, ICON } from './ui.js';
 
-const STAGES = ['Quote', 'Accepted', '50% Paid', '100% Paid'];
-const stagePct = (st) => (st === '100% Paid' ? 1 : st === '50% Paid' ? 0.5 : 0);
-const isInvoice = (st) => st !== 'Quote';
+const isInvoice = isInvoiceStage;
 
 // One muted, low-chroma family for the whole board. Saturated primaries next to this
 // warm paper read as alarms; data that is merely *different* should not shout.
-const STAGE_COLOR = { Quote: 'var(--dv-quote)', Accepted: 'var(--dv-accepted)', '50% Paid': 'var(--dv-half)', '100% Paid': 'var(--dv-paid)' };
+const STAGE_COLOR = { Quote: 'var(--dv-quote)', Accepted: 'var(--dv-accepted)', '50% Invoice': 'var(--dv-half)', '100% Invoice': 'var(--dv-paid)' };
 const SERIES = [1, 2, 3, 4, 5, 6].map((n) => `var(--dv-${n})`);
 
 function metrics(s) {
@@ -37,13 +35,13 @@ function metrics(s) {
     const total = quoteTotals(q, s).net;
     const cost = q.items.reduce((c, it) => c + (computeLine(it, s).cost || 0) * qty(it), 0);
     const stage = q.stage || 'Quote';
-    return { q, total, cost, profit: total - cost, stage, month: (q.date || '').slice(0, 7) };
+    return { q, total, cost, profit: total - cost, stage, pct: payPct(q), month: (q.date || '').slice(0, 7) };
   });
   const sum = (arr, k) => arr.reduce((a, r) => a + r[k], 0);
   const invoiced = rows.filter((r) => isInvoice(r.stage));
   const open = rows.filter((r) => !isInvoice(r.stage));
   const invoicedTotal = sum(invoiced, 'total');
-  const collected = invoiced.reduce((a, r) => a + r.total * stagePct(r.stage), 0);
+  const collected = invoiced.reduce((a, r) => a + r.total * r.pct, 0);
 
   // Revenue by month, split so quoted money is never mistaken for earned money.
   const months = {};

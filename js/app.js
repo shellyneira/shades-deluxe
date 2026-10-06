@@ -66,6 +66,7 @@ function go(view, parts = null) {
   current = view;
   if (parts) ROUTES[view]?.set(parts);
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
+  document.querySelector('.tab.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   VIEWS[view]();
 }
 

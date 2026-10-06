@@ -24,6 +24,13 @@ const DEFAULT_COMPANY = {
     '* Any additional work shall be invoiced and billed separately - Delivery time 10 working days',
 };
 
+// Status = what the document is. Payment = how much of it has been collected; the
+// dashboard's Collected / Still owed read Payment, nothing else.
+export const STAGES = ['Quote', 'Accepted', '50% Invoice', '100% Invoice'];
+export const PAYMENTS = ['Not paid', '50% Paid', '100% Paid'];
+export const isInvoiceStage = (st) => STAGES.indexOf(st) >= 1;
+export const payPct = (q) => (isInvoiceStage(q.stage) ? (q.payment === '100% Paid' ? 1 : q.payment === '50% Paid' ? 0.5 : 0) : 0);
+
 // Which fields land in each document's Description column (Settings → Documents).
 const DEFAULT_DOC_CONFIG = {
   // Client quote: no dimensions, shown with prices. Mount is a build detail for the
@@ -205,8 +212,11 @@ function normalize(state) {
         : q.payment === '50% paid' ? '50% Paid'
         : q.status === 'won' ? 'Accepted' : 'Quote';
     }
-    // Rename earlier stage labels to the current, simpler set.
-    q.stage = { Sent: 'Quote', 'Deposit Paid': '50% Paid', Paid: '100% Paid' }[q.stage] || q.stage;
+    // Earlier versions folded payment into the stage ('50% Paid', 'Deposit Paid'…). Status says
+    // what the document is, Payment says how much has come in — split them apart.
+    const legacy = { Sent: ['Quote', 'Not paid'], 'Deposit Paid': ['50% Invoice', '50% Paid'], '50% Paid': ['50% Invoice', '50% Paid'], Paid: ['100% Invoice', '100% Paid'], '100% Paid': ['100% Invoice', '100% Paid'] }[q.stage];
+    if (legacy) { q.stage = legacy[0]; q.payment = legacy[1]; }
+    if (!PAYMENTS.includes(q.payment)) q.payment = 'Not paid';
     q.isTest = q.isTest === true;
   });
   return state;
@@ -608,7 +618,8 @@ export function newQuote() {
     deliveryDate: '',
     client: { name: '', address: '', phone: '', email: '' },
     discount: 0,
-    stage: 'Quote',      // Quote → Sent → Accepted → Deposit Paid → Paid
+    stage: 'Quote',      // Quote → Accepted → 50% Invoice → 100% Invoice
+    payment: 'Not paid',
     isTest: false,       // a practice quote: kept out of every business number
     invoiceNumber: null, // assigned when it first becomes an invoice (Accepted+)
     items: [],
@@ -628,6 +639,7 @@ export function duplicateQuote(id) {
     installDate: '',
     deliveryDate: '',
     stage: 'Quote',
+    payment: 'Not paid',
     invoiceNumber: null,
   };
   q.items.forEach((it) => { if (it.id) it.id = 'i_' + Math.random().toString(36).slice(2, 10); });

@@ -3,9 +3,9 @@
 // Details are editable here and written to every one of that client's quotes; editing a
 // quote's client changes what shows here, so the two can never disagree.
 import { el, mount, toast } from './dom.js';
-import { getState, newQuote, save } from './store.js';
+import { getState, newQuote, save, payPct, isInvoiceStage } from './store.js';
 import { quoteTotals, money, money0 } from './pricing.js';
-import { openQuote, stageBadgeClass, isInvoiceStageName } from './quotes.js';
+import { openQuote, stageBadgeClass } from './quotes.js';
 import { labeled, iconSvg, ICON } from './ui.js';
 
 let active = null; // any identity key of the open client
@@ -43,9 +43,9 @@ function buildClients(s) {
     const pick = (f) => qs.map((q) => q.client[f]).find((v) => v && v.trim()) || '';
     const rows = qs.map((q) => {
       const net = quoteTotals(q, s).net, total = quoteTotals(q, s).total, stage = q.stage || 'Quote';
-      return { q, total, stage, paid: isInvoiceStageName(stage) ? total * (stage === '100% Paid' ? 1 : stage === '50% Paid' ? 0.5 : 0) : 0, net };
+      return { q, total, stage, paid: total * payPct(q), net };
     });
-    const invoiced = rows.filter((r) => isInvoiceStageName(r.stage));
+    const invoiced = rows.filter((r) => isInvoiceStage(r.stage));
     const invoicedTotal = invoiced.reduce((a, r) => a + r.total, 0);
     const collected = invoiced.reduce((a, r) => a + r.paid, 0);
     return {
@@ -134,11 +134,12 @@ function detail(c) {
   ]);
 
   const history = el('div', { class: 'client-history' }, c.rows.map((r) => {
-    const inv = isInvoiceStageName(r.stage) && r.q.invoiceNumber;
+    const inv = isInvoiceStage(r.stage) && r.q.invoiceNumber;
     return el('button', { class: 'client-hist-row', type: 'button', onclick: () => goToQuote(r.q.id) }, [
       el('div', { class: 'client-hist-num' }, [inv ? 'INV #' + r.q.invoiceNumber : 'Q #' + r.q.number]),
       el('div', { class: 'client-hist-meta' }, [
         el('span', { class: 'badge ' + stageBadgeClass(r.stage) }, [r.stage]),
+        payPct(r.q) > 0 ? el('span', { class: 'badge paid' }, [r.q.payment]) : null,
         el('span', { class: 'muted' }, [`${r.q.date || '—'} · ${r.q.items.length} item${r.q.items.length === 1 ? '' : 's'}`]),
       ]),
       el('div', { class: 'client-hist-amt' }, [money(r.total)]),
