@@ -14,6 +14,8 @@ export const currentQuoteRef = () => sub;
 // "no price" warning). Only sets where the Quotes tab should land — the caller
 // still has to switch to that tab, since this module doesn't own the router.
 export function openQuote(id, view = 'edit') { sub = { view, quoteId: id }; }
+export const stageBadgeClass = (st) => STAGE_CLASS[st] || 'quote';
+export const isInvoiceStageName = (st) => st === 'Accepted' || st === '50% Paid' || st === '100% Paid';
 
 // URL <-> screen. A reload lands before the cloud pull, so a quote that isn't in
 // the store yet keeps its place in `sub`; dropMissingQuote() runs once data settled.
@@ -55,6 +57,8 @@ const STAGES = ['Quote', 'Accepted', '50% Paid', '100% Paid'];
 const stagePct = (st) => (st === '100% Paid' ? 1 : st === '50% Paid' ? 0.5 : 0);
 const isInvoiceStage = (st) => st === 'Accepted' || st === '50% Paid' || st === '100% Paid';
 const STAGE_CLASS = { Quote: 'quote', Accepted: 'accepted', '50% Paid': 'half', '100% Paid': 'paid' };
+// Stored values stay short; the picker spells out what each paid stage means.
+const STAGE_LABEL = { '50% Paid': '50% Paid (partial invoice)', '100% Paid': '100% Paid (full invoice)' };
 const stageClass = (st) => STAGE_CLASS[st] || 'quote';
 let filter = 'All';
 
@@ -129,7 +133,7 @@ function editor(q) {
       dateField('Quote date', q.date, (v) => set(() => (q.date = v))),
       dateField('Install date', q.installDate, (v) => set(() => (q.installDate = v))),
       dateField('Delivery date', q.deliveryDate, (v) => set(() => (q.deliveryDate = v))),
-      selectField('Stage', STAGES, q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
+      selectField('Stage', STAGES.map((v) => ({ value: v, label: STAGE_LABEL[v] || v })), q.stage || 'Quote', (v) => { q.stage = v; if (isInvoiceStage(v)) assignInvoiceNumber(q); save(); renderQuotes(); }),
     ]),
   ]);
 
@@ -201,7 +205,7 @@ function blankLine(s) {
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', reverse: false, fascia: false, cassette: false, sideChannel: false,
     installation: s.defaultInstallation || '', brackets: '', mount: 'Ceiling', discount: '', markup: '', motorPrice: '',
-    fabricPrice: '', lining: '', track: '', accessories: [], notes: '',
+    fabricPrice: '', fabricWidth: '', lining: '', track: '', accessories: [], notes: '',
   };
 }
 
@@ -283,6 +287,7 @@ function columns(o, tables, categories, customLists) {
     { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
     { key: 'mount', label: 'Mount', kind: 'select', opts: opt(o.mount), w: 90 },
     { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0', hideWhen: (it) => !forDrapery(it), naWhy: 'Fabric price per yard only applies to drapery — Roller and Zebra are priced from their chart' },
+    { key: 'fabricWidth', label: 'Fabric W', kind: 'select', opts: opt(['54', '118']), w: 90, hideWhen: (it) => !['heavyFabric', 'sheer', 'grommetPanel'].includes(tables[it.table]?.style), naWhy: 'Fabric width only applies to Heavy Fabric, Sheer and Grommet Panel' },
     { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining, naWhy: 'Lining only applies to drapery styles that come lined (Heavy Fabric, Grommet Panel)' },
     { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0' },
     { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
@@ -323,6 +328,7 @@ const COL_HELP = {
   brackets: 'Brackets $',
   mount: 'Where the brackets mount',
   fabricPrice: 'Fabric cost ($ per yard) — Drapery lines only, drives the whole price',
+  fabricWidth: 'Fabric width in inches (54 or 118) — narrower fabric = more panels = more yards. Blank = the table\'s default. Prints on the Work Order only',
   lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
   accessories: 'Priced extras (Remote, Valance, etc.) — same list for every table. Click to open and tick as many as you need. Edit prices in Lists.',

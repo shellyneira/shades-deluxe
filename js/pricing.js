@@ -182,7 +182,7 @@ export function draperyAutoInstall(line, table) {
 function computePanelDrapery(line, rates, hasLining, track, table) {
   const w = Number(line.width) || 0, h = Number(line.height) || 0, price = Number(line.fabricPrice) || 0;
   if (!w || !h || !price) return null;
-  const panels = Math.ceil((w * rates.fullness) / rates.fabricWidth);
+  const panels = Math.ceil((w * rates.fullness) / (Number(line.fabricWidth) || rates.fabricWidth));
   const yards = Math.ceil((panels * (h + 12)) / 36);
   const fabricCost = price * yards * (1 + (rates.fabricTaxPct || 0) / 100);
   const laborRate = hasLining
@@ -226,7 +226,7 @@ function computeLinearDrapery(line, rates, track) {
 function computeGrommetDrapery(line, rates) {
   const w = Number(line.width) || 0, h = Number(line.height) || 0, price = Number(line.fabricPrice) || 0;
   if (!w || !h || !price) return null;
-  const panelsPerSide = ((w / 2 + rates.panelAllowanceIn) * rates.fullness) / rates.fabricWidth;
+  const panelsPerSide = ((w / 2 + rates.panelAllowanceIn) * rates.fullness) / (Number(line.fabricWidth) || rates.fabricWidth);
   const panels = panelsPerSide * 2;
   const yards = ((h + 12) * panels) / 36;
   const fabricCost = price * rates.fabricWasteFactor * yards;
@@ -430,6 +430,7 @@ function builtinDescFields(abbrev) {
     // WALL/CEILING pair that would go stale the moment Mount is renamed in Lists.
     { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork && l.mount ? ' - ' + l.mount.toUpperCase() : ''}` : '') },
     { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
+    { key: 'fabricWidth', label: 'Fabric width', fmt: (l) => (l.fabricWidth ? 'Fabric width: ' + l.fabricWidth + '"' : '') },
     { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
     // Was silently missing entirely — Work Order needs it (the maker has to know which),
     // the client quote never should (only the price matters to them).

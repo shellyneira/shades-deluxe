@@ -7,18 +7,20 @@ import { initCloud, startLiveSync, onStateChange } from './store.js';
 import { authRequired, ensureSession, login, logout, userEmail } from './auth.js';
 import { renderDashboard } from './dashboard.js';
 import { renderQuotes, quoteRoute, applyQuoteRoute, dropMissingQuote } from './quotes.js';
+import { renderClients, clientsRoute, applyClientsRoute, dropMissingClient } from './clients.js';
 import { renderTables, tablesRoute, applyTablesRoute, dropMissingTable } from './tables.js';
 import { renderLists } from './lists.js';
 import { renderSettings } from './settings.js';
 import { initPresence } from './presence.js';
 
-const VIEWS = { dashboard: renderDashboard, quotes: renderQuotes, tables: renderTables, lists: renderLists, settings: renderSettings };
+const VIEWS = { dashboard: renderDashboard, quotes: renderQuotes, clients: renderClients, tables: renderTables, lists: renderLists, settings: renderSettings };
 
 // The URL path is the source of truth for where you are: /view/part/part. Views that
 // have a place inside them (an open quote, a price table) expose it as route parts,
 // so a reload or a shared link lands on the same screen.
 const ROUTES = {
   quotes: { get: quoteRoute, set: applyQuoteRoute },
+  clients: { get: clientsRoute, set: applyClientsRoute },
   tables: { get: tablesRoute, set: applyTablesRoute },
 };
 
@@ -76,7 +78,7 @@ function redraw() {
   redrawPending = true;
   requestAnimationFrame(() => {
     redrawPending = false;
-    fromUrl(() => { dropMissingQuote(); dropMissingTable(); VIEWS[current](); });
+    fromUrl(() => { dropMissingQuote(); dropMissingTable(); dropMissingClient(); VIEWS[current](); });
   });
 }
 
@@ -125,7 +127,7 @@ function addThemeToggle() {
 function startApp() {
   addLogout();
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
-  window.addEventListener('popstate', () => fromUrl(() => { go(...splitUrl()); dropMissingQuote(); dropMissingTable(); VIEWS[current](); }));
+  window.addEventListener('popstate', () => fromUrl(() => { go(...splitUrl()); dropMissingQuote(); dropMissingTable(); dropMissingClient(); VIEWS[current](); }));
   onStateChange((reason) => { if (reason === 'remote') redraw(); });
   migrateLegacyHash();
   fromUrl(() => go(...splitUrl()));

@@ -28,14 +28,14 @@ const DEFAULT_COMPANY = {
 const DEFAULT_DOC_CONFIG = {
   // Client quote: no dimensions, shown with prices. Mount is a build detail for the
   // maker, not the client.
-  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true, mount: false },
+  client: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: false, bottomRail: true, reverse: false, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, fabricWidth: false, track: true, accessories: true, mount: false },
   // Work order: every build detail, dimensions shown, no prices. Shade Type off —
   // that's an internal price-tier name, not something to reveal (Product/Fabric
   // already say what it is, and the client shouldn't be able to shop the exact tier
   // elsewhere). Mount ON — the maker needs to know Wall vs. Ceiling.
-  work: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, track: true, accessories: true, mount: true },
+  work: { table: false, product: true, fabric: true, color: true, control: true, system: true, style: true, headrail: true, bottomRail: true, reverse: true, fascia: true, cassette: true, sideChannel: true, brackets: true, lining: true, fabricWidth: true, track: true, accessories: true, mount: true },
   // DYMO sticker: short — product shown separately, so description = fabric + control.
-  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, track: false, accessories: false, mount: false },
+  label: { table: false, product: false, fabric: true, color: false, control: true, system: false, style: false, headrail: false, bottomRail: false, reverse: false, fascia: false, cassette: false, sideChannel: false, brackets: false, lining: false, fabricWidth: false, track: false, accessories: false, mount: false },
 };
 
 // Editable pricing rates (Settings → Rates) so nothing is hard-coded in the engine.
