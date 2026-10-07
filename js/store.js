@@ -2,7 +2,7 @@
 // (durable, shared across devices) and is kept live over a Realtime channel so a
 // change made on one screen shows up on every other screen within a second.
 import { SEED } from './seed-data.js';
-import { DRAPERY_STYLES, DEFAULT_TRACK_RATES, DEFAULT_ABBREV } from './pricing.js';
+import { DRAPERY_STYLES, DEFAULT_TRACK_RATES, DEFAULT_ABBREV, descFields } from './pricing.js';
 import {
   dbEnabled, pullState, pushState,
   pullQuotes, pushQuotes, deleteQuoteRow,
@@ -217,6 +217,29 @@ function normalize(state) {
   const patternList = state.customLists.find((l) => l.name === 'Pattern' && l.perCategory);
   if (patternList && state.docFieldLabel.work['custom_' + patternList.id] === undefined) {
     state.docFieldLabel.work['custom_' + patternList.id] = true;
+  }
+  // Migration: a field that's new to the orderable set (this session turned every
+  // worksheet column — Qty, Width, Motor $, Notes...) into one) but missing from an
+  // ALREADY-SAVED drag order must NOT fall back to descFields()'s "append at the very
+  // end" rule — for someone who dragged Pattern around weeks ago, that flung Width,
+  // Height and everything after them to the back of the worksheet, reordering columns
+  // nobody touched. Slot each missing field in next to its natural neighbor instead.
+  if (state.docFieldOrder.length) {
+    const natural = descFields({ ...state, docFieldOrder: [] }).map((f) => f.key);
+    const missing = natural.filter((k) => !state.docFieldOrder.includes(k));
+    if (missing.length) {
+      const next = [...state.docFieldOrder];
+      for (const key of missing) {
+        const naturalIdx = natural.indexOf(key);
+        let insertAt = next.length; // no placed predecessor found → goes at the end
+        for (let i = naturalIdx - 1; i >= 0; i--) {
+          const idx = next.indexOf(natural[i]);
+          if (idx !== -1) { insertAt = idx + 1; break; }
+        }
+        next.splice(insertAt, 0, key);
+      }
+      state.docFieldOrder = next;
+    }
   }
   state.nextInvoiceNumber = Number(state.nextInvoiceNumber) || 2001;
   // Migrate legacy status/payment into the single lifecycle stage.

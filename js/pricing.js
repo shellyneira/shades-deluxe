@@ -457,16 +457,25 @@ function builtinDescFields(abbrev) {
   ];
 }
 
-// Built-ins plus one entry per per-category custom list (Lists screen), in the order
-// the user dragged them into in Settings → Documents — any field not in that saved
-// order (a field that existed before ordering was added, or a category created since)
-// is appended at the end, so it shows up rather than silently vanishing.
+// Built-ins plus one entry per per-category custom list (Lists screen), spliced in
+// right after Color — same spot quotes.js's worksheet puts them — so the NATURAL
+// (un-dragged) order here matches the worksheet's physical column order exactly. Get
+// this wrong and reorderByFieldOrder() in quotes.js (which maps this list's order
+// straight onto worksheet column positions) silently scrambles columns nobody asked
+// to move — the one it shipped with mismatched here once already.
 export function descFields(state) {
   const abbrev = { ...DEFAULT_ABBREV, ...(state.abbrev || {}) };
   const custom = (state.customLists || []).filter((l) => l.perCategory).map((l) => ({
     key: 'custom_' + l.id, label: l.name, fmt: (line) => line['custom_' + l.id] || '',
   }));
-  const all = [...builtinDescFields(abbrev), ...custom];
+  const builtin = builtinDescFields(abbrev);
+  const colorIdx = builtin.findIndex((f) => f.key === 'color');
+  const all = [...builtin.slice(0, colorIdx + 1), ...custom, ...builtin.slice(colorIdx + 1)];
+  // Any field not in the saved drag order (a field added after the user last dragged
+  // anything — a new Lists category, or a worksheet column this app only just made
+  // orderable) slots in NEXT TO where it naturally sits, not at the end — store.js's
+  // normalize() does that migration once, so by the time we get here `order` already
+  // accounts for every current field and this fallback only matters on a fresh state.
   const order = state.docFieldOrder;
   if (!order || !order.length) return all;
   const byKey = new Map(all.map((f) => [f.key, f]));
