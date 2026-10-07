@@ -834,3 +834,12 @@ label.check.price-switch:hover { background: var(--bg); color: var(--ink); }
   .client-list { max-height: none; }
   .client-stats { grid-template-columns: 1fr; }
 }
+
+/* Worksheet cells size to their content — never truncate a name with "…". The column's
+   `w` is only a minimum. Controls fill their cell; the cell is as wide as the widest
+   text in its column, so every row in a column lines up. */
+table.sheet td { white-space: nowrap; }
+table.sheet .dd-text { flex: 1 0 auto; overflow: visible; text-overflow: clip; }
+table.sheet .dd { width: 100%; }
+table.sheet input:not([type="checkbox"]) { field-sizing: content; width: 100%; }
+table.sheet input[type="text"] { max-width: 480px; }

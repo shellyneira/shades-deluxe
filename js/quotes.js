@@ -331,8 +331,12 @@ const COL_HELP = {
   notes: 'Free-text note for the maker — prints only on the Work Order, its own column',
 };
 
+// field-sizing does this in CSS; `size` is the same idea for browsers without it.
+const fitText = (inp) => { inp.size = Math.max(4, inp.value.length || (inp.placeholder || '').length, 1) + 1; };
+
 function cell(col, item, onChange) {
-  const style = `width:${col.w}px`;
+  // col.w is a floor, not a size: cells grow to whatever their text needs (see table.sheet in styles.css).
+  const style = `min-width:${col.w}px`;
   if (col.hideWhen && col.hideWhen(item)) {
     return el('td', { class: 'c na', style, title: col.naWhy || 'Not applicable to this line' }, [el('span', { class: 'muted' }, ['—'])]);
   }
@@ -354,8 +358,9 @@ function cell(col, item, onChange) {
   if (col.kind === 'text') {
     const inp = el('input', {
       type: 'text', value: item[col.key] ?? '', style, placeholder: col.placeholder || '',
-      oninput: (e) => onChange(col.key, e.target.value),
+      oninput: (e) => { fitText(e.target); onChange(col.key, e.target.value); },
     });
+    fitText(inp);
     return el('td', {}, [inp]);
   }
   if (col.kind === 'num') {
