@@ -109,6 +109,7 @@ function freshState() {
     options: structuredClone(SEED.options),
     docConfig: structuredClone(DEFAULT_DOC_CONFIG),
     docFieldOrder: [],
+    docFieldLabel: { work: {} },
     abbrev: { ...DEFAULT_ABBREV },
     rates: { ...DEFAULT_RATES },
     minimumOrder: 0,
@@ -170,6 +171,8 @@ function normalize(state) {
   }
   state.docConfig.work.table = false; // one-time: Shade Type briefly defaulted on for Work Order — turn it back off
   state.docFieldOrder = Array.isArray(state.docFieldOrder) ? state.docFieldOrder : [];
+  state.docFieldLabel = state.docFieldLabel || {};
+  state.docFieldLabel.work = state.docFieldLabel.work || {};
   state.abbrev = { ...DEFAULT_ABBREV, ...(state.abbrev || {}) };
 
 
@@ -197,6 +200,13 @@ function normalize(state) {
       name: 'Pattern', perCategory: true, priced: false,
       items: Object.fromEntries(state.categories.map((cat) => [cat, []])),
     });
+  }
+  // One-time default: Work Order prints "Pattern: X" and "Color: X" out of the box —
+  // every other field's label prefix starts off, toggled on per field in Settings.
+  if (state.docFieldLabel.work.color === undefined) state.docFieldLabel.work.color = true;
+  const patternList = state.customLists.find((l) => l.name === 'Pattern' && l.perCategory);
+  if (patternList && state.docFieldLabel.work['custom_' + patternList.id] === undefined) {
+    state.docFieldLabel.work['custom_' + patternList.id] = true;
   }
   state.nextInvoiceNumber = Number(state.nextInvoiceNumber) || 2001;
   // Migrate legacy status/payment into the single lifecycle stage.

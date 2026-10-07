@@ -73,15 +73,33 @@ function documentsPanel(s) {
     // Labels always print the control's hand side next to the size — the Description
     // toggle for it would just duplicate that, so it's not offered here.
     const docFields = docKey === 'label' ? fields.filter((f) => f.key !== 'control') : fields;
+    // Work Order only: a second, narrower checkbox per field that prints "Field: " ahead
+    // of the value (e.g. "Pattern: Mumbay 01") instead of the bare value. Hidden for the
+    // handful of fields that already bake their own label into the text (Headrail,
+    // Bottom rail, Fabric width, Mount...) — ticking it there would double the label up.
+    const showLabelToggle = docKey === 'work';
+    const labelCfg = showLabelToggle ? (s.docFieldLabel.work = s.docFieldLabel.work || {}) : null;
     const boxes = docFields.map((f) => {
       const box = el('input', { type: 'checkbox', onchange: (e) => { cfg[f.key] = e.target.checked; save(); } });
       box.checked = !!cfg[f.key];
-      return el('label', { class: 'field check', style: 'margin:0' }, [box, f.label]);
+      const row = [el('label', { class: 'field check', style: 'margin:0' }, [box, f.label])];
+      // A second, SEPARATE <label> (not nested in the one above) — a label wrapping two
+      // checkboxes forwards an unlabeled click to the first one, so the "show label"
+      // checkbox needs its own label to be clickable by its own text.
+      if (showLabelToggle && f.labelable !== false) {
+        const labelBox = el('input', { type: 'checkbox', onchange: (e) => { labelCfg[f.key] = e.target.checked; save(); } });
+        labelBox.checked = !!labelCfg[f.key];
+        row.push(el('label', {
+          class: 'field check hint', title: `Print "${f.label}: " before the value on the Work Order`,
+          style: 'margin:0 0 0 8px;font-weight:500;text-transform:none;letter-spacing:0',
+        }, [labelBox, `show “${f.label}:”`]));
+      }
+      return el('div', { style: 'display:flex;align-items:center' }, row);
     });
     return el('div', { class: 'field-subcard' }, [
       el('div', { class: 'field-subcard-head' }, [title]),
       el('p', { class: 'hint', style: 'margin:-6px 0 12px' }, [note]),
-      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px 14px' }, boxes),
+      el('div', { style: `display:grid;grid-template-columns:${showLabelToggle ? '1fr' : '1fr 1fr'};gap:8px 14px` }, boxes),
     ]);
   };
   return el('div', { class: 'panel' }, [
@@ -89,7 +107,7 @@ function documentsPanel(s) {
     el('p', { class: 'muted', style: 'margin-top:0' }, ['Pick which details go into each document’s Description. Location, size and price are handled by their own columns. Adding a category in Lists adds it here too — nothing to wire up by hand.']),
     el('div', { class: 'field-subcard-grid' }, [
       col('client', 'Client Quote', 'Shown to the customer. No dimensions; prices shown.'),
-      col('work', 'Work Order', 'For your maker. Dimensions shown; no prices.'),
+      col('work', 'Work Order', 'For your maker. Dimensions shown; no prices. The second checkbox prints the field name before the value.'),
       col('label', 'Stickers (DYMO)', 'Extra info line on each shade label (name, location, product, size & control are always shown).'),
     ]),
   ]);

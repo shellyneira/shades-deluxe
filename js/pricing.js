@@ -417,24 +417,27 @@ function builtinDescFields(abbrev) {
     { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
     { key: 'control', label: 'Control', fmt: (l) => controlText(l.control, abbrev) },
     { key: 'style', label: 'Style', fmt: (l) => l.style },
-    { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : '') },
-    { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : '') },
-    { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : '') },
-    { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
-    { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
+    // These five already bake their own label into the printed text (a plain value would
+    // read as a bare word with nothing saying what it is) — "Settings → Documents" label
+    // checkbox is pointless (and would double up) for them, so `labelable: false`.
+    { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : ''), labelable: false },
+    { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : ''), labelable: false },
+    { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : ''), labelable: false },
+    { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : ''), labelable: false },
+    { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : ''), labelable: false },
     // `compact` is only set for DYMO labels — the sticker is tiny, so this one gets an
     // abbreviation there while Client Quote/Work Order keep the full word.
-    { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with ' + abbrev.sideChannelShort : 'with Side Channels') : '') },
+    { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with ' + abbrev.sideChannelShort : 'with Side Channels') : ''), labelable: false },
     // Wall vs. ceiling mount only matters to the maker — the client quote just says
     // "with Brackets". Prints the Lists value itself (uppercased), not a hardcoded
     // WALL/CEILING pair that would go stale the moment Mount is renamed in Lists.
-    { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork && l.mount ? ' - ' + l.mount.toUpperCase() : ''}` : '') },
+    { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork && l.mount ? ' - ' + l.mount.toUpperCase() : ''}` : ''), labelable: false },
     { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
-    { key: 'fabricWidth', label: 'Fabric width', fmt: (l) => (l.fabricWidth ? 'Fabric width: ' + l.fabricWidth + '"' : '') },
+    { key: 'fabricWidth', label: 'Fabric width', fmt: (l) => (l.fabricWidth ? 'Fabric width: ' + l.fabricWidth + '"' : ''), labelable: false },
     { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
     // Was silently missing entirely — Work Order needs it (the maker has to know which),
     // the client quote never should (only the price matters to them).
-    { key: 'mount', label: 'Mount', fmt: (l) => (l.mount ? l.mount + ' Mount' : '') },
+    { key: 'mount', label: 'Mount', fmt: (l) => (l.mount ? l.mount + ' Mount' : ''), labelable: false },
   ];
 }
 
@@ -456,10 +459,18 @@ export function descFields(state) {
   return [...ordered, ...all.filter((f) => !placed.has(f.key))];
 }
 
+// Work Order only (Settings → Documents, per field): prints "Pattern: X" instead of
+// just "X" for the fields where a bare value would be ambiguous on the shop floor.
+// Client Quote and Stickers never read label prefixes — the maker is the only reader
+// who needs the field name spelled out next to the value.
 export function describeLine(line, cfg, isWork, compact, state) {
+  const labels = isWork ? (state?.docFieldLabel?.work || {}) : null;
   return descFields(state)
     .filter((f) => !cfg || cfg[f.key])
-    .map((f) => f.fmt(line, isWork, compact))
+    .map((f) => {
+      const text = f.fmt(line, isWork, compact);
+      return text && labels && f.labelable !== false && labels[f.key] ? `${f.label}: ${text}` : text;
+    })
     .filter(Boolean)
     .join(', ');
 }

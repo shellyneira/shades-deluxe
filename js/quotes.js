@@ -2,7 +2,7 @@
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
 import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine } from './pricing.js';
+import { computeLine, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -222,10 +222,30 @@ const isDrapery = (it, tables) => tables[it.table]?.kind === 'formula';
 // (e.g. Cornice has neither) — null here means "hide the field" for this row.
 const draperyStyleOf = (it, tables) => (isDrapery(it, tables) ? DRAPERY_STYLES[tables[it.table].style] : null);
 
+// Any worksheet column whose key also appears in Settings → "Order these appear in
+// every document" (descFields) gets reordered to match — dragging a row there (e.g.
+// moving Pattern before Color) reorders the matching worksheet columns in place, not
+// just the printed Description. Columns with no Settings equivalent (Qty, Location,
+// W/H, Motor $, Ins, Disc, Notes...) are structural/data-entry fields, not printable
+// attributes, so they stay exactly where they are.
+function reorderByFieldOrder(cols, state) {
+  const order = descFields(state).map((f) => f.key);
+  const slots = [];
+  const movable = [];
+  cols.forEach((c, i) => { if (order.includes(c.key)) { slots.push(i); movable.push(c); } });
+  if (movable.length < 2) return cols;
+  const rank = (c) => order.indexOf(c.key);
+  const sorted = [...movable].sort((a, b) => rank(a) - rank(b));
+  const result = [...cols];
+  slots.forEach((slotIdx, i) => { result[slotIdx] = sorted[i]; });
+  return result;
+}
+
 // Spreadsheet columns — one narrow column each, mirroring the Excel worksheet (Hoja 1).
 // `opts` may be an array or a function of the row item (used for table-aware filtering).
 // `hideWhen(item)` greys a cell out for rows where the field is meaningless.
-function columns(o, tables, categories, customLists) {
+function columns(state, tables, categories, customLists) {
+  const o = state.options;
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
   // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
@@ -241,7 +261,7 @@ function columns(o, tables, categories, customLists) {
     key: 'custom_' + l.id, label: l.name, kind: 'select', w: 130,
     opts: (it) => opt(l.items[tableCategory(it.table, tables)] || []),
   }));
-  return [
+  return reorderByFieldOrder([
     { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
     { key: 'location', label: 'Location', kind: 'select', opts: opt(o.locations), w: 116 },
@@ -293,7 +313,7 @@ function columns(o, tables, categories, customLists) {
     // Free-text, per-line — only printed on the Work Order (its own column there), never
     // on Client Quote or Labels.
     { key: 'notes', label: 'Notes', kind: 'text', w: 160, placeholder: 'Work order only' },
-  ];
+  ], state);
 }
 
 const FRAC_OPTS = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
@@ -396,7 +416,7 @@ function cell(col, item, onChange) {
 
 function sheet(q, rerender) {
   const s = getState();
-  const cols = columns(s.options, s.tables, s.categories, s.customLists);
+  const cols = columns(s, s.tables, s.categories, s.customLists);
   const draft = q._draft || (q._draft = blankLine(s));
 
   const priceCells = []; // {getItem, node}
