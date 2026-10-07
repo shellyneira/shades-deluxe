@@ -64,6 +64,9 @@ const routeKey = (c) => c.rows[0].q.id;
 const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
 const mapsUrl = (a) => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a);
 
+// wa.me wants the full international number with no + or spaces; a bare 10-digit number is a US one.
+const waNumber = (phone) => { const d = digits(phone); return phone.trim().startsWith('+') || d.length !== 10 ? d : '1' + d; };
+
 function goToQuote(id) { openQuote(id); document.querySelector('.tab[data-view="quotes"]')?.click(); }
 
 async function copy(text, what) {
@@ -116,6 +119,7 @@ function detail(c) {
   const actions = el('div', { class: 'client-actions' }, [
     action('phone', 'Call', tel ? 'tel:' + (c.phone.trim().startsWith('+') ? '+' : '') + tel : null),
     action('chat', 'Text', tel ? 'sms:' + tel : null),
+    action('chat', 'WhatsApp', tel ? 'https://wa.me/' + waNumber(c.phone) : null, { blank: true }),
     action('mail', 'Email', c.email ? 'mailto:' + c.email.trim() : null),
     action('pin', 'Directions', c.address ? mapsUrl(c.address) : null, { blank: true }),
   ]);
