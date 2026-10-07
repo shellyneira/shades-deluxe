@@ -86,7 +86,7 @@ function documentsPanel(s) {
       // A second, SEPARATE <label> (not nested in the one above) — a label wrapping two
       // checkboxes forwards an unlabeled click to the first one, so the "show label"
       // checkbox needs its own label to be clickable by its own text.
-      if (showLabelToggle && f.labelable !== false) {
+      if (showLabelToggle) {
         const labelBox = el('input', { type: 'checkbox', onchange: (e) => { labelCfg[f.key] = e.target.checked; save(); } });
         labelBox.checked = !!labelCfg[f.key];
         row.push(el('label', {

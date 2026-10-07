@@ -417,27 +417,29 @@ function builtinDescFields(abbrev) {
     { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
     { key: 'control', label: 'Control', fmt: (l) => controlText(l.control, abbrev) },
     { key: 'style', label: 'Style', fmt: (l) => l.style },
-    // These five already bake their own label into the printed text (a plain value would
-    // read as a bare word with nothing saying what it is) — "Settings → Documents" label
-    // checkbox is pointless (and would double up) for them, so `labelable: false`.
-    { key: 'headrail', label: 'Headrail', fmt: (l) => (l.headrail ? 'Headrail: ' + l.headrail : ''), labelable: false },
-    { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => (l.bottomRail ? 'Bottom: ' + l.bottomRail : ''), labelable: false },
-    { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : ''), labelable: false },
-    { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : ''), labelable: false },
-    { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : ''), labelable: false },
+    // Headrail/Bottom rail/Fabric width bake their own fixed label into the text on
+    // Client Quote & Stickers (never toggled there — no checkbox exists for those two
+    // documents). On the Work Order the label is instead whatever the per-field "show
+    // label" checkbox in Settings → Documents says, same mechanism as every other
+    // field — so here they print bare, and describeLine() prepends the label.
+    { key: 'headrail', label: 'Headrail', fmt: (l, isWork) => (l.headrail ? (isWork ? l.headrail : 'Headrail: ' + l.headrail) : '') },
+    { key: 'bottomRail', label: 'Bottom rail', fmt: (l, isWork) => (l.bottomRail ? (isWork ? l.bottomRail : 'Bottom: ' + l.bottomRail) : '') },
+    { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : '') },
+    { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
+    { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
     // `compact` is only set for DYMO labels — the sticker is tiny, so this one gets an
     // abbreviation there while Client Quote/Work Order keep the full word.
-    { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with ' + abbrev.sideChannelShort : 'with Side Channels') : ''), labelable: false },
+    { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with ' + abbrev.sideChannelShort : 'with Side Channels') : '') },
     // Wall vs. ceiling mount only matters to the maker — the client quote just says
     // "with Brackets". Prints the Lists value itself (uppercased), not a hardcoded
     // WALL/CEILING pair that would go stale the moment Mount is renamed in Lists.
-    { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork && l.mount ? ' - ' + l.mount.toUpperCase() : ''}` : ''), labelable: false },
+    { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork && l.mount ? ' - ' + l.mount.toUpperCase() : ''}` : '') },
     { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
-    { key: 'fabricWidth', label: 'Fabric width', fmt: (l) => (l.fabricWidth ? 'Fabric width: ' + l.fabricWidth + '"' : ''), labelable: false },
+    { key: 'fabricWidth', label: 'Fabric width', fmt: (l, isWork) => (l.fabricWidth ? (isWork ? l.fabricWidth + '"' : 'Fabric width: ' + l.fabricWidth + '"') : '') },
     { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
     // Was silently missing entirely — Work Order needs it (the maker has to know which),
     // the client quote never should (only the price matters to them).
-    { key: 'mount', label: 'Mount', fmt: (l) => (l.mount ? l.mount + ' Mount' : ''), labelable: false },
+    { key: 'mount', label: 'Mount', fmt: (l, isWork) => (l.mount ? (isWork ? l.mount : l.mount + ' Mount') : '') },
   ];
 }
 
@@ -469,7 +471,7 @@ export function describeLine(line, cfg, isWork, compact, state) {
     .filter((f) => !cfg || cfg[f.key])
     .map((f) => {
       const text = f.fmt(line, isWork, compact);
-      return text && labels && f.labelable !== false && labels[f.key] ? `${f.label}: ${text}` : text;
+      return text && labels && labels[f.key] ? `${f.label}: ${text}` : text;
     })
     .filter(Boolean)
     .join(', ');

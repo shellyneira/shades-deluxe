@@ -201,9 +201,14 @@ function normalize(state) {
       items: Object.fromEntries(state.categories.map((cat) => [cat, []])),
     });
   }
-  // One-time default: Work Order prints "Pattern: X" and "Color: X" out of the box —
-  // every other field's label prefix starts off, toggled on per field in Settings.
-  if (state.docFieldLabel.work.color === undefined) state.docFieldLabel.work.color = true;
+  // One-time defaults: Work Order prints "Pattern: X" and "Color: X" out of the box.
+  // Headrail/Bottom rail/Fabric width/Mount used to ALWAYS bake a label into the Work
+  // Order text (no toggle existed) — default their checkbox on too, so this change
+  // doesn't silently drop a label that was already printing. Every other field's
+  // label prefix starts off, toggled on per field in Settings.
+  for (const k of ['color', 'headrail', 'bottomRail', 'fabricWidth', 'mount']) {
+    if (state.docFieldLabel.work[k] === undefined) state.docFieldLabel.work[k] = true;
+  }
   const patternList = state.customLists.find((l) => l.name === 'Pattern' && l.perCategory);
   if (patternList && state.docFieldLabel.work['custom_' + patternList.id] === undefined) {
     state.docFieldLabel.work['custom_' + patternList.id] = true;
