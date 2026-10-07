@@ -400,6 +400,13 @@ function controlText(ctrl, abbrev) {
 // listed here — they were hardcoded once before and a new one needed a code change
 // every time; `descFields()` below appends one for each of those automatically, so
 // Settings → Documents always offers exactly what the worksheet currently has.
+// A field's `fmt` returns the BARE value only — never a baked-in "Field: " prefix or
+// fixed phrase wrapper. Whether (and how) a field's name prints next to its value is
+// entirely a Settings → Documents choice (the per-field "show label" checkbox, one
+// per document), applied uniformly by describeLine() below. This is also exactly why
+// the worksheet's own columns (Qty, Width, Motor $, Notes...) are included here too —
+// one list drives drag order AND the show/label choice everywhere, not just the
+// built-in "description" attributes.
 function builtinDescFields(abbrev) {
   return [
     // The table name (Roller #3, Zebra #5, Heavy Fabric...) is an internal price-tier
@@ -407,39 +414,46 @@ function builtinDescFields(abbrev) {
     // for every category. Off by default (Settings → Documents); a plain toggle like
     // every other field here, no per-category special-casing.
     { key: 'table', label: 'Shade type', fmt: (l) => l.table },
+    { key: 'qty', label: 'Qty', fmt: (l) => (l.qty ? String(l.qty) : '') },
+    { key: 'location', label: 'Location', fmt: (l) => l.location || '' },
+    { key: 'wdNumber', label: 'W/D #', fmt: (l) => l.wdNumber || '' },
+    { key: 'width', label: 'Width', fmt: (l) => (l.width ? String(l.width) : '') },
+    { key: 'widthFrac', label: 'Width fraction', fmt: (l) => FRACTION_TEXT[l.widthFrac] || '' },
+    { key: 'height', label: 'Height', fmt: (l) => (l.height ? String(l.height) : '') },
+    { key: 'heightFrac', label: 'Height fraction', fmt: (l) => FRACTION_TEXT[l.heightFrac] || '' },
     { key: 'product', label: 'Product', fmt: (l) => l.product },
     { key: 'fabric', label: 'Fabric', fmt: (l) => l.fabric },
     { key: 'color', label: 'Color', fmt: (l) => l.color },
-    // System/Track share the worksheet's merged column, so they sit together here too,
-    // ahead of Control — matches that column's position (left of Ctrl) on the worksheet.
     // Prints whatever Lists → Systems actually says, not a hardcoded expansion of it.
     { key: 'system', label: 'System', fmt: (l) => l.system || '' },
-    { key: 'track', label: 'Track', fmt: (l) => (l.track ? l.track + ' Track' : '') },
+    { key: 'track', label: 'Track', fmt: (l) => l.track || '' },
     { key: 'control', label: 'Control', fmt: (l) => controlText(l.control, abbrev) },
+    { key: 'motorPrice', label: 'Motor $', fmt: (l) => ((Number(l.motorPrice) || 0) > 0 ? '$' + l.motorPrice : '') },
     { key: 'style', label: 'Style', fmt: (l) => l.style },
-    // Headrail/Bottom rail/Fabric width bake their own fixed label into the text on
-    // Client Quote & Stickers (never toggled there — no checkbox exists for those two
-    // documents). On the Work Order the label is instead whatever the per-field "show
-    // label" checkbox in Settings → Documents says, same mechanism as every other
-    // field — so here they print bare, and describeLine() prepends the label.
-    { key: 'headrail', label: 'Headrail', fmt: (l, isWork) => (l.headrail ? (isWork ? l.headrail : 'Headrail: ' + l.headrail) : '') },
-    { key: 'bottomRail', label: 'Bottom rail', fmt: (l, isWork) => (l.bottomRail ? (isWork ? l.bottomRail : 'Bottom: ' + l.bottomRail) : '') },
+    { key: 'headrail', label: 'Headrail', fmt: (l) => l.headrail || '' },
+    { key: 'bottomRail', label: 'Bottom rail', fmt: (l) => l.bottomRail || '' },
     { key: 'reverse', label: 'Reverse roll', fmt: (l) => (l.reverse ? 'Reverse Roll' : '') },
     { key: 'fascia', label: 'Fascia', fmt: (l) => (l.fascia ? 'with Fascia' : '') },
     { key: 'cassette', label: 'Cassette', fmt: (l) => (l.cassette ? 'with Cassette' : '') },
     // `compact` is only set for DYMO labels — the sticker is tiny, so this one gets an
     // abbreviation there while Client Quote/Work Order keep the full word.
     { key: 'sideChannel', label: 'Side channels', fmt: (l, isWork, compact) => (l.sideChannel ? (compact ? 'with ' + abbrev.sideChannelShort : 'with Side Channels') : '') },
-    // Wall vs. ceiling mount only matters to the maker — the client quote just says
-    // "with Brackets". Prints the Lists value itself (uppercased), not a hardcoded
-    // WALL/CEILING pair that would go stale the moment Mount is renamed in Lists.
-    { key: 'brackets', label: 'Brackets', fmt: (l, isWork) => ((Number(l.brackets) || 0) > 0 ? `with Brackets${isWork && l.mount ? ' - ' + l.mount.toUpperCase() : ''}` : '') },
+    { key: 'installation', label: 'Installation $', fmt: (l) => ((Number(l.installation) || 0) > 0 ? '$' + l.installation : '') },
+    { key: 'brackets', label: 'Brackets', fmt: (l) => ((Number(l.brackets) || 0) > 0 ? 'with Brackets' : '') },
+    // Mount location (Wall/Ceiling) only matters to the maker, but which document gets
+    // to see it is a plain Settings → Documents checkbox now, same as every other field
+    // — used to print as a fixed "with Brackets - WALL" suffix on Brackets, work-order-
+    // only; now it's its own orderable, labelable field, shown wherever it's enabled.
+    { key: 'mount', label: 'Mount', fmt: (l) => l.mount || '' },
+    { key: 'fabricPrice', label: 'Fabric $/yd', fmt: (l) => ((Number(l.fabricPrice) || 0) > 0 ? '$' + l.fabricPrice + '/yd' : '') },
+    { key: 'fabricWidth', label: 'Fabric width', fmt: (l) => (l.fabricWidth ? l.fabricWidth + '"' : '') },
     { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
-    { key: 'fabricWidth', label: 'Fabric width', fmt: (l, isWork) => (l.fabricWidth ? (isWork ? l.fabricWidth + '"' : 'Fabric width: ' + l.fabricWidth + '"') : '') },
+    { key: 'discount', label: 'Discount', fmt: (l) => ((Number(l.discount) || 0) > 0 ? '$' + l.discount : '') },
+    { key: 'markup', label: 'Extra', fmt: (l) => ((Number(l.markup) || 0) > 0 ? '$' + l.markup : '') },
     { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
-    // Was silently missing entirely — Work Order needs it (the maker has to know which),
-    // the client quote never should (only the price matters to them).
-    { key: 'mount', label: 'Mount', fmt: (l, isWork) => (l.mount ? (isWork ? l.mount : l.mount + ' Mount') : '') },
+    // Free-text — also has its own dedicated column on the Work Order table; this entry
+    // only matters if someone also wants it folded into the Description text itself.
+    { key: 'notes', label: 'Notes', fmt: (l) => l.notes || '' },
   ];
 }
 
@@ -461,17 +475,18 @@ export function descFields(state) {
   return [...ordered, ...all.filter((f) => !placed.has(f.key))];
 }
 
-// Work Order only (Settings → Documents, per field): prints "Pattern: X" instead of
-// just "X" for the fields where a bare value would be ambiguous on the shop floor.
-// Client Quote and Stickers never read label prefixes — the maker is the only reader
-// who needs the field name spelled out next to the value.
+// Settings → Documents, per field, per document: prints "Pattern: X" instead of just
+// "X" wherever that field's "show label" checkbox is on for THIS document. One flat
+// docKey ('client'/'work'/'label') per call, derived from the same isWork/compact
+// flags every call site already passes — no field ever hardcodes its own label text.
 export function describeLine(line, cfg, isWork, compact, state) {
-  const labels = isWork ? (state?.docFieldLabel?.work || {}) : null;
+  const docKey = isWork ? 'work' : compact ? 'label' : 'client';
+  const labels = state?.docFieldLabel?.[docKey] || {};
   return descFields(state)
     .filter((f) => !cfg || cfg[f.key])
     .map((f) => {
       const text = f.fmt(line, isWork, compact);
-      return text && labels && labels[f.key] ? `${f.label}: ${text}` : text;
+      return text && labels[f.key] ? `${f.label}: ${text}` : text;
     })
     .filter(Boolean)
     .join(', ');

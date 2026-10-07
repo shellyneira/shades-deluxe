@@ -109,7 +109,7 @@ function freshState() {
     options: structuredClone(SEED.options),
     docConfig: structuredClone(DEFAULT_DOC_CONFIG),
     docFieldOrder: [],
-    docFieldLabel: { work: {} },
+    docFieldLabel: { client: {}, work: {}, label: {} },
     abbrev: { ...DEFAULT_ABBREV },
     rates: { ...DEFAULT_RATES },
     minimumOrder: 0,
@@ -172,7 +172,7 @@ function normalize(state) {
   state.docConfig.work.table = false; // one-time: Shade Type briefly defaulted on for Work Order — turn it back off
   state.docFieldOrder = Array.isArray(state.docFieldOrder) ? state.docFieldOrder : [];
   state.docFieldLabel = state.docFieldLabel || {};
-  state.docFieldLabel.work = state.docFieldLabel.work || {};
+  for (const doc of ['client', 'work', 'label']) state.docFieldLabel[doc] = state.docFieldLabel[doc] || {};
   state.abbrev = { ...DEFAULT_ABBREV, ...(state.abbrev || {}) };
 
 
@@ -201,14 +201,19 @@ function normalize(state) {
       items: Object.fromEntries(state.categories.map((cat) => [cat, []])),
     });
   }
-  // One-time defaults: Work Order prints "Pattern: X" and "Color: X" out of the box.
-  // Headrail/Bottom rail/Fabric width/Mount used to ALWAYS bake a label into the Work
-  // Order text (no toggle existed) — default their checkbox on too, so this change
-  // doesn't silently drop a label that was already printing. Every other field's
-  // label prefix starts off, toggled on per field in Settings.
-  for (const k of ['color', 'headrail', 'bottomRail', 'fabricWidth', 'mount']) {
-    if (state.docFieldLabel.work[k] === undefined) state.docFieldLabel.work[k] = true;
+  // One-time defaults, preserving exactly what used to print before any of this was a
+  // choice: Headrail/Bottom rail/Fabric width/Mount/Track used to ALWAYS bake a fixed
+  // label (or suffix) into the text on every document that showed them — default each
+  // document's checkbox on for these five so the change doesn't silently drop text
+  // that was already printing. Work Order also starts with "Pattern: X"/"Color: X" per
+  // the user's own request. Every other field's label prefix starts off, toggled on
+  // per field per document in Settings.
+  for (const doc of ['client', 'work', 'label']) {
+    for (const k of ['headrail', 'bottomRail', 'fabricWidth', 'mount', 'track']) {
+      if (state.docFieldLabel[doc][k] === undefined) state.docFieldLabel[doc][k] = true;
+    }
   }
+  if (state.docFieldLabel.work.color === undefined) state.docFieldLabel.work.color = true;
   const patternList = state.customLists.find((l) => l.name === 'Pattern' && l.perCategory);
   if (patternList && state.docFieldLabel.work['custom_' + patternList.id] === undefined) {
     state.docFieldLabel.work['custom_' + patternList.id] = true;
