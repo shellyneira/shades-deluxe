@@ -49,8 +49,9 @@ function addRow(arr, placeholder, priced, onChange) {
   const name = el('input', { type: 'text', class: 'field-add-input', placeholder: 'Type a ' + placeholder + '…' });
   const price = priced ? el('input', { type: 'number', min: '0', step: '0.01', class: 'field-add-price', placeholder: '$0' }) : null;
   const add = () => {
-    const v = name.value.trim();
-    if (!v) return name.focus();
+    const typed = name.value.trim();
+    if (!typed) return name.focus();
+    const v = typed[0].toUpperCase() + typed.slice(1); // lists read as a set of labels: always start with a capital
     arr.push({ name: v, price: priced ? Number(price.value) || 0 : 0 });
     name.value = ''; if (price) price.value = '';
     onChange();
