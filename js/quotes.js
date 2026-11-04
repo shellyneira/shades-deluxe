@@ -699,13 +699,12 @@ function sheet(q, rerender) {
     const item = (label, hint, key) => el('div', { class: 'dd-opt', role: 'option', onclick: () => { closePopover(); openSection(key); } }, [
       el('span', { class: 'dd-label' }, [label]), hint ? el('em', {}, [hint]) : null,
     ]);
-    const list = el('div', { class: 'dd-list' }, [
+    const list = el('div', { class: 'dd-list', style: 'max-height:min(460px, calc(100vh - 140px))' }, [
       ...(firstGrid ? [item('Shade', groupsOf(isGrid).map((g) => g.label).join(', '), 'shades')] : []),
-      ...(allSections.some((x) => x.family === 'drapery') ? [el('div', { class: 'dd-group' }, ['Drapery'])] : []),
-      ...allSections.filter((x) => x.family === 'drapery').map((x) => item(x.defaultTable, '', x.key)),
-      el('div', { class: 'dd-group' }, ['Other']),
       item('Accessory', 'remote, charger, hub', 'accessory'),
       item('Service', 'service call, repair…', 'service'),
+      ...(allSections.some((x) => x.family === 'drapery') ? [el('div', { class: 'dd-group' }, ['Drapery'])] : []),
+      ...allSections.filter((x) => x.family === 'drapery').map((x) => item(x.defaultTable, '', x.key)),
     ]);
     popover(anchor, list);
   };
