@@ -1,6 +1,6 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
-import { dropdown, combo, popover, closePopover, selectField, dateField, iconButton, confirmAction, labeled } from './ui.js';
+import { dropdown, combo, popover, closePopover, icon, ICON, selectField, dateField, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
 import { computeLine, isSizeless, isOtherLine, SERVICE_TABLE, CUSTOM_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
@@ -137,7 +137,7 @@ function editor(q) {
   const dynamic = el('div', {});
   const reRender = () => dynamic.replaceChildren(sheet(q, reRender));
   reRender();
-  return el('div', {}, [toolbar, client, dynamic]);
+  return el('div', {}, [toolbar, client, quoteTabs(q, sheetMode()), dynamic]);
 }
 
 /* ---------------- price breakdown ----------------
@@ -395,7 +395,8 @@ function cell(col, item, onChange, ctx = {}) {
       return picked.length ? picked.map((l) => l.location || l.table).join(', ') : 'Whole quote';
     };
     const text = el('span', { class: 'dd-text' }, [label()]);
-    const btn = el('button', { type: 'button', class: 'dd', style, 'aria-haspopup': 'listbox' }, [text]);
+    const btn = el('button', { type: 'button', class: 'dd', style, 'aria-haspopup': 'listbox' }, [text, icon(ICON.chevron, 14)]);
+    btn.querySelector('.ico').classList.add('dd-chev');
     btn.addEventListener('click', () => {
       const chosen = new Set(item.forLines || []);
       const rows = targets().map((l) => {
@@ -433,7 +434,7 @@ function cell(col, item, onChange, ctx = {}) {
         // Choosing a saved entry (not typing one) fills in its price, which stays editable.
         onChange: (text, picked) => {
           onChange(col.key, text);
-          if (picked && col.key === 'customText' && Number(picked.price) && !Number(item.customPrice)) onChange('customPrice', picked.price);
+          if (picked && col.key === 'customText' && Number(picked.price) && !Number(item.customPrice)) { onChange('customPrice', picked.price); ctx.rerender?.(); }
         },
       })]);
     }
@@ -467,6 +468,36 @@ function cell(col, item, onChange, ctx = {}) {
   const choices = options.map((o) => ({ value: o.name, label: o.price > 0 ? `${o.name} (${money(o.price)})` : o.name }));
   return el('td', {}, [dropdown({ options: choices, value: cur, style, onChange: (v) => onChange(key, v) })]);
 }
+
+// How the quote page shows its lines: "sheet" (spreadsheet, fast for many similar lines)
+// or "lines" (a short list with every field of the chosen line stacked beside it).
+const sheetMode = () => { try { return localStorage.getItem('sd-sheet-mode') === 'sheet' ? 'sheet' : 'lines'; } catch { return 'lines'; } };
+const setSheetMode = (m) => { try { localStorage.setItem('sd-sheet-mode', m); } catch { /* the choice just is not remembered */ } };
+
+// The five views of one quote, always in the same place: between the client card and the lines.
+function quoteTabs(q, active) {
+  const tab = (id, label, go) => el('button', { type: 'button', class: 'subtab' + (active === id ? ' active' : ''), onclick: go }, [label]);
+  const doc = (mode) => () => { commitDraftIfFilled(q); invMode = mode; open(q.id, 'invoice'); };
+  return el('div', { class: 'subtabs quote-tabs no-print' }, [
+    tab('sheet', 'Worksheet', () => { setSheetMode('sheet'); open(q.id, 'edit'); }),
+    tab('lines', 'Line editor', () => { setSheetMode('lines'); open(q.id, 'edit'); }),
+    tab('client', 'Client quote', doc('client')),
+    tab('work', 'Work order', doc('work')),
+    tab('labels', 'Stickers', doc('labels')),
+  ]);
+}
+
+// Which fields of a line sit together in the line editor; anything not listed (a custom
+// list added in Lists) lands under "What it is".
+const EDITOR_GROUPS = [
+  ['Where', ['location', 'wdNumber', 'qty']],
+  ['Size', ['width', 'widthFrac', 'height', 'heightFrac']],
+  ['What it is', ['table', 'customText', 'customPrice', 'forLines', 'product', 'fabric', 'color']],
+  ['Build', ['system', 'control', 'style', 'headrail', 'bottomRail', 'mount', 'fabricPrice', 'fabricWidth', 'lining', 'reverse', 'fascia', 'cassette', 'sideChannel']],
+  ['Charges', ['motorPrice', 'installation', 'brackets', 'markup', 'discount']],
+  ['Notes', ['notes']],
+];
+const editorSel = new Map(); // "quote|section" -> index of the line being edited, or 'new'
 
 // One open-section memory per quote for this session: a section the user just asked for
 // exists even before it has a line, so there is somewhere to type the first one.
@@ -571,7 +602,7 @@ function sheet(q, rerender) {
       return el('button', {
         class: 'off-line', type: 'button',
         onclick: () => {
-          const tr = priceCells.find((c) => c.item === p.it)?.node.closest('tr');
+          const tr = priceCells.find((c) => c.item === p.it)?.node.closest('tr, .edrow');
           if (!tr) return;
           tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
           tr.classList.add('flash');
@@ -625,7 +656,7 @@ function sheet(q, rerender) {
     // Changing the table refilters the Product/Description options, so rebuild the row.
     // Save on every keystroke, draft rows included — otherwise a refresh (or a browser
     // that never gets to "Add line") silently loses whatever was typed into them.
-    const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table' || key === 'customPrice') rerender(); };
+    const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table') rerender(); };
     // Every charge should be checkable without trusting the app: click the price and
     // it shows the arithmetic that produced it.
     const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
@@ -633,7 +664,7 @@ function sheet(q, rerender) {
     const clientNode = el('span', {}, ['—']);
     const clientTd = el('td', { class: 'r stk stk-c', style: 'color:var(--muted)' }, [clientNode]);
     priceCells.push({ committed: !sec, get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
-    const cells = cols.map((col) => cell(col, item, onChange, { q }));
+    const cells = cols.map((col) => cell(col, item, onChange, { q, rerender }));
     const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
     if (insInput) insCells.push({ get item() { return live(); }, input: insInput });
     const dimCell = (key) => cells[cols.findIndex((c) => c.key === key)];
@@ -667,7 +698,7 @@ function sheet(q, rerender) {
     rerender();
     focusDraft(sec.key);
   };
-  const focusDraft = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] tr.draftrow input:not([type=checkbox])`)?.focus(), 40);
+  const focusDraft = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] :is(tr.draftrow, .ed-panel) input:not([type=checkbox])`)?.focus(), 40);
 
   const openSection = (key) => {
     if (!openedSections.has(q.id)) openedSections.set(q.id, new Set());
@@ -693,6 +724,88 @@ function sheet(q, rerender) {
       el('div', { class: 'sheet-wrap' }, [el('table', { class: 'sheet' }, [el('thead', {}, [head]), el('tbody', {}, body)])]),
     ]);
   };
+
+  // ---- line editor: a short list of lines, and every field of the chosen one stacked beside it
+  const lineSummary = (l) => {
+    const family = familyOf(l, tables);
+    const main = l.location || (family === 'accessory' || family === 'service' ? '' : '—');
+    const what = describeLine(l, { ...s.docConfig.client, table: false }, false, false, s) || (['accessory', 'service'].includes(family) ? '' : l.table);
+    const size = l.width && l.height ? `${l.width} × ${l.height}` : '';
+    return { main: main || what || 'New line', what: main ? what : '', size };
+  };
+
+  const editorEl = (sec, cols, target) => {
+    const live = () => (target.draft ? q._drafts[sec.key] : q.items[target.idx]) || {};
+    const item = live();
+    const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table') rerender(); };
+    const byKey = Object.fromEntries(cols.map((c) => [c.key, c]));
+    const placed = new Set(EDITOR_GROUPS.flatMap(([, keys]) => keys));
+    let groups = EDITOR_GROUPS.map(([title, keys]) => [title, keys.filter((k) => byKey[k])]);
+    // Accessories and services are about WHAT they are first; where they go comes after.
+    if (['accessory', 'service'].includes(sec.family)) groups = [...groups.filter(([t]) => t === 'What it is'), ...groups.filter(([t]) => t !== 'What it is')];
+    const extra = cols.filter((c) => !placed.has(c.key)).map((c) => c.key);
+    const whatIs = groups.find(([t]) => t === 'What it is');
+    whatIs[1] = [...whatIs[1], ...extra];
+    const field = (col) => {
+      const td = cell(col, item, onChange, { q, rerender });
+      if (col.kind === 'check') {
+        const box = td.querySelector('input');
+        return el('label', { class: 'field check', style: 'flex-direction:row;align-items:center;gap:8px' }, [box, col.label]);
+      }
+      return el('label', { class: 'field' }, [col.label, ...td.childNodes]);
+    };
+    const body = groups.filter(([, keys]) => keys.length).map(([title, keys]) => {
+      const checks = keys.filter((k) => byKey[k].kind === 'check');
+      const rest = keys.filter((k) => byKey[k].kind !== 'check');
+      return el('div', { class: 'ed-group' }, [
+        el('div', { class: 'ed-title' }, [title]),
+        el('div', { class: 'ed-grid' }, rest.map((k) => field(byKey[k]))),
+        checks.length ? el('div', { class: 'ed-checks' }, checks.map((k) => field(byKey[k]))) : null,
+      ]);
+    });
+    const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
+    const priceTd = el('span', { onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
+    priceCells.push({ committed: !target.draft, get item() { return live(); }, node: priceNode, td: priceTd, client: el('span', {}, []), dims: {} });
+    const head = target.draft
+      ? [el('h4', {}, ['New ' + titleOf(sec).toLowerCase().replace(/^drapery · /, '') + ' line']), el('span', { class: 'grow' }, []), el('button', { class: 'btn primary small', type: 'button', onclick: () => addLine(sec) }, ['Add line'])]
+      : [el('h4', {}, ['Edit line · ' + (lineSummary(live()).main)]), el('span', { class: 'grow' }, []),
+        iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(target.idx + 1, 0, { ...live(), id: undefined }); save(); editorSel.set(q.id + '|' + sec.key, target.idx + 1); rerender(); }),
+        iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(target.idx, 1); save(); editorSel.set(q.id + '|' + sec.key, 'new'); rerender(); } })];
+    const box = el('div', { class: 'ed-panel' }, [
+      el('div', { class: 'ed-head' }, head),
+      el('div', { class: 'ed-body' }, body),
+      el('div', { class: 'ed-foot' }, [el('span', { class: 'muted' }, ['Price per unit']), priceTd]),
+    ]);
+    if (target.draft) box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented && e.target.tagName === 'INPUT') { e.preventDefault(); addLine(sec); } });
+    return box;
+  };
+
+  const listSectionEl = (sec) => {
+    const cols = colsOf(sec);
+    const key = q.id + '|' + sec.key;
+    const lines = linesOf(sec);
+    let sel = editorSel.get(key);
+    if (sel === undefined || (sel !== 'new' && !q.items[sel])) sel = 'new';
+    const rows = lines.map(({ it, idx }) => {
+      const sm = lineSummary(it);
+      const priceNode = el('strong', {}, ['—']);
+      const priceTd = el('div', { class: 'edprice' }, [priceNode]);
+      priceCells.push({ committed: true, get item() { return q.items[idx] || it; }, node: priceNode, td: priceTd, client: el('span', {}, []), dims: {} });
+      return el('div', { class: 'edrow' + (sel === idx ? ' active' : ''), tabindex: 0, onclick: () => { editorSel.set(key, idx); rerender(); } }, [
+        el('div', { class: 'edmain' }, [el('b', {}, [(Number(it.qty) > 1 ? it.qty + ' × ' : '') + sm.main]), sm.what ? el('span', {}, [sm.what]) : null, sm.size ? el('small', {}, [sm.size]) : null]),
+        priceTd,
+      ]);
+    });
+    const addRow = el('div', { class: 'edrow edadd' + (sel === 'new' ? ' active' : ''), tabindex: 0, onclick: () => { editorSel.set(key, 'new'); rerender(); focusEditor(); } }, [el('div', { class: 'edmain' }, [el('b', {}, ['+ New line'])])]);
+    const count = el('span', { class: 'sub' }, ['']);
+    const sub = el('strong', { class: 'sec-sub' }, ['']);
+    secRefs.push({ sec, count, sub });
+    return el('section', { class: 'fam', 'data-sec': sec.key }, [
+      el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
+      el('div', { class: 'ed-wrap' }, [el('div', { class: 'ed-list' }, [...rows, addRow]), sel === 'new' ? editorEl(sec, cols, { draft: true }) : editorEl(sec, cols, { idx: sel })]),
+    ]);
+  };
+  const focusEditor = () => setTimeout(() => document.querySelector('.ed-panel input:not([type=checkbox])')?.focus(), 40);
 
   // The one place to start anything: a menu of every kind of line the quote can hold.
   const addMenu = (anchor) => {
@@ -756,7 +869,7 @@ function sheet(q, rerender) {
   const addBtn = el('button', { class: 'btn primary', type: 'button' }, labeled('plus', 'Add to quote'));
   addBtn.onclick = () => addMenu(addBtn);
   const body = sections.length
-    ? sections.map(sectionEl)
+    ? sections.map(sheetMode() === 'sheet' ? sectionEl : listSectionEl)
     : [el('div', { class: 'empty-sheet' }, [el('p', {}, ['Nothing here yet. Start with the kind of line you want to add.']), ...['shades', 'accessory', 'service'].filter((k) => k !== 'shades' || firstGrid).map((k) => el('button', { class: 'btn', type: 'button', onclick: () => openSection(k) }, [({ shades: 'Shade', accessory: 'Accessory', service: 'Service' })[k]]))])];
 
   recalc();
@@ -764,7 +877,7 @@ function sheet(q, rerender) {
   return el('div', { class: 'panel' }, [
     el('div', { class: 'section-head' }, [
       el('h3', { style: 'margin:0' }, ['Worksheet']),
-      el('span', { class: 'hint' }, ['Each kind of line has its own section with only the fields that belong to it · scroll sideways inside a section.']),
+      el('span', { class: 'hint' }, [sheetMode() === 'sheet' ? 'Each kind of line has its own section with only the fields that belong to it · scroll sideways inside a section.' : 'Pick a line to edit all of its fields, or start a new one.']),
       addBtn,
     ]),
     ...body,
@@ -853,13 +966,9 @@ function invoice(q) {
   const isWork = invMode === 'work';
 
   const toolbar = el('div', { class: 'section-head no-print' }, [
-    el('button', { class: 'btn ghost', onclick: () => open(q.id, 'edit') }, labeled('arrowLeft', 'Back to worksheet')),
-    el('div', { class: 'subtabs', style: 'margin:0' }, [
-      el('button', { class: 'subtab' + (invMode === 'client' ? ' active' : ''), onclick: () => { invMode = 'client'; renderQuotes(); } }, ['Client Quote']),
-      el('button', { class: 'subtab' + (invMode === 'work' ? ' active' : ''), onclick: () => { invMode = 'work'; renderQuotes(); } }, ['Work Order']),
-      el('button', { class: 'subtab' + (invMode === 'labels' ? ' active' : ''), onclick: () => { invMode = 'labels'; renderQuotes(); } }, ['Labels']),
-      el('button', { class: 'btn primary small', onclick: () => window.print() }, labeled('printer', 'Print / Save PDF')),
-    ]),
+    el('button', { class: 'btn ghost', onclick: () => open(q.id, 'edit') }, labeled('arrowLeft', 'Back to quote')),
+    quoteTabs(q, invMode),
+    el('button', { class: 'btn primary small', onclick: () => window.print() }, labeled('printer', 'Print / Save PDF')),
   ]);
 
   if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);

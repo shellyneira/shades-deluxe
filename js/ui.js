@@ -37,7 +37,7 @@ const ICON = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 };
-export { svg as iconSvg, ICON };
+export { svg as iconSvg, ICON, icon };
 
 // Icon + text, for a button's label: labeled('plus', 'New quote').
 export function labeled(name, text, size = 16) {
@@ -69,32 +69,37 @@ export function closePopover() {
 }
 
 // A floating panel pinned to `anchor`. Fixed, not absolute, so a scrolling sheet can't
-// clip it; it closes on outside click, Escape, resize and scroll rather than float
-// away from what it belongs to. One at a time.
+// clip it; it follows the anchor when the page scrolls or resizes (and closes only once
+// the anchor itself has scrolled out of view). It also closes on outside click and Escape.
+// One at a time.
 export function popover(anchor, node, { onClose, minWidth = true } = {}) {
   closePopover();
   node.classList.add('pop');
   document.body.append(node);
   anchor.setAttribute?.('aria-expanded', 'true');
-  const r = anchor.getBoundingClientRect();
-  if (minWidth) node.style.minWidth = r.width + 'px';
-  const w = node.offsetWidth, h = node.offsetHeight;
-  const below = innerHeight - r.bottom;
-  node.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
-  node.style.top = (below < h + 12 && r.top > h + 12 ? r.top - h - 6 : r.bottom + 6) + 'px';
+  const place = () => {
+    const r = anchor.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight) { closePopover(); return; }
+    if (minWidth) node.style.minWidth = r.width + 'px';
+    const w = node.offsetWidth, h = node.offsetHeight;
+    const below = innerHeight - r.bottom;
+    node.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+    node.style.top = (below < h + 12 && r.top > h + 12 ? r.top - h - 6 : r.bottom + 6) + 'px';
+  };
+  place();
 
   const away = (e) => { if (!node.contains(e.target) && !anchor.contains(e.target)) closePopover(); };
-  const onScroll = (e) => { if (!node.contains(e.target)) closePopover(); };
+  const onScroll = (e) => { if (!node.contains(e.target)) place(); };
   const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); if (openPop) openPop.restoreFocus = true; closePopover(); } };
   document.addEventListener('mousedown', away, true);
   document.addEventListener('keydown', esc, true);
   addEventListener('scroll', onScroll, true);
-  addEventListener('resize', closePopover);
+  addEventListener('resize', place);
   const off = () => {
     document.removeEventListener('mousedown', away, true);
     document.removeEventListener('keydown', esc, true);
     removeEventListener('scroll', onScroll, true);
-    removeEventListener('resize', closePopover);
+    removeEventListener('resize', place);
   };
   openPop = { node, anchor, onClose, restoreFocus: false, off };
   return { close: closePopover };
@@ -220,6 +225,8 @@ export function combo({ options, value, onChange, placeholder = '', style = '', 
   };
   const pick = (o) => { inp.value = o.name; closePopover(); onChange(o.name, o); };
 
+  const wrap = el('div', { class: 'combo' }, [inp, icon(ICON.chevron, 14)]);
+  wrap.lastChild.classList.add('combo-chev');
   inp.addEventListener('focus', () => fill());
   inp.addEventListener('click', () => { if (!list) fill(); });
   inp.addEventListener('input', () => { onChange(inp.value, null); fill(true); });
@@ -229,7 +236,7 @@ export function combo({ options, value, onChange, placeholder = '', style = '', 
     else if (e.key === 'Enter' && list && active >= 0) { e.preventDefault(); pick(shown[active]); }
     else if (e.key === 'Tab') closePopover();
   });
-  return inp;
+  return wrap;
 }
 
 // A labelled field wrapping a dropdown — the form-style replacement for <select>.

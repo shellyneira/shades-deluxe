@@ -871,3 +871,42 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .sumbar strong { color: var(--ink); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .sumbar-profit strong { color: var(--ok, #2f7d4f); }
 .invoice table.items tr.grp td { padding: 16px 12px 6px; font-size: 10.5px; letter-spacing: 1px; font-weight: 700; color: var(--ink3); border-bottom: 1px solid var(--hair); }
+.combo { position: relative; display: block; }
+.combo input { padding-right: 26px !important; }
+.combo .combo-chev { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--muted); }
+
+/* ---- cards: each kind of line reads as its own card ---- */
+.fam { margin-bottom: 26px; border: 1px solid var(--line-strong); box-shadow: var(--shadow-md, 0 2px 10px rgba(20,24,40,.08)); }
+.fam > header { background: var(--surface-sunken); border-bottom: 1px solid var(--line-strong); }
+.fam > header h4 { font-size: 16px; }
+/* the pinned price columns read as their own panel over the scrolling fields */
+table.sheet .stk { background: var(--panel); }
+table.sheet th.stk { background: var(--surface-sunken); }
+table.sheet .stk-u { box-shadow: -10px 0 12px -10px rgba(20, 24, 40, .22); border-left: 1px solid var(--line-strong); }
+table.sheet tr.draftrow td.stk { background: color-mix(in srgb, var(--brand-tint) 55%, var(--panel)); }
+table.sheet tbody tr:hover td.stk { background: var(--surface-hover); }
+/* the quote's views */
+.quote-tabs { margin: 18px 0 14px; }
+/* line editor */
+.ed-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 0; align-items: start; }
+.ed-list { border-right: 1px solid var(--line); min-height: 220px; }
+.edrow { display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.edrow:hover { background: var(--surface-hover); }
+.edrow.active { background: var(--brand-tint); box-shadow: inset 3px 0 0 var(--brand); }
+.edmain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.edmain b { font-weight: 700; }
+.edmain span { color: var(--ink); font-size: 13px; }
+.edmain small { color: var(--muted); font-size: 12px; }
+.edprice { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.edadd { color: var(--brand); }
+.ed-panel { position: sticky; top: 8px; display: flex; flex-direction: column; max-height: calc(100vh - 24px); }
+.ed-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.ed-head h4 { margin: 0; font-size: 14px; }
+.ed-head .grow { flex: 1; }
+.ed-body { display: grid; gap: 18px; padding: 16px; overflow: auto; }
+.ed-title { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+.ed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 12px; }
+.ed-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; }
+.ed-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 13px; }
+.ed-foot strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) { .ed-wrap { grid-template-columns: 1fr; } .ed-list { border-right: 0; border-bottom: 1px solid var(--line); } .ed-panel { position: static; max-height: none; } }
