@@ -509,6 +509,7 @@ export function duplicateQuote(id) {
   const src = getQuote(id);
   const q = {
     ...structuredClone(src),
+    client: { ...structuredClone(src.client), name: src.client?.name ? `${src.client.name} Copy` : '' },
     id: 'q_' + Date.now().toString(36),
     number: state.nextQuoteNumber++,
     date: new Date().toISOString().slice(0, 10),
