@@ -4,6 +4,7 @@ import { dropdown, combo, popover, closePopover, icon, ICON, selectField, dateFi
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
 import { computeLine, isSizeless, isOtherLine, SERVICE_TABLE, CUSTOM_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
+import { paginate } from './paginate.js';
 
 let sub = { view: 'list', quoteId: null };
 
@@ -1124,7 +1125,15 @@ function docView(q) {
   } else docs = picked.map((c) => build(itemsFor(c), { name: c }));
   if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection.'])];
 
-  return el('div', {}, [makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
+  // The document is measured and split into Letter pages once it is on screen; until then it
+  // stays invisible so nobody sees the tall, unbroken version.
+  const panel = el('div', { class: 'panel invoice-panel paginating' }, docs);
+  const run = () => {
+    if (panel.isConnected) [...panel.querySelectorAll(':scope > .invoice')].forEach(paginate);
+    panel.classList.remove('paginating');
+  };
+  (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(() => requestAnimationFrame(run)));
+  return el('div', {}, [makerBar, panel]);
 }
 
 // DYMO 30252 stickers (1⅛" × 3½"), one per shade, for the LabelWriter 550.
@@ -1187,13 +1196,16 @@ function fitLabels() {
 // Documents group lines by kind, in the order a customer thinks of them. Headings only
 // appear when more than one kind is present, so a shades-only quote reads exactly as before.
 const DOC_GROUPS = [['shade', 'Shades'], ['drapery', 'Drapery'], ['accessory', 'Accessories'], ['service', 'Services']];
-function groupedRows(items, tables, span, rowFor) {
+function groupedRows(items, tables, span, rowFor, subtotalFor) {
   const groups = DOC_GROUPS
     .map(([family, label]) => ({ label, lines: items.filter((l) => familyOf(l, tables) === family) }))
     .filter((g) => g.lines.length);
   let n = 0;
   return groups.flatMap((g) => [
-    groups.length > 1 ? el('tr', { class: 'grp' }, [el('td', { colspan: span }, [g.label.toUpperCase()])]) : null,
+    groups.length > 1 ? el('tr', { class: 'grp' }, [
+      el('td', { colspan: subtotalFor ? span - 1 : span }, [g.label.toUpperCase(), el('span', { class: 'grp-n' }, [`· ${g.lines.length}`])]),
+      subtotalFor ? el('td', { class: 'num' }, [subtotalFor(g.lines)]) : null,
+    ]) : null,
     ...g.lines.map((l) => rowFor(l, n++)),
   ]);
 }
@@ -1251,7 +1263,10 @@ function clientTable(q, s) {
       el('td', { class: 'num' }, [unpriced ? 'TBD' : unitText]),
       el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(lineTotal)]),
     ]);
-  });
+  }, (lines) => money0(lines.reduce((a, l) => {
+    const c = computeLine(l, s);
+    return a + roundWhole((c.unit || 0) - (showInstall ? (c.installation || 0) : 0)) * (Number(l.qty) || 1) + (bundle.extra.get(l.id) || 0);
+  }, 0)));
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })]), el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),

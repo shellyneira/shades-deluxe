@@ -137,8 +137,8 @@ table.grid th .row-act { width: 22px; height: 22px; opacity: .45; margin-top: 2p
 
 /* ---------- printable document (refined greyscale, brand logo) ---------- */
 .invoice-panel { padding: 0; overflow: hidden; }
-.invoice { --ink1: var(--paper-ink-1); --ink2: var(--paper-ink-2); --ink3: var(--paper-ink-3); --hair: var(--paper-hair); --wash: var(--paper-wash); background: var(--paper); color: var(--ink2); padding: 46px 52px 48px; max-width: 860px; margin: 0 auto; }
-.invoice .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 26px; border-bottom: 1px solid var(--hair); }
+.invoice { --ink1: var(--paper-ink-1); --ink2: var(--paper-ink-2); --ink3: var(--paper-ink-3); --hair: var(--paper-hair); --wash: var(--paper-wash); background: var(--paper); color: var(--ink2); padding: 34px 38px 0; max-width: 860px; margin: 0 auto; }
+.invoice .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--hair); }
 .invoice .co { display: flex; align-items: center; gap: 18px; }
 .invoice .logo { width: 78px; height: 78px; object-fit: contain; flex: none; }
 .invoice .co-lines { display: flex; flex-direction: column; gap: 2px; }
@@ -151,7 +151,7 @@ table.grid th .row-act { width: 22px; height: 22px; opacity: .45; margin-top: 2p
 .invoice .mrow .mv { color: var(--ink1); font-weight: 600; font-variant-numeric: tabular-nums; }
 .invoice .mrow.status { justify-content: flex-end; margin-top: 2px; }
 .invoice .delivery-banner { margin: 4px 0 20px; padding: 10px 16px; border: 2px solid var(--brand); border-radius: var(--radius-sm); font-size: 20px; font-weight: 800; color: var(--brand); text-align: center; letter-spacing: .3px; }
-.invoice .parties { display: flex; justify-content: space-between; gap: 40px; margin-bottom: 28px; }
+.invoice .parties { display: flex; justify-content: space-between; gap: 40px; margin-bottom: 16px; }
 .invoice .parties .ship { text-align: right; }
 @media screen and (max-width: 760px) { .invoice .parties { flex-direction: column; gap: 16px; } .invoice .parties .ship { text-align: left; } }
 .invoice .bill { padding: 2px 0 0; }
@@ -161,21 +161,21 @@ table.grid th .row-act { width: 22px; height: 22px; opacity: .45; margin-top: 2p
 .invoice table.items { width: 100%; border-collapse: collapse; }
 .invoice table.items th { background: var(--wash); color: var(--ink3); padding: 11px 12px; font-size: 10.5px; text-align: left; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; border-bottom: 2px solid var(--ink1); }
 .invoice table.items th.num, .invoice table.items td.num { text-align: right; }
-.invoice table.items td { padding: 13px 12px; border-bottom: 1px solid var(--hair); font-size: 13px; vertical-align: top; color: var(--ink2); }
+.invoice table.items td { padding: 8px 11px; border-bottom: 1px solid var(--hair); font-size: 13px; vertical-align: top; color: var(--ink2); }
 .invoice table.items td.strong { font-weight: 600; color: var(--ink1); }
 .invoice table.items td.desc { color: var(--ink3); max-width: 280px; line-height: 1.55; }
 /* A line the price chart cannot reach prints TBD, not $0. Make it unmissable on the
    page so it is never mailed as a free shade. */
 .invoice table.items tr.unpriced td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .invoice table.items tr.unpriced td.num { color: var(--danger); font-weight: 800; letter-spacing: .5px; }
-.invoice .sum { display: flex; justify-content: flex-end; margin-top: 20px; }
+.invoice .sum { display: flex; justify-content: flex-end; margin-top: 14px; }
 .invoice .sum-box { width: 300px; }
 .invoice .sum-box .line { display: flex; justify-content: space-between; padding: 8px 2px; font-size: 14px; color: var(--ink2); }
 .invoice .sum-box .line.grand { margin-top: 8px; padding: 14px 2px 4px; border-top: 2px solid var(--ink1); color: var(--ink1); font-size: 20px; font-weight: 800; }
 .invoice .sum-box .line.paid { color: var(--paper-success); font-weight: 600; }
 .invoice .sum-box .line.balance { color: var(--ink1); font-weight: 700; border-top: 1px dashed var(--hair); padding-top: 10px; }
 .invoice .paid-stamp { margin-top: 12px; text-align: center; border: 2px solid var(--paper-success); color: var(--paper-success); font-weight: 800; letter-spacing: 2px; padding: 8px; border-radius: 8px; font-size: 15px; }
-.invoice .terms { margin-top: 36px; font-size: 11.5px; color: var(--ink3); white-space: pre-line; border-top: 1px solid var(--hair); padding-top: 16px; line-height: 1.7; }
+.invoice .terms { margin-top: 20px; font-size: 11.5px; color: var(--ink3); white-space: pre-line; border-top: 1px solid var(--hair); padding-top: 16px; line-height: 1.7; }
 /* work order: compact spec grid */
 .invoice.work { max-width: 1040px; }
 .invoice.work table.items th, .invoice.work table.items td { padding: 8px 9px; font-size: 11.5px; white-space: nowrap; }
@@ -207,7 +207,6 @@ table.grid th .row-act { width: 22px; height: 22px; opacity: .45; margin-top: 2p
 .share-item { border: 0; background: transparent; text-align: left; padding: 9px 12px; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink); }
 .share-item:hover { background: var(--bg); }
 @media print {
-  .invoice { padding: 6px 8px; }
   .invoice.work { max-width: none; }
   .inv-scroll { overflow: visible; }
   .invoice table.items th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -534,22 +533,17 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
 .invoice-panel .invoice + .invoice { border-top: 2px dashed var(--line); }
 
 @media print {
-  .invoice + .invoice { break-before: page; border: 0; }
   .invoice table.items tr.print-gap { display: table-row; }
-  .invoice table.items tr.print-gap td { height: 8mm; padding: 0; border: 0; }
-  .invoice table.items tfoot tr.print-gap td { height: 8mm; }
   .no-print { display: none !important; }
   html, body, main { background: var(--paper); margin: 0; max-width: none; padding: 0; }
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
   /* margin:0 page leaves the browser no room to inject its URL/date/page footer */
   html, body, main { height: auto !important; min-height: 0 !important; }
-  .invoice { padding: 9mm 10mm 0; max-width: none; page: inv; }
-  /* compact so a short quote always fits ONE page (Edge is stricter than Chrome) */
-  .invoice .head { margin-bottom: 18px; padding-bottom: 14px; }
-  .invoice .parties { margin-bottom: 16px; }
-  .invoice table.items td { padding: 8px 11px; }
-  .invoice .sum { margin-top: 14px; }
-  .invoice .terms { margin-top: 20px; break-inside: avoid; }
+  .invoice { max-width: none; page: inv; }
+  /* the app already split the document into Letter pages: print them as they are */
+  .invoice.page { width: 8.5in; height: 1055px; overflow: hidden; margin: 0; border: 0; box-shadow: none; break-after: page; }
+  .invoice.page:last-child { break-after: auto; }
+  .invoice .terms { break-inside: avoid; }
   .invoice .sum { break-inside: avoid; }
   .invoice table.items tr { break-inside: avoid; }
   @page inv { margin: 0; }
@@ -933,15 +927,26 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
   .invoice-panel { padding: 0; background: none; border: 0; box-shadow: none; overflow: visible; }
   /* a sheet of US Letter (8.5 x 11 in at 96 dpi), centered, exactly the proportions that print */
   .invoice-panel .invoice, .invoice-panel .invoice.work { width: 100%; max-width: 816px; box-sizing: border-box; border-radius: 4px; box-shadow: 0 10px 30px rgba(20, 24, 40, .16), 0 2px 6px rgba(20, 24, 40, .10); }
-  @media (min-width: 880px) { .invoice-panel .invoice { min-height: 1056px; } }
   .invoice-panel .invoice { margin-bottom: 8px; }
   .invoice-panel .invoice + .invoice { margin-top: 26px; border-top: 0; }
 }
 .applies { margin-left: 8px; padding: 1px 7px; border-radius: 99px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--panel); border: 1px solid var(--line); }
 
-/* stickers preview on screen as a sheet too, at the same width and padding as the other documents */
+/* stickers: each label IS its paper (3.5 x 1.125 in), so the preview is the print: one page per label, stacked */
 @media screen {
   .doc-col { max-width: 816px; margin-left: auto; margin-right: auto; }
-  .labels-wrap { max-width: 816px; margin: 0 auto 8px; box-sizing: border-box; padding: 36px 40px; border-radius: 4px; background: var(--paper); box-shadow: 0 10px 30px rgba(20, 24, 40, .16), 0 2px 6px rgba(20, 24, 40, .10); }
-  @media (min-width: 880px) { .labels-wrap { min-height: 1056px; align-content: flex-start; } }
+  .labels-wrap { flex-direction: column; flex-wrap: nowrap; align-items: center; gap: 22px; padding: 8px 0 24px; }
+  .dl-wrap { position: relative; }
+  .dl-wrap .dl-check { position: absolute; left: -36px; top: 50%; transform: translateY(-50%); }
+  .dl-wrap .dymo-label { border: 0; border-radius: 2px; padding: 0.09in 0.14in; box-shadow: 0 10px 30px rgba(20, 24, 40, .16), 0 2px 6px rgba(20, 24, 40, .10); }
 }
+
+/* paginated Letter pages: the screen shows exactly what prints */
+.invoice.page { position: relative; height: 1056px; overflow: hidden; }
+.invoice.page .pg { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 10.5px; letter-spacing: .08em; color: var(--ink3); }
+.invoice-panel.paginating { visibility: hidden; }
+/* a group in a document: a clear band with its name, how many, and (client quote) its subtotal */
+.invoice table.items tr.grp td { padding: 9px 11px; background: var(--wash); color: var(--ink1); font-size: 10.5px; font-weight: 800; letter-spacing: 1.2px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); border-left: 0; }
+.invoice table.items tr.grp:not(:first-child) td { border-top: 1px solid var(--ink1); }
+.invoice table.items tr.grp td.num { text-align: right; letter-spacing: 0; font-variant-numeric: tabular-nums; font-size: 12px; }
+.invoice table.items tr.grp .grp-n { font-weight: 600; color: var(--ink3); margin-left: 6px; }
