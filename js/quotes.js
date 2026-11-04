@@ -262,21 +262,21 @@ function columns(state, tables, categories, customLists) {
   // and Color: they read as their own group, right after the shade's core identity
   // (Product/Fabric/Color), not wedged into the middle of it.
   const customCols = (customLists || []).filter((l) => l.perCategory).map((l) => ({
-    key: 'custom_' + l.id, label: l.name, kind: 'select', w: 130,
+    key: 'custom_' + l.id, label: l.name, kind: 'select', w: 130, free: !l.priced,
     opts: (it) => opt(l.items[tableCategory(it.table, tables)] || []),
   }));
   return reorderByFieldOrder([
     { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
     { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
-    { key: 'location', label: 'Location', kind: 'select', opts: opt(o.locations), w: 116 },
-    { key: 'wdNumber', label: 'W/D #', kind: 'select', opts: opt(o.wdNumbers), w: 92 },
+    { key: 'location', label: 'Location', kind: 'select', free: true, opts: opt(o.locations), w: 116 },
+    { key: 'wdNumber', label: 'W/D #', kind: 'select', free: true, opts: opt(o.wdNumbers), w: 92 },
     { key: 'width', label: 'W', kind: 'num', w: 52 },
     { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
     { key: 'height', label: 'H', kind: 'num', w: 52 },
     { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
-    { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
-    { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
+    { key: 'product', label: 'Product', kind: 'select', free: true, opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
+    { key: 'fabric', label: 'Description', kind: 'select', free: true, opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
+    { key: 'color', label: 'Color', kind: 'select', free: true, opts: opt(o.colors), w: 116 },
     // Custom item lines: what to call it and what to charge. Every other column stays live.
     { key: 'customText', label: 'Item', kind: 'text', w: 150, placeholder: 'What is it?', hideWhen: (it) => !isOtherLine(it), naWhy: 'Only for Accessory, Service and Custom item lines',
       // Saved services/accessories as suggestions; anything else can still be typed. Picking one fills its price.
@@ -363,7 +363,14 @@ const COL_HELP = {
 // field-sizing does this in CSS; `size` is the same idea for browsers without it.
 const fitText = (inp) => { inp.size = Math.max(4, inp.value.length || (inp.placeholder || '').length, 1) + 1; };
 
+// Labels that only describe (location, color, product...) accept anything typed, with
+// the saved list as suggestions — a one-off name never has to be added to Lists first.
+// Priced or rule-bearing fields stay strict: a typed value there would silently charge $0.
 function cell(col, item, onChange) {
+  if (col.kind === 'select' && col.free) {
+    const listed = col;
+    col = { ...col, kind: 'text', suggest: (it) => ((typeof listed.opts === 'function' ? listed.opts(it) : listed.opts) || []).filter(Boolean).map((o) => (typeof o === 'string' ? { name: o, price: 0 } : o)) };
+  }
   // col.w is a floor, not a size: cells grow to whatever their text needs (see table.sheet in styles.css).
   const style = `min-width:${col.w}px`;
   if (col.hideWhen && col.hideWhen(item)) {
@@ -394,7 +401,7 @@ function cell(col, item, onChange) {
       // Choosing a saved entry (not typing one) fills in its price, which stays editable.
       onchange: (e) => {
         const hit = suggestions.find((o) => o.name === e.target.value);
-        if (hit && Number(hit.price) && !Number(item.customPrice)) onChange('customPrice', hit.price);
+        if (col.key === 'customText' && hit && Number(hit.price) && !Number(item.customPrice)) onChange('customPrice', hit.price);
       },
     });
     fitText(inp);
