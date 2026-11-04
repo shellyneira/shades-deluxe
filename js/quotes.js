@@ -770,15 +770,20 @@ function sheet(q, rerender) {
     const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
     const priceTd = el('span', { onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
     priceCells.push({ committed: !target.draft, get item() { return live(); }, node: priceNode, td: priceTd, client: el('span', {}, []), dims: {} });
+    const key = q.id + '|' + sec.key;
     const head = target.draft
-      ? [el('h4', {}, ['New ' + titleOf(sec).toLowerCase().replace(/^drapery · /, '') + ' line']), el('span', { class: 'grow' }, []), el('button', { class: 'btn primary small', type: 'button', onclick: () => addLine(sec) }, ['Add line'])]
-      : [el('h4', {}, ['Edit line · ' + (lineSummary(live()).main)]), el('span', { class: 'grow' }, []),
-        iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(target.idx + 1, 0, { ...live(), id: undefined }); save(); editorSel.set(q.id + '|' + sec.key, target.idx + 1); rerender(); }),
-        iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(target.idx, 1); save(); editorSel.set(q.id + '|' + sec.key, 'new'); rerender(); } })];
+      ? [el('h4', {}, ['New ' + titleOf(sec).toLowerCase().replace(/^drapery · /, '') + ' line'])]
+      : [el('h4', {}, ['Edit line · ' + lineSummary(live()).main]), el('span', { class: 'grow' }, []),
+        iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(target.idx + 1, 0, { ...live(), id: undefined }); save(); editorSel.set(key, target.idx + 1); rerender(); }),
+        iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(target.idx, 1); save(); editorSel.set(key, null); rerender(); } })];
+    // The action sits where the form ends: that is where the eye and the cursor are when it is filled.
+    const action = target.draft
+      ? el('button', { class: 'btn primary', type: 'button', onclick: () => addLine(sec) }, ['Add line'])
+      : el('button', { class: 'btn', type: 'button', onclick: () => { editorSel.set(key, null); rerender(); } }, ['Done']);
     const box = el('div', { class: 'ed-panel' }, [
       el('div', { class: 'ed-head' }, head),
       el('div', { class: 'ed-body' }, body),
-      el('div', { class: 'ed-foot' }, [el('span', { class: 'muted' }, ['Price per unit']), priceTd]),
+      el('div', { class: 'ed-foot' }, [el('span', { class: 'ed-price' }, [el('span', { class: 'muted' }, ['Price per unit ']), priceTd]), action]),
     ]);
     if (target.draft) box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented && e.target.tagName === 'INPUT') { e.preventDefault(); addLine(sec); } });
     return box;
@@ -788,28 +793,34 @@ function sheet(q, rerender) {
     const cols = colsOf(sec);
     const key = q.id + '|' + sec.key;
     const lines = linesOf(sec);
+    // A section with lines starts collapsed; an empty one opens straight into its first line.
     let sel = editorSel.get(key);
-    if (sel === undefined || (sel !== 'new' && !q.items[sel])) sel = 'new';
-    const rows = lines.map(({ it, idx }) => {
+    if (sel === undefined) { sel = lines.length ? null : 'new'; editorSel.set(key, sel); }
+    if (typeof sel === 'number' && !q.items[sel]) sel = null;
+    const toggle = (target) => { editorSel.set(key, sel === target ? null : target); rerender(); if (sel !== target) focusEditor(sec.key); };
+    const rows = lines.flatMap(({ it, idx }) => {
       const sm = lineSummary(it);
       const priceNode = el('strong', {}, ['—']);
       const priceTd = el('div', { class: 'edprice' }, [priceNode]);
       priceCells.push({ committed: true, get item() { return q.items[idx] || it; }, node: priceNode, td: priceTd, client: el('span', {}, []), dims: {} });
-      return el('div', { class: 'edrow' + (sel === idx ? ' active' : ''), tabindex: 0, onclick: () => { editorSel.set(key, idx); rerender(); } }, [
+      const row = el('div', { class: 'edrow' + (sel === idx ? ' active' : ''), tabindex: 0, role: 'button', 'aria-expanded': String(sel === idx), onclick: () => toggle(idx) }, [
         el('div', { class: 'edmain' }, [el('b', {}, [(Number(it.qty) > 1 ? it.qty + ' × ' : '') + sm.main]), sm.what ? el('span', {}, [sm.what]) : null, sm.size ? el('small', {}, [sm.size]) : null]),
         priceTd,
       ]);
+      row.addEventListener('keydown', (e) => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(idx); } });
+      return sel === idx ? [row, editorEl(sec, cols, { idx })] : [row];
     });
-    const addRow = el('div', { class: 'edrow edadd' + (sel === 'new' ? ' active' : ''), tabindex: 0, onclick: () => { editorSel.set(key, 'new'); rerender(); focusEditor(); } }, [el('div', { class: 'edmain' }, [el('b', {}, ['+ New line'])])]);
+    const addRow = el('div', { class: 'edrow edadd' + (sel === 'new' ? ' active' : ''), tabindex: 0, role: 'button', 'aria-expanded': String(sel === 'new'), onclick: () => toggle('new') }, [el('div', { class: 'edmain' }, [el('b', {}, ['+ New line'])])]);
+    addRow.addEventListener('keydown', (e) => { if (e.target === addRow && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle('new'); } });
     const count = el('span', { class: 'sub' }, ['']);
     const sub = el('strong', { class: 'sec-sub' }, ['']);
     secRefs.push({ sec, count, sub });
     return el('section', { class: 'fam', 'data-sec': sec.key }, [
       el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
-      el('div', { class: 'ed-wrap' }, [el('div', { class: 'ed-list' }, [...rows, addRow]), sel === 'new' ? editorEl(sec, cols, { draft: true }) : editorEl(sec, cols, { idx: sel })]),
+      el('div', { class: 'ed-list' }, [...rows, addRow, ...(sel === 'new' ? [editorEl(sec, cols, { draft: true })] : [])]),
     ]);
   };
-  const focusEditor = () => setTimeout(() => document.querySelector('.ed-panel input:not([type=checkbox])')?.focus(), 40);
+  const focusEditor = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] .ed-panel input:not([type=checkbox])`)?.focus(), 40);
 
   // The one place to start anything: a menu of every kind of line the quote can hold.
   const addMenu = (anchor) => {
@@ -860,14 +871,19 @@ function sheet(q, rerender) {
     totalsRefs.offRow,
     totalsRefs.taxRow,
     el('div', { class: 'line grand' }, [el('span', {}, ['Total']), totalsRefs.total]),
-    el('div', { class: 'profit-box' }, [
-      el('div', { class: 'pb-head' }, ['Internal · not shown to client']),
-      el('div', { class: 'line' }, [el('span', {}, ['Revenue (taxable)']), totalsRefs.revenue]),
-      el('div', { class: 'line sub' }, [el('span', {}, ['Material']), totalsRefs.material]),
-      el('div', { class: 'line sub' }, [el('span', {}, ['Labor / install']), totalsRefs.labor]),
-      el('div', { class: 'line sub' }, [el('span', {}, ['Accessories']), totalsRefs.acc]),
-      el('div', { class: 'line profit' }, [el('span', {}, ['Est. profit ', totalsRefs.margin]), totalsRefs.profit]),
-    ]),
+  ]);
+  const profitBox = el('div', { class: 'profit-box' }, [
+    el('div', { class: 'pb-head' }, ['Internal · not shown to client']),
+    el('div', { class: 'line' }, [el('span', {}, ['Revenue (taxable)']), totalsRefs.revenue]),
+    el('div', { class: 'line sub' }, [el('span', {}, ['Material']), totalsRefs.material]),
+    el('div', { class: 'line sub' }, [el('span', {}, ['Labor / install']), totalsRefs.labor]),
+    el('div', { class: 'line sub' }, [el('span', {}, ['Accessories']), totalsRefs.acc]),
+    el('div', { class: 'line profit' }, [el('span', {}, ['Est. profit ', totalsRefs.margin]), totalsRefs.profit]),
+  ]);
+  // The numbers belong to the quote like any section does, so they get a card of their own.
+  const summary = el('section', { class: 'fam summary' }, [
+    el('header', {}, [el('h4', {}, ['Summary'])]),
+    el('div', { class: 'sum-body' }, [totals, profitBox]),
   ]);
 
   const addBtn = el('button', { class: 'btn primary', type: 'button' }, labeled('plus', 'Add to quote'));
@@ -885,7 +901,7 @@ function sheet(q, rerender) {
       addBtn,
     ]),
     ...body,
-    totals,
+    summary,
     el('div', { class: 'sumbar' }, [
       el('span', {}, ['Subtotal ', totalsRefs.barSub]),
       el('span', {}, ['Total ', totalsRefs.barTotal]),
