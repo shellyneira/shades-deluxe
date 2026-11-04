@@ -183,6 +183,53 @@ export function dropdown({ options, value, onChange, placeholder = '—', classN
   return btn;
 }
 
+// A text box with a real list under it: focus or type and the saved entries appear,
+// filtered as you go; click or press Enter to take one, or just keep typing something
+// new. Same panel as `dropdown`, so a one-off value never needs a trip to Lists first.
+// options: [{ name, price? }]. onChange(text, picked) — picked is the entry chosen, or null while typing.
+export function combo({ options, value, onChange, placeholder = '', style = '', money }) {
+  const inp = el('input', { type: 'text', value: value ?? '', placeholder, style: style || null, autocomplete: 'off', role: 'combobox', 'aria-expanded': 'false' }, []);
+  let list = null, rows = [], shown = [], active = -1;
+
+  const fill = () => {
+    const q = inp.value.trim().toLowerCase();
+    shown = options.filter((o) => o.name && (!q || o.name.toLowerCase().includes(q)) && o.name !== inp.value);
+    rows = shown.map((o, i) => {
+      const row = el('div', { class: 'dd-opt', role: 'option' }, [
+        el('span', { class: 'dd-mark' }, []),
+        el('span', { class: 'dd-label' }, [o.name]),
+        Number(o.price) && money ? el('em', {}, [money(o.price)]) : null,
+      ]);
+      row.onmousedown = (e) => e.preventDefault(); // keep the caret in the box
+      row.onclick = () => pick(o);
+      row.onmousemove = () => mark(i, false);
+      return row;
+    });
+    active = -1;
+    if (!rows.length) { closePopover(); return; }
+    if (!list) { list = el('div', { class: 'dd-list', role: 'listbox' }, []); popover(inp, list, { onClose: () => { list = null; inp.setAttribute('aria-expanded', 'false'); } }); }
+    list.replaceChildren(...rows);
+  };
+  const mark = (i, scroll = true) => {
+    if (!rows.length) return;
+    active = (i + rows.length) % rows.length;
+    rows.forEach((r, k) => r.classList.toggle('active', k === active));
+    if (scroll) rows[active].scrollIntoView({ block: 'nearest' });
+  };
+  const pick = (o) => { inp.value = o.name; closePopover(); onChange(o.name, o); };
+
+  inp.addEventListener('focus', fill);
+  inp.addEventListener('click', () => { if (!list) fill(); });
+  inp.addEventListener('input', () => { onChange(inp.value, null); fill(); });
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (!list) fill(); mark(active + 1); }
+    else if (e.key === 'ArrowUp' && list) { e.preventDefault(); mark(active - 1); }
+    else if (e.key === 'Enter' && list && active >= 0) { e.preventDefault(); pick(shown[active]); }
+    else if (e.key === 'Tab') closePopover();
+  });
+  return inp;
+}
+
 // A labelled field wrapping a dropdown — the form-style replacement for <select>.
 export function selectField(labelText, options, value, onChange, extraClass = '') {
   const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }));

@@ -1,6 +1,6 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
-import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
+import { dropdown, combo, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
 import { computeLine, isSizeless, isOtherLine, OTHER_LINES, SERVICE_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
@@ -393,20 +393,22 @@ function cell(col, item, onChange) {
   }
   if (col.kind === 'text') {
     const suggestions = col.suggest ? col.suggest(item) : [];
-    const listId = suggestions.length ? 'dl-' + col.key + '-' + Math.random().toString(36).slice(2, 7) : null;
+    if (suggestions.length) {
+      return el('td', {}, [combo({
+        options: suggestions, value: item[col.key], placeholder: col.placeholder || '', style, money,
+        // Choosing a saved entry (not typing one) fills in its price, which stays editable.
+        onChange: (text, picked) => {
+          onChange(col.key, text);
+          if (picked && col.key === 'customText' && Number(picked.price) && !Number(item.customPrice)) onChange('customPrice', picked.price);
+        },
+      })]);
+    }
     const inp = el('input', {
       type: 'text', value: item[col.key] ?? '', style, placeholder: col.placeholder || '',
-      ...(listId ? { list: listId } : {}),
       oninput: (e) => { fitText(e.target); onChange(col.key, e.target.value); },
-      // Choosing a saved entry (not typing one) fills in its price, which stays editable.
-      onchange: (e) => {
-        const hit = suggestions.find((o) => o.name === e.target.value);
-        if (col.key === 'customText' && hit && Number(hit.price) && !Number(item.customPrice)) onChange('customPrice', hit.price);
-      },
     });
     fitText(inp);
-    if (!listId) return el('td', {}, [inp]);
-    return el('td', {}, [inp, el('datalist', { id: listId }, suggestions.map((o) => el('option', { value: o.name }, [])))]);
+    return el('td', {}, [inp]);
   }
   if (col.kind === 'num') {
     const placeholder = typeof col.placeholder === 'function' ? col.placeholder(item) : (col.placeholder || '');
