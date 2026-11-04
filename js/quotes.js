@@ -1193,9 +1193,6 @@ function fitLabels() {
 
 // Client version: everything goes into the Description (fields chosen in Settings),
 // client price shown, NO dimensions.
-// What a line is, for the small tag the client quote shows in front of its description.
-const FAMILY_TAG = { shade: 'Shade', drapery: 'Drapery', accessory: 'Accessory', service: 'Service' };
-
 // Which shades or drapes an accessory goes with, by room.
 const forNames = (q, l) => q.items.filter((x) => (l.forLines || []).includes(x.id) && x.id !== l.id).map((x) => x.location || x.table);
 
@@ -1223,11 +1220,20 @@ function bundling(q, s, showInstall, { singleOnly = false } = {}) {
   return { hidden, extra, added };
 }
 
+// The client quote reads in up to three parts — products (shades and drapery together), accessories,
+// and services — each with its own title and column headings, because they are bought differently.
+const CLIENT_SECTIONS = [
+  ['Products', (f) => f === 'shade' || f === 'drapery'],
+  ['Accessories', (f) => f === 'accessory'],
+  ['Services', (f) => f === 'service'],
+];
+const CLIENT_COLS = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
+
 function clientTable(q, s) {
   const cfg = s.docConfig.client;
   const showInstall = s.showInstall !== false;
   const bundle = cfg.bundleAccessories === true ? bundling(q, s, showInstall) : { hidden: new Set(), extra: new Map(), added: new Map() };
-  const rows = q.items.filter((l) => !bundle.hidden.has(l.id)).map((l) => {
+  const line = (l) => {
     const c = computeLine(l, s);
     const qty = Number(l.qty) || 1;
     const shownUnit = (c.unit || 0) - (showInstall ? (c.installation || 0) : 0);
@@ -1242,20 +1248,32 @@ function clientTable(q, s) {
     const unpriced = c.unit == null;
     const names = familyOf(l, s.tables) === 'accessory' ? forNames(q, l) : [];
     const desc = [describeLine(l, cfg, false, false, s) + (names.length ? ` (for ${names.join(', ')})` : ''), ...(bundle.added.get(l.id) || []).map((t) => '+ ' + t)].filter(Boolean).join(', ');
-    return el('tr', { class: unpriced ? 'unpriced' : '' }, [
-      el('td', { class: 'num' }, [String(qty)]),
-      el('td', { class: 'strong' }, [l.location]),
-      el('td', { class: 'desc' }, [el('span', { class: 'doc-tag' }, [FAMILY_TAG[familyOf(l, s.tables)]]), desc]),
-      el('td', { class: 'num' }, [unpriced ? 'TBD' : unitText]),
-      el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(lineTotal)]),
-    ]);
-  });
-  const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
-  return el('table', { class: 'items' }, [
-    el('thead', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })]), el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
-    el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
-    el('tfoot', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })])]),
+    return {
+      total: unpriced ? 0 : lineTotal,
+      tr: el('tr', { class: unpriced ? 'unpriced' : '' }, [
+        el('td', { class: 'num' }, [String(qty)]),
+        el('td', { class: 'strong' }, [l.location]),
+        el('td', { class: 'desc' }, [desc]),
+        el('td', { class: 'num' }, [unpriced ? 'TBD' : unitText]),
+        el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(lineTotal)]),
+      ]),
+    };
+  };
+  const shown = q.items.filter((l) => !bundle.hidden.has(l.id));
+  const parts = CLIENT_SECTIONS
+    .map(([title, match]) => ({ title, lines: shown.filter((l) => match(familyOf(l, s.tables))).map(line) }))
+    .filter((p) => p.lines.length);
+  const table = (rows) => el('table', { class: 'items fixed' }, [
+    el('colgroup', {}, ['7%', '16%', '47%', '15%', '15%'].map((w) => el('col', { style: `width:${w}` }, []))),
+    el('thead', {}, [el('tr', {}, CLIENT_COLS.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
+    el('tbody', {}, rows),
   ]);
+  if (!parts.length) return table([el('tr', {}, [el('td', { colspan: CLIENT_COLS.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]);
+  return el('div', { class: 'inv-sections' }, parts.flatMap((p) => [
+    // One part needs no title; several do.
+    parts.length > 1 ? el('div', { class: 'sec-title' }, [el('b', {}, [p.title]), el('span', {}, [money0(p.lines.reduce((a, x) => a + x.total, 0))])]) : null,
+    table(p.lines.map((x) => x.tr)),
+  ]));
 }
 
 // Work order: same Description style (fields chosen in Settings) PLUS dimensions,

@@ -947,4 +947,9 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .invoice.page { position: relative; height: 1056px; overflow: hidden; box-sizing: border-box; }
 .invoice.page .pg { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 10.5px; letter-spacing: .08em; color: var(--ink3); }
 .invoice-panel.paginating { visibility: hidden; }
-.invoice .doc-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--hair); color: var(--ink3); margin-right: 6px; vertical-align: 1px; }
+.invoice table.items.fixed { table-layout: fixed; }
+.invoice .sec-title { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 6px; padding: 0 11px; color: var(--ink1); }
+.invoice .sec-title:first-child { margin-top: 4px; }
+.invoice .sec-title b { font-size: 14px; letter-spacing: .2px; }
+.invoice .sec-title span { font-variant-numeric: tabular-nums; color: var(--ink3); font-size: 12.5px; }
+.invoice .sec-title .sec-cont { font-weight: 500; color: var(--ink3); font-size: 12px; margin-left: 4px; }
