@@ -104,7 +104,7 @@ export function offChartReason(table, width, widthFrac, height, heightFrac) {
 export function lineIssues(line, state, { committed = true } = {}) {
   if (!(Number(line.width) && Number(line.height))) return [];
   const table = state.tables[line.table];
-  if (table?.noSize) return [];
+  if (isSizeless(state, line)) return [];
   if (table?.kind === 'formula') {
     return committed && !Number(line.fabricPrice)
       ? [{ text: 'Fabric $/yd is missing — drapery is priced from it', fields: ['fabricPrice'] }] : [];
@@ -260,17 +260,19 @@ function computeDraperyLine(line, table, state) {
 // A table flagged `noSize` is for lines with no dimensions at all — an accessory sold
 // on its own (remote, service call). Nothing is looked up on a chart; the line is the
 // accessories you picked plus whatever is typed on it.
-export const isSizeless = (state, line) => !!state.tables[line?.table]?.noSize;
+export const CUSTOM_TABLE = 'Custom item';
+export const isSizeless = (state, line) => line?.table === CUSTOM_TABLE || !!state.tables[line?.table]?.noSize;
 
 export function computeLine(line, state) {
   const table = state.tables[line.table];
-  if (table?.noSize) {
+  if (isSizeless(state, line)) {
+    const typed = Number(line.customPrice) || 0;
     const extras = accessoriesExtras(line, state) + customListExtras(line, state);
     const installation = Number(line.installation) || 0;
     const brackets = Number(line.brackets) || 0;
-    const unit = Math.max(0, extras + installation + brackets + (Number(line.markup) || 0) + (Number(line.motorPrice) || 0) - (Number(line.discount) || 0));
+    const unit = Math.max(0, typed + extras + installation + brackets + (Number(line.markup) || 0) + (Number(line.motorPrice) || 0) - (Number(line.discount) || 0));
     // Accessories are billed at cost on the cost side, same as everywhere else.
-    return { list: 0, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation, brackets, extras: round2(extras), cost: round2(extras + installation + brackets), unit: round2(unit) };
+    return { list: 0, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation, brackets, extras: round2(extras), cost: round2(typed + extras + installation + brackets), unit: round2(unit) };
   }
   if (table?.kind === 'formula') {
     const d = computeDraperyLine(line, table, state);
@@ -344,9 +346,10 @@ export function explainLine(line, state) {
   const w = Number(line.width) || 0;
   const h = Number(line.height) || 0;
 
-  if (table?.noSize) {
-    // Nothing to look up: the accessory charges below ARE the line.
-    if (!(line.accessories || []).length) steps.push({ kind: 'note', label: 'Pick an accessory', detail: `${line.table} lines have no size \u2014 the price is the accessories you pick` });
+  if (isSizeless(state, line)) {
+    // Nothing to look up: what is typed and the accessories picked ARE the line.
+    if (Number(line.customPrice)) steps.push({ kind: 'base', label: line.customText || 'Item', detail: 'Price typed on the line', amount: round2(Number(line.customPrice)) });
+    else if (!(line.accessories || []).length) steps.push({ kind: 'note', label: 'No price yet', detail: 'Type a Price $ or pick an accessory \u2014 this line has no size to price from' });
   } else if (table?.kind === 'formula') {
     // Drapery is computed from a formula per style rather than a grid; report what
     // it produced plus everything added on top of it.
@@ -520,13 +523,14 @@ export function descFields(state) {
 export function describeLine(line, cfg, isWork, compact, state) {
   const docKey = isWork ? 'work' : compact ? 'label' : 'client';
   const labels = state?.docFieldLabel?.[docKey] || {};
-  return descFields(state)
+  const named = line.table === CUSTOM_TABLE && line.customText ? [line.customText] : [];
+  return [...named, ...descFields(state)
     .filter((f) => !cfg || cfg[f.key])
     .map((f) => {
       const text = f.fmt(line, isWork, compact);
       return text && labels[f.key] ? `${f.label}: ${text}` : text;
     })
-    .filter(Boolean)
+    .filter(Boolean)]
     .join(', ');
 }
 

@@ -2,7 +2,7 @@
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
 import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, isSizeless, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
+import { computeLine, isSizeless, CUSTOM_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -185,9 +185,10 @@ function showBreakdown(item, s) {
 
 // If the bottom "add" row was filled in but never committed, keep it so the user
 // doesn't silently lose a line when they jump to the invoice.
+const hasSizelessContent = (l) => (l.accessories || []).length || Number(l.customPrice) || l.customText;
 function commitDraftIfFilled(q) {
   const d = q._draft;
-  if (d && (isSizeless(getState(), d) ? (d.accessories || []).length : d.width && d.height)) {
+  if (d && (isSizeless(getState(), d) ? hasSizelessContent(d) : d.width && d.height)) {
     q.items.push({ ...d });
     delete q._draft;
     save();
@@ -250,7 +251,10 @@ function columns(state, tables, categories, customLists) {
   const tableNames = Object.keys(tables);
   // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
   // kind of table each one is, even though the table names themselves are plain.
-  const tableGroups = categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) }));
+  const tableGroups = [
+    ...categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) })),
+    { label: 'Other', names: [CUSTOM_TABLE] },
+  ];
   const forDrapery = (it) => isDrapery(it, tables);
   // Per-category attributes created from the Lists screen (Pattern, and whatever gets
   // added after it) — same shape as Product/Fabric, so they're filtered by the line's
@@ -273,6 +277,9 @@ function columns(state, tables, categories, customLists) {
     { key: 'product', label: 'Product', kind: 'select', opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
     { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
+    // Custom item lines: what to call it and what to charge. Every other column stays live.
+    { key: 'customText', label: 'Item', kind: 'text', w: 150, placeholder: 'Custom item', hideWhen: (it) => it.table !== CUSTOM_TABLE, naWhy: 'Only for Custom item lines' },
+    { key: 'customPrice', label: 'Price $', kind: 'num', w: 74, placeholder: '0', hideWhen: (it) => it.table !== CUSTOM_TABLE, naWhy: 'Only for Custom item lines' },
     ...customCols,
     // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
     // (Motorized/Manual) instead — the two concepts play the same role, so Track
@@ -563,7 +570,7 @@ function sheet(q, rerender) {
 
   const addLine = () => {
     const d = q._draft || draft;
-    if (isSizeless(s, d)) { if (!d.accessories?.length) return toast('Pick at least one accessory'); }
+    if (isSizeless(s, d)) { if (!hasSizelessContent(d)) return toast('Type an item and price, or pick an accessory'); }
     else if (!d.width || !d.height) return toast('Enter width and height');
     q.items.push({ ...d });
     q._draft = blankLine(s);
@@ -652,6 +659,7 @@ let woSel = null; // product types ticked on the work order; null = all of them
 let invMode = 'client'; // 'client' = prices, no dimensions · 'work' = specs + dimensions, no prices
 
 const sizeText = (l) => {
+  if (isSizeless(getState(), l) && !l.width && !l.height) return '—';
   const f = (v, fr) => `${v ?? ''}${fr && FRACTION_LABEL[fr] ? ' ' + FRACTION_LABEL[fr] : ''}`;
   return `${f(l.width, l.widthFrac)} × ${f(l.height, l.heightFrac)}`;
 };
