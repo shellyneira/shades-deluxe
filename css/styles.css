@@ -929,10 +929,19 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 /* On screen the document sits on a tinted desk with a soft shadow, so the white page reads as a page.
    Screen only: print keeps a flat, borderless sheet. */
 @media screen {
-  .invoice-panel { padding: 28px 18px; background: var(--surface-sunken); }
+  /* the sheet stands on the page itself — no card around it */
+  .invoice-panel { padding: 0; background: none; border: 0; box-shadow: none; overflow: visible; }
   /* a sheet of US Letter (8.5 x 11 in at 96 dpi), centered, exactly the proportions that print */
   .invoice-panel .invoice, .invoice-panel .invoice.work { width: 100%; max-width: 816px; box-sizing: border-box; border-radius: 4px; box-shadow: 0 10px 30px rgba(20, 24, 40, .16), 0 2px 6px rgba(20, 24, 40, .10); }
   @media (min-width: 880px) { .invoice-panel .invoice { min-height: 1056px; } }
+  .invoice-panel .invoice { margin-bottom: 8px; }
   .invoice-panel .invoice + .invoice { margin-top: 26px; border-top: 0; }
 }
 .applies { margin-left: 8px; padding: 1px 7px; border-radius: 99px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--panel); border: 1px solid var(--line); }
+
+/* stickers preview on screen as a sheet too, at the same width and padding as the other documents */
+@media screen {
+  .doc-col { max-width: 816px; margin-left: auto; margin-right: auto; }
+  .labels-wrap { max-width: 816px; margin: 0 auto 8px; box-sizing: border-box; padding: 36px 40px; border-radius: 4px; background: var(--paper); box-shadow: 0 10px 30px rgba(20, 24, 40, .16), 0 2px 6px rgba(20, 24, 40, .10); }
+  @media (min-width: 880px) { .labels-wrap { min-height: 1056px; align-content: flex-start; } }
+}

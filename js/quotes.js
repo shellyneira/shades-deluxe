@@ -1160,7 +1160,7 @@ function labelsView(q, s) {
     boxes.forEach((b) => { b.checked = target; b.onchange(); });
   } }, ['Select / clear all']);
   return el('div', {}, [
-    el('div', { class: 'section-head no-print', style: 'margin-bottom:12px' }, [
+    el('div', { class: 'section-head no-print doc-col', style: 'margin-bottom:12px' }, [
       el('span', { class: 'hint' }, ['One label per shade · DYMO 30252. Uncheck any you don’t want, then Print. Only checked labels print.']),
       toggleAll,
     ]),
