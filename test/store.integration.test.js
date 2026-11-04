@@ -131,3 +131,42 @@ test('first boot seeds the cloud; typing syncs one write per pause; reload keeps
   assert.equal(after.client.email, 'a@b.c', 'their edit kept');
   revived.server.close(); revived.server.closeAllConnections?.();
 });
+
+test('edits made while the cloud is unreachable survive a reload and merge on the next read', async () => {
+  const live = await fakeServer();
+  const ls = new Map();
+  shims(ls);
+  const a = await loadStore(live.port);
+  await a.initCloud();
+  await settle();
+  const q = a.newQuote();
+  q.client.name = 'Ana';
+  a.save();
+  await settle();
+  const row = structuredClone(live.tables.quotes.get(q.id));
+  live.server.close(); live.server.closeAllConnections?.();
+
+  // Next session starts with the cloud down and no remembered base (older data, or a first
+  // boot after an update): the document is only assumed to match the server.
+  ls.delete('shades-deluxe-v1:sync');
+  shims(ls);
+  const down = await loadStore(live.port);
+  await down.initCloud();
+  down.getQuote(q.id).client.address = 'typed while offline';
+  down.save();
+  await settle();
+  const keep = new Map(ls);
+
+  const back = await fakeServer();
+  for (const k of Object.keys(live.tables)) for (const [id, v] of live.tables[k]) back.tables[k].set(id, structuredClone(v));
+  const theirs = structuredClone(row); theirs.data.client.phone = '999'; theirs.rev += 1; theirs.op = 'other:9';
+  back.tables.quotes.set(q.id, theirs);
+  shims(new Map(keep));
+  const b = await loadStore(back.port);
+  await b.initCloud();
+  await settle();
+  const data = back.tables.quotes.get(q.id).data;
+  assert.equal(data.client.address, 'typed while offline', 'offline typing was not reverted by the first read');
+  assert.equal(data.client.phone, '999', 'their edit kept');
+  back.server.close(); back.server.closeAllConnections?.();
+});

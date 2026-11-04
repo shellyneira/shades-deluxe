@@ -198,7 +198,7 @@ export function renderSettings() {
       el('div', { class: 'row' }, [
         input('Company name', co.name, set('name'), { class: 'grow' }),
         input('Phone', co.phone, set('phone'), { class: 'grow' }),
-        input('Email', co.email, set('email'), { class: 'grow' }),
+        input('Email', co.email, set('email'), { class: 'grow', keepCase: true }),
       ]),
       el('div', { class: 'row' }, [input('Address', co.address, set('address'), { class: 'grow' })]),
       el('label', { class: 'field', style: 'margin-top:14px' }, ['Payment & terms', terms]),

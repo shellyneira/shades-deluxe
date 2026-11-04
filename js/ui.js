@@ -358,7 +358,27 @@ export function confirmAction(message, confirmLabel = 'Delete') {
 /* ------------------------------------------------------- global behaviours */
 
 // Installed once at boot.
+// Whatever is typed into a text field starts with a capital. It only ever RAISES the
+// first letter, so Shift or Caps Lock cannot cause a reverse effect, and the caret
+// stays put. Runs in the capture phase so each field's own handler already sees the
+// corrected value. Opt out with data-keep-case (emails); number/date/search/password
+// fields are not type=text and are untouched.
+function autoCapitalize() {
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    const textual = (t instanceof HTMLInputElement && t.type === 'text') || t instanceof HTMLTextAreaElement;
+    if (!textual || e.isComposing || t.dataset.keepCase !== undefined || !t.value) return;
+    const first = t.value[0];
+    const up = first.toUpperCase();
+    if (first === up) return; // already a capital, a digit or a symbol
+    const { selectionStart: a, selectionEnd: b } = t;
+    t.value = up + t.value.slice(1);
+    t.setSelectionRange(a, b);
+  }, true);
+}
+
 export function initUI() {
+  autoCapitalize();
   // Tooltips. The browser's own `title` bubble is slow, flaky on cells and gone the
   // moment the pointer twitches, so every title in the app is lifted into one fast,
   // fixed-position tip (fixed, so a scrolling sheet can't clip it).

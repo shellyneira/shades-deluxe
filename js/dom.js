@@ -29,6 +29,7 @@ export function input(labelText, value, onChange, opts = {}) {
     placeholder: opts.placeholder || '',
     oninput: (e) => onChange(opts.type === 'number' ? e.target.value : e.target.value),
   });
+  if (opts.keepCase) inp.dataset.keepCase = ''; // emails and the like: never touch the casing
   if (opts.step) inp.step = opts.step;
   if (opts.width) inp.style.width = opts.width;
   return el('label', { class: 'field ' + (opts.class || '') }, [labelText, inp]);

@@ -121,7 +121,7 @@ function editor(q) {
     el('div', { class: 'row' }, [
       input('Client name', q.client.name, (v) => set(() => (q.client.name = v)), { class: 'grow' }),
       input('Phone', q.client.phone, (v) => set(() => (q.client.phone = v)), { class: 'grow' }),
-      input('Email', q.client.email, (v) => set(() => (q.client.email = v)), { class: 'grow' }),
+      input('Email', q.client.email, (v) => set(() => (q.client.email = v)), { class: 'grow', keepCase: true }),
     ]),
     el('div', { class: 'row' }, [
       input('Address', q.client.address, (v) => set(() => (q.client.address = v)), { class: 'grow' }),

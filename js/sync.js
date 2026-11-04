@@ -114,7 +114,7 @@ export class SyncEngine {
   restore(meta) {
     for (const [k, v] of Object.entries(meta?.pending || {})) {
       const [kind, ...rest] = k.split('/');
-      this.recs.set(k, { kind, id: rest.join('/'), baseRev: v.rev, baseData: v.data, inflight: null, ackClock: 0 });
+      this.recs.set(k, { kind, id: rest.join('/'), baseRev: v.rev, baseData: v.data, inflight: null, ackClock: 0, assumed: !!v.assumed });
     }
     for (const d of meta?.deletes || []) {
       this.deletes.set(this.key(d.kind, d.id), d);
@@ -137,7 +137,9 @@ export class SyncEngine {
   meta() {
     const pending = {};
     for (const rec of this.recs.values()) {
-      if (rec.baseRev > 0 && this.dirty(rec)) pending[this.key(rec.kind, rec.id)] = { rev: rec.baseRev, data: rec.baseData };
+      // A document never acknowledged this session (assumed clean at boot) needs its base kept
+      // too: if the cloud was unreachable, a reload must not mistake our unsent edits for the server's copy.
+      if ((rec.baseRev > 0 || rec.assumed) && this.dirty(rec)) pending[this.key(rec.kind, rec.id)] = { rev: rec.baseRev, data: rec.baseData, assumed: !!rec.assumed };
     }
     return { pending, deletes: [...this.deletes.values()] };
   }
