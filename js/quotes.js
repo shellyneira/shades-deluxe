@@ -1,8 +1,8 @@
 // Quotes: list -> estimator worksheet (internal, with dimensions) -> invoice (customer, no dimensions).
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
-import { dropdown, combo, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
+import { dropdown, combo, popover, closePopover, selectField, dateField, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, isSizeless, isOtherLine, OTHER_LINES, SERVICE_TABLE, CUSTOM_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
+import { computeLine, isSizeless, isOtherLine, SERVICE_TABLE, CUSTOM_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -183,26 +183,32 @@ function showBreakdown(item, s) {
   document.body.append(wrap);
 }
 
-// If the bottom "add" row was filled in but never committed, keep it so the user
-// doesn't silently lose a line when they jump to the invoice.
-const hasSizelessContent = (l) => (l.accessories || []).length || Number(l.customPrice) || l.customText;
+// A section's "add" row that was filled in but never committed is kept, so jumping to
+// the invoice never silently drops a line.
+const hasSizelessContent = (l) => Number(l.customPrice) || l.customText;
 function commitDraftIfFilled(q) {
-  const d = q._draft;
-  if (d && (isSizeless(getState(), d) ? hasSizelessContent(d) : d.width && d.height)) {
-    q.items.push({ ...d });
-    delete q._draft;
-    save();
+  const tables = getState().tables;
+  for (const [key, d] of Object.entries(q._drafts || {})) {
+    const sizeless = ['accessory', 'service'].includes(familyOf(d, tables));
+    if (sizeless ? hasSizelessContent(d) : d.width && d.height) {
+      q.items.push({ ...d });
+      delete q._drafts[key];
+    }
   }
+  save();
 }
 
-function blankLine(s) {
+function blankLine(s, table) {
+  // Accessories and services carry only what they are: no size, fabric or mount to leak
+  // into a document.
+  if (table === ACCESSORY_TABLE || table === SERVICE_TABLE) return { table, qty: 1, location: '', customText: '', customPrice: '', installation: '', discount: '', forLines: [] };
   return {
-    table: Object.keys(s.tables)[0], qty: 1, location: '', wdNumber: '',
+    table: table || Object.keys(s.tables).find((n) => s.tables[n].kind !== 'formula'), qty: 1, location: '', wdNumber: '',
     width: '', widthFrac: 0, height: '', heightFrac: 0,
     product: '', fabric: '', color: '', control: '', system: '', style: '',
     headrail: '', bottomRail: '', reverse: false, fascia: false, cassette: false, sideChannel: false,
     installation: s.defaultInstallation || '', brackets: '', mount: 'Ceiling', discount: '', markup: '', motorPrice: '',
-    fabricPrice: '', fabricWidth: '', lining: '', track: '', accessories: [], notes: '',
+    fabricPrice: '', fabricWidth: '', lining: '', track: '', notes: '',
   };
 }
 
@@ -210,7 +216,8 @@ function blankLine(s) {
 function isRowEmpty(l) {
   return !l.width && !l.height && !l.location && !l.wdNumber && !l.product && !l.fabric &&
     !l.color && !l.control && !l.system && !l.style && !l.headrail && !l.bottomRail && !l.reverse &&
-    !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets && !l.fabricPrice;
+    !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets && !l.fabricPrice &&
+    !l.customText && !l.customPrice;
 }
 
 // A shade's Product/Fabric options are filtered by its table's category (Roller,
@@ -219,6 +226,11 @@ function isRowEmpty(l) {
 export const tableCategory = (table, tables) => tables[table]?.category || 'Roller';
 
 const isDrapery = (it, tables) => tables[it.table]?.kind === 'formula';
+
+// Every line belongs to one family, and a family decides which worksheet section it sits in
+// and which columns that section shows.
+const familyOf = (it, tables) => (it.table === ACCESSORY_TABLE ? 'accessory' : isOtherLine(it) ? 'service' : isDrapery(it, tables) ? 'drapery' : 'shade');
+const sectionKeyOf = (it, tables) => { const f = familyOf(it, tables); return f === 'drapery' ? 'drapery:' + it.table : f === 'shade' ? 'shades' : f; };
 // Lining/Track only mean something for the Drapery styles that actually offer them
 // (e.g. Cornice has neither) — null here means "hide the field" for this row.
 const draperyStyleOf = (it, tables) => (isDrapery(it, tables) ? DRAPERY_STYLES[tables[it.table].style] : null);
@@ -247,14 +259,9 @@ function reorderByFieldOrder(cols, state) {
 // `hideWhen(item)` greys a cell out for rows where the field is meaningless.
 function columns(state, tables, categories, customLists) {
   const o = state.options;
+  const SH = ['shade'], DR = ['drapery'], SD = ['shade', 'drapery'], OT = ['accessory', 'service'], SIA = ['shade', 'drapery', 'accessory'], ALL = ['shade', 'drapery', 'accessory', 'service'];
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
-  // Grouped by category (Roller/Zebra/Drapery/...) so the dropdown still shows what
-  // kind of table each one is, even though the table names themselves are plain.
-  const tableGroups = [
-    ...categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) })),
-    { label: 'Other', names: OTHER_LINES },
-  ];
   const forDrapery = (it) => isDrapery(it, tables);
   // Per-category attributes created from the Lists screen (Pattern, and whatever gets
   // added after it) — same shape as Product/Fabric, so they're filtered by the line's
@@ -262,66 +269,65 @@ function columns(state, tables, categories, customLists) {
   // and Color: they read as their own group, right after the shade's core identity
   // (Product/Fabric/Color), not wedged into the middle of it.
   const customCols = (customLists || []).filter((l) => l.perCategory).map((l) => ({
-    key: 'custom_' + l.id, label: l.name, kind: 'select', w: 130, free: !l.priced,
+    key: 'custom_' + l.id, label: l.name, kind: 'select', fam: SD, w: 130, free: !l.priced,
     opts: (it) => opt(l.items[tableCategory(it.table, tables)] || []),
   }));
   return reorderByFieldOrder([
-    { key: 'table', label: 'Table', kind: 'tablegroup', groups: tableGroups, w: 108 },
-    { key: 'qty', label: 'Qty', kind: 'num', w: 48 },
-    { key: 'location', label: 'Location', kind: 'select', free: true, opts: opt(o.locations), w: 116 },
-    { key: 'wdNumber', label: 'W/D #', kind: 'select', free: true, opts: opt(o.wdNumbers), w: 92 },
-    { key: 'width', label: 'W', kind: 'num', w: 52 },
-    { key: 'widthFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'height', label: 'H', kind: 'num', w: 52 },
-    { key: 'heightFrac', label: 'Fr', kind: 'frac', w: 66 },
-    { key: 'product', label: 'Product', kind: 'select', free: true, opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
-    { key: 'fabric', label: 'Description', kind: 'select', free: true, opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
-    { key: 'color', label: 'Color', kind: 'select', free: true, opts: opt(o.colors), w: 116 },
+    { key: 'table', label: 'Table', kind: 'tablegroup', fam: SD, w: 108 },
+    { key: 'qty', fam: ALL, label: 'Qty', kind: 'num', w: 48 },
+    { key: 'location', fam: ALL, label: 'Location', kind: 'select', free: true, opts: opt(o.locations), w: 116 },
+    { key: 'wdNumber', fam: SD, label: 'W/D #', kind: 'select', free: true, opts: opt(o.wdNumbers), w: 92 },
+    { key: 'width', fam: SD, label: 'W', kind: 'num', w: 52 },
+    { key: 'widthFrac', fam: SD, label: 'Fr', kind: 'frac', w: 66 },
+    { key: 'height', fam: SD, label: 'H', kind: 'num', w: 52 },
+    { key: 'heightFrac', fam: SD, label: 'Fr', kind: 'frac', w: 66 },
+    { key: 'product', fam: SD, label: 'Product', kind: 'select', free: true, opts: (it) => opt(o.products[tableCategory(it.table, tables)] || []), w: 150 },
+    { key: 'fabric', fam: SD, label: 'Description', kind: 'select', free: true, opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
+    { key: 'color', fam: SD, label: 'Color', kind: 'select', free: true, opts: opt(o.colors), w: 116 },
     // Custom item lines: what to call it and what to charge. Every other column stays live.
-    { key: 'customText', label: 'Item', kind: 'text', w: 150, placeholder: 'What is it?', hideWhen: (it) => !isOtherLine(it), naWhy: 'Only for Accessory, Service and Custom item lines',
+    { key: 'customText', label: 'Item', kind: 'text', fam: OT, w: 220, placeholder: 'Pick a saved one or type',
       // Saved services/accessories as suggestions; anything else can still be typed. Picking one fills its price.
       suggest: (it) => (it.table === SERVICE_TABLE ? o.services : it.table === ACCESSORY_TABLE ? o.accessories : []) || [] },
-    { key: 'customPrice', label: 'Price $', kind: 'num', w: 74, placeholder: '0', hideWhen: (it) => !isOtherLine(it), naWhy: 'Only for Accessory, Service and Custom item lines' },
+    { key: 'customPrice', label: 'Price $', kind: 'num', fam: OT, w: 84, placeholder: '0' },
+    // Which shades or drapes an accessory goes with. Optional: empty means the whole quote.
+    { key: 'forLines', label: 'For', kind: 'forlines', fam: ['accessory'], w: 170 },
     ...customCols,
     // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
     // (Motorized/Manual) instead — the two concepts play the same role, so Track
     // replaces System in place rather than sitting in its own separate column.
     {
-      key: 'system', label: 'System / Track', kind: 'select', w: 108,
+      key: 'system', label: 'System / Track', kind: 'select', fam: SD, w: 108,
       keyFor: (it) => (isDrapery(it, tables) ? 'track' : 'system'),
       opts: (it) => (isDrapery(it, tables) ? opt(draperyStyleOf(it, tables)?.hasTrack ? ['Motorized', 'Manual'] : []) : opt(o.systems)),
       hideWhen: (it) => isDrapery(it, tables) && !draperyStyleOf(it, tables)?.hasTrack,
       naWhy: 'This drapery style has no track',
     },
-    { key: 'control', label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
-    { key: 'motorPrice', label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
-    { key: 'style', label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
-    { key: 'headrail', label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
-    { key: 'bottomRail', label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
+    { key: 'control', fam: SH, label: 'Ctrl', kind: 'select', opts: opt(o.controls), w: 86 },
+    { key: 'motorPrice', fam: SD, label: 'Motor $', kind: 'num', w: 74, placeholder: '0' },
+    { key: 'style', fam: SH, label: 'Style', kind: 'select', opts: opt(o.styles), w: 96 },
+    { key: 'headrail', fam: SH, label: 'Headrails', kind: 'select', opts: opt(o.headrails), w: 118 },
+    { key: 'bottomRail', fam: SH, label: 'Bottom Rail', kind: 'select', opts: opt(o.headrails), w: 118 },
     // Reverse roll: the fabric comes off the back of the tube instead of the front.
     // A Roller/Zebra build detail only — no such thing on Drapery.
-    { key: 'reverse', label: 'Reverse', kind: 'check', w: 66, hideWhen: forDrapery, naWhy: 'Reverse roll is a Roller/Zebra option — not for drapery' },
-    { key: 'fascia', label: 'Fascia', kind: 'check', w: 58 },
-    { key: 'cassette', label: 'Cassette', kind: 'check', w: 66 },
-    { key: 'sideChannel', label: 'S/Ch', kind: 'check', w: 54 },
+    { key: 'reverse', fam: SH, label: 'Reverse', kind: 'check', w: 66, hideWhen: forDrapery, naWhy: 'Reverse roll is a Roller/Zebra option — not for drapery' },
+    { key: 'fascia', fam: SH, label: 'Fascia', kind: 'check', w: 58 },
+    { key: 'cassette', fam: SH, label: 'Cassette', kind: 'check', w: 66 },
+    { key: 'sideChannel', fam: SH, label: 'S/Ch', kind: 'check', w: 54 },
     // Roller: pre-filled from Settings' default, then a plain override from then on.
     // Drapery Heavy/Sheer: same idea, but the "default" is a live formula (scales with
     // width) shown as a placeholder — leave it blank to use it, type a number to override.
     // Drapery Cornice/Swag/Grommet: no formula exists, so it behaves exactly like Brackets.
-    { key: 'installation', label: 'Ins', kind: 'num', w: 58, placeholder: (it) => String(draperyAutoInstall(it, tables[it.table]) || '0') },
-    { key: 'brackets', label: 'Bra', kind: 'num', w: 58 },
-    { key: 'mount', label: 'Mount', kind: 'select', opts: opt(o.mount), w: 90 },
-    { key: 'fabricPrice', label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0', hideWhen: (it) => !forDrapery(it), naWhy: 'Fabric price per yard only applies to drapery — Roller and Zebra are priced from their chart' },
-    { key: 'fabricWidth', label: 'Fabric W', kind: 'select', opts: opt(['54', '118']), w: 90, hideWhen: (it) => !['heavyFabric', 'sheer', 'grommetPanel'].includes(tables[it.table]?.style), naWhy: 'Fabric width only applies to Heavy Fabric, Sheer and Grommet Panel' },
-    { key: 'lining', label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining, naWhy: 'Lining only applies to drapery styles that come lined (Heavy Fabric, Grommet Panel)' },
-    { key: 'discount', label: 'Disc −$', kind: 'num', w: 78, placeholder: '0' },
-    { key: 'markup', label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
-    // Shared across Roller/Zebra/Drapery (unlike Product/Fabric, which are per-category)
-    // and multi-valued — a line can carry any number of priced accessories.
-    { key: 'accessories', label: 'Accessories', kind: 'multiselect', opts: o.accessories, w: 150 },
+    { key: 'installation', fam: SIA, label: 'Ins', kind: 'num', w: 58, placeholder: (it) => String(draperyAutoInstall(it, tables[it.table]) || '0') },
+    { key: 'brackets', fam: SD, label: 'Bra', kind: 'num', w: 58 },
+    { key: 'mount', fam: SD, label: 'Mount', kind: 'select', opts: opt(o.mount), w: 90 },
+    { key: 'fabricPrice', fam: DR, label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0', hideWhen: (it) => !forDrapery(it), naWhy: 'Fabric price per yard only applies to drapery — Roller and Zebra are priced from their chart' },
+    { key: 'fabricWidth', fam: DR, label: 'Fabric W', kind: 'select', opts: opt(['54', '118']), w: 90, hideWhen: (it) => !['heavyFabric', 'sheer', 'grommetPanel'].includes(tables[it.table]?.style), naWhy: 'Fabric width only applies to Heavy Fabric, Sheer and Grommet Panel' },
+    { key: 'lining', fam: DR, label: 'Lining', kind: 'select', opts: opt(['Lining', 'Lining + Interlining']), w: 130, hideWhen: (it) => !draperyStyleOf(it, tables)?.hasLining, naWhy: 'Lining only applies to drapery styles that come lined (Heavy Fabric, Grommet Panel)' },
+    { key: 'discount', fam: ALL, label: 'Disc −$', kind: 'num', w: 78, placeholder: '0' },
+    { key: 'markup', fam: SD, label: 'Extra +$', kind: 'num', w: 74, placeholder: '0' },
     // Free-text, per-line — only printed on the Work Order (its own column there), never
     // on Client Quote or Labels.
-    { key: 'notes', label: 'Notes', kind: 'text', w: 160, placeholder: 'Work order only' },
+    { key: 'notes', fam: SD, label: 'Notes', kind: 'text', w: 160, placeholder: 'Work order only' },
   ], state);
 }
 
@@ -356,7 +362,6 @@ const COL_HELP = {
   fabricWidth: 'Fabric width in inches (54 or 118) — narrower fabric = more panels = more yards. Blank = the table\'s default. Prints on the Work Order only',
   lining: 'Drapery lining tier — changes which labor rate applies (edit in Price Tables)',
   markup: 'Extra profit added on top (0 = none). Overall margin comes from the cost factor in Settings → Rates.',
-  accessories: 'Priced extras (Remote, Valance, etc.) — same list for every table. Click to open and tick as many as you need. Edit prices in Lists.',
   notes: 'Free-text note for the maker — prints only on the Work Order, its own column',
 };
 
@@ -366,7 +371,7 @@ const fitText = (inp) => { inp.size = Math.max(4, inp.value.length || (inp.place
 // Labels that only describe (location, color, product...) accept anything typed, with
 // the saved list as suggestions — a one-off name never has to be added to Lists first.
 // Priced or rule-bearing fields stay strict: a typed value there would silently charge $0.
-function cell(col, item, onChange) {
+function cell(col, item, onChange, ctx = {}) {
   if (col.kind === 'select' && col.free) {
     const listed = col;
     col = { ...col, kind: 'text', suggest: (it) => ((typeof listed.opts === 'function' ? listed.opts(it) : listed.opts) || []).filter(Boolean).map((o) => (typeof o === 'string' ? { name: o, price: 0 } : o)) };
@@ -381,6 +386,35 @@ function cell(col, item, onChange) {
     const options = col.groups.flatMap(({ label, names }) => names.map((name) => ({ value: name, label: name, group: label })));
     if (cur && !options.some((o) => o.value === cur)) options.push({ value: cur, label: cur }); // table renamed/deleted elsewhere — keep it visible
     return el('td', {}, [dropdown({ options, value: cur, style, onChange: (v) => onChange(col.key, v) })]);
+  }
+  if (col.kind === 'forlines') {
+    const tables = getState().tables;
+    const targets = () => ctx.q.items.filter((l) => ['shade', 'drapery'].includes(familyOf(l, tables)) && l.id);
+    const label = () => {
+      const picked = targets().filter((l) => (item.forLines || []).includes(l.id));
+      return picked.length ? picked.map((l) => l.location || l.table).join(', ') : 'Whole quote';
+    };
+    const text = el('span', { class: 'dd-text' }, [label()]);
+    const btn = el('button', { type: 'button', class: 'dd', style, 'aria-haspopup': 'listbox' }, [text]);
+    btn.addEventListener('click', () => {
+      const chosen = new Set(item.forLines || []);
+      const rows = targets().map((l) => {
+        const box = el('input', { type: 'checkbox' });
+        box.checked = chosen.has(l.id);
+        box.onchange = () => {
+          if (box.checked) chosen.add(l.id); else chosen.delete(l.id);
+          onChange('forLines', [...chosen]);
+          text.textContent = label();
+        };
+        return el('label', { class: 'dd-opt for-opt' }, [box, el('span', { class: 'dd-label' }, [`${l.location || '—'} · ${l.table}${l.width ? ` · ${l.width}×${l.height}` : ''}`])]);
+      });
+      const panel = el('div', { class: 'dd-list', style: 'max-width:min(420px, calc(100vw - 24px))' }, [
+        el('div', { class: 'dd-group' }, ['Goes with (empty = whole quote)']),
+        ...(rows.length ? rows : [el('div', { class: 'dd-empty' }, ['Add a shade or drapery first'])]),
+      ]);
+      popover(btn, panel);
+    });
+    return el('td', {}, [btn]);
   }
   if (col.kind === 'check') {
     const box = el('input', { type: 'checkbox', onchange: (e) => onChange(col.key, e.target.checked) });
@@ -423,13 +457,6 @@ function cell(col, item, onChange) {
     if (col.prefix) return el('td', {}, [el('div', { style: 'display:flex;align-items:center;gap:2px' }, [el('span', { style: 'color:var(--danger);font-weight:800' }, [col.prefix]), inp])]);
     return el('td', {}, [inp]);
   }
-  if (col.kind === 'multiselect') {
-    const options = (typeof col.opts === 'function' ? col.opts(item) : col.opts) || [];
-    return el('td', {}, [multiDropdown({
-      options, values: item[col.key], style, money, emptyHint: 'No accessories yet — add them in Lists',
-      onChange: (names) => onChange(col.key, names),
-    })]);
-  }
   // select — options may be plain strings, priced objects {name, price}, or a
   // function of the row item (table-dependent product/fabric lists). `keyFor`
   // lets one column write to different fields per row (System vs Track).
@@ -441,17 +468,56 @@ function cell(col, item, onChange) {
   return el('td', {}, [dropdown({ options: choices, value: cur, style, onChange: (v) => onChange(key, v) })]);
 }
 
+// One open-section memory per quote for this session: a section the user just asked for
+// exists even before it has a line, so there is somewhere to type the first one.
+const openedSections = new Map();
+
 function sheet(q, rerender) {
   const s = getState();
-  const cols = columns(s, s.tables, s.categories, s.customLists);
-  const draft = q._draft || (q._draft = blankLine(s));
+  const tables = s.tables;
+  delete q._draft;
+  q._drafts = q._drafts || {};
+  const allCols = columns(s, tables, s.categories, s.customLists);
+  const tableNames = Object.keys(tables);
+  const isGrid = (n) => tables[n].kind !== 'formula';
+  const groupsOf = (pred) => s.categories
+    .map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat && pred(n)) }))
+    .filter((g) => g.names.length);
+  const firstGrid = tableNames.find(isGrid);
+
+  // Every section a quote can have. Shades share one (same fields); each drapery table has
+  // its own because Sheer, Cornice and Grommet Panel genuinely ask different questions.
+  const allSections = [
+    { key: 'shades', family: 'shade', defaultTable: firstGrid, tag: 'sized from a price chart', groups: groupsOf(isGrid) },
+    ...tableNames.filter((n) => !isGrid(n)).map((n) => ({
+      key: 'drapery:' + n, family: 'drapery', defaultTable: n, title: 'Drapery · ' + n,
+      tag: DRAPERY_STYLES[tables[n].style]?.label || 'formula priced', groups: groupsOf((x) => x === n),
+    })),
+    { key: 'accessory', family: 'accessory', defaultTable: ACCESSORY_TABLE, title: 'Accessories', tag: 'from your Accessories list' },
+    { key: 'service', family: 'service', defaultTable: SERVICE_TABLE, title: 'Services', tag: 'saved or typed' },
+  ];
+  const draftOf = (sec) => q._drafts[sec.key] || (q._drafts[sec.key] = blankLine(s, sec.defaultTable));
+  const colsOf = (sec) => {
+    const sample = draftOf(sec);
+    return allCols
+      .filter((c) => c.fam.includes(sec.family) && !(c.hideWhen && c.hideWhen(sample)))
+      .map((c) => (c.kind === 'tablegroup' ? { ...c, groups: sec.groups } : c))
+      // Accessories and services lead with what they are.
+      .sort((a, b) => (b.key === 'customText') - (a.key === 'customText'));
+  };
+  const titleOf = (sec) => sec.title || [...new Set(sec.groups.map((g) => g.label))].join(' & ') || 'Shades';
+  const linesOf = (sec) => q.items.map((it, idx) => ({ it, idx })).filter(({ it }) => sectionKeyOf(it, tables) === sec.key);
+  const isOpen = (sec) => linesOf(sec).length || openedSections.get(q.id)?.has(sec.key) || !isRowEmpty(q._drafts[sec.key] || {});
+  const sections = allSections.filter((sec) => (sec.family !== 'shade' || sec.defaultTable) && isOpen(sec));
 
   const priceCells = []; // {getItem, node}
   const insCells = []; // {item, input} — Drapery's live "auto install" placeholder
+  const secRefs = [];  // per-section subtotal nodes
   const totalsRefs = {};
 
+  const draftsPriced = () => Object.values(q._drafts);
   const recalc = () => {
-    for (const { item, input } of insCells) { input.placeholder = String(draperyAutoInstall(item, s.tables[item.table]) || '0'); input.title = installAutoText(item, s.tables[item.table]); }
+    for (const { item, input } of insCells) { input.placeholder = String(draperyAutoInstall(item, tables[item.table]) || '0'); input.title = installAutoText(item, tables[item.table]); }
     for (const p of priceCells) {
       const c = computeLine(p.item, s);
       const hasDims = p.item.width && p.item.height;
@@ -461,35 +527,33 @@ function sheet(q, rerender) {
       const bad = lineIssues(p.item, s, { committed: p.committed }).flatMap((i) => i.fields);
       for (const [k, td] of Object.entries(p.dims || {})) td?.classList.toggle('off-dim', bad.includes(k));
       p.td.querySelector('.offtag')?.remove();
-      // DISABLED table minimum (see pricing.js header): restore with the pricing.js blocks.
-      // p.td.querySelector('.mintag')?.remove();
-      // if (c.floored) p.td.append(el('span', { class: 'mintag', title: `Table minimum ${money(c.floor)} for ${p.item.table} — raise the size or lower the minimum in Price Tables` }, ['min']));
       // The amount shown IS charged now, so the tag has to say what it is missing
       // rather than the price cell reading as a complete one.
       if (c.listMissing) p.td.append(el('span', { class: 'offtag', title: `This size is off the ${p.item.table} chart, so the shade itself is not priced — only the charges typed on this line are. Extend the chart in Price Tables.` }, ['no list']));
       // An untitled em-dash is why a row with a markup typed into it reads as a dead
       // app. Say what is missing instead of saying nothing.
-      p.node.title = isSizeless(s, p.item) ? 'Accessories-only line — priced from the accessories picked, no size needed'
-        : c.list == null && isDrapery(p.item, s.tables)
+      p.node.title = isSizeless(s, p.item) ? 'Priced from what is typed on this line — no size needed'
+        : c.list == null && isDrapery(p.item, tables)
         ? (hasDims ? 'Type the fabric price per yard in the "Fabric $/yd" column — drapery is priced from it. Price Tables only holds the rates (fullness, labor, markup).' : 'Enter width, height and Fabric $/yd to price this drapery')
         : c.list == null
         ? (hasDims ? `Off the ${p.item.table} chart — this is the typed charges only, NOT a full price` : 'Enter width and height — charges are added on top of the list price, so there is nothing to price yet')
         : `List ${money(c.list)}`;
       p.client.textContent = c.unit == null ? '—' : money0((c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0));
     }
-    // Subtotal reflects committed lines PLUS the row currently being filled, so the
-    // number is never a surprising $0 while a priced line sits in the draft row.
+    for (const r of secRefs) {
+      const lines = linesOf(r.sec);
+      r.count.textContent = lines.length === 1 ? '1 line' : lines.length + ' lines';
+      r.sub.textContent = money0(lines.reduce((a, { it }) => a + roundWhole(computeLine(it, s).unit || 0) * (Number(it.qty) || 1), 0));
+    }
+    // Subtotal reflects committed lines PLUS the rows currently being filled, so the
+    // number is never a surprising $0 while a priced line sits in a draft row.
     // Mirror the client invoice: whole-dollar amounts + tax, so the worksheet matches.
-    // Live q._draft, not the `draft` this sheet captured — same reason the rows do it.
-    const priced = [...q.items, q._draft || draft].map((it) => ({ it, c: computeLine(it, s), qty: Number(it.qty) || 1 }));
+    const priced = [...q.items, ...draftsPriced()].map((it) => ({ it, c: computeLine(it, s), qty: Number(it.qty) || 1 }));
     const sub = priced.reduce((a, p) => a + roundWhole(p.c.unit || 0) * p.qty, 0);
     const afterDiscount = sub - roundWhole(Number(q.discount) || 0);
     // The worksheet used to ignore the minimum order entirely, so the screen showed
     // one total and the printed invoice another for the same quote.
     const minOrder = roundWhole(Number(s.minimumOrder) || 0);
-    // The subtotal above counts the draft row, so the minimum has to as well — keyed
-    // to committed lines only, a priced draft showed a total that jumped the moment
-    // you clicked ✓ on the same numbers.
     const minApplied = (q.items.length > 0 || sub > 0) && minOrder > 0 && afterDiscount < minOrder;
     const taxable = minApplied ? minOrder : afterDiscount;
     const rate = Number(s.taxRate) || 0;
@@ -535,6 +599,10 @@ function sheet(q, rerender) {
     totalsRefs.acc.textContent = '−' + money(acc);
     totalsRefs.profit.textContent = money(profit);
     totalsRefs.margin.textContent = taxable > 0 ? Math.round((profit / taxable) * 100) + '% margin' : '';
+    // The always-visible strip: what the job is worth right now, wherever you are scrolled.
+    totalsRefs.barSub.textContent = money0(sub);
+    totalsRefs.barTotal.textContent = money0(taxable + tax);
+    totalsRefs.barProfit.textContent = money0(profit);
   };
 
   // A ROW MUST NOT CAPTURE ITS ITEM. A sync replaces q.items with fresh objects of
@@ -545,80 +613,106 @@ function sheet(q, rerender) {
   // 999 — the line price moves (it reads the capture), the subtotal does not (it
   // reads q.items), and the save drops the edit entirely. Resolve by position on
   // every access instead; order is preserved by the merge, and the two operations
-  // that do reorder (duplicate, remove) rerender.
-  // q._draft is replaced by the same merge, so the draft row resolves it too rather
-  // than holding the object `draft` pointed at when this sheet was built.
-  const liveItem = (idx, draftRow, captured) =>
-    (draftRow ? q._draft : q.items[idx]) || captured;
+  // that do reorder (duplicate, remove) rerender. Drafts are replaced by the same
+  // merge, so a draft row resolves its section's draft the same way.
+  const liveItem = (idx, sec, captured) => (sec ? q._drafts[sec.key] : q.items[idx]) || captured;
 
-  const makeRow = (captured, { draftRow, idx } = {}) => {
-    // Falling back to `captured` (never to the draft) keeps a row whose index went
+  const makeRow = (captured, cols, { sec, idx } = {}) => {
+    // Falling back to `captured` (never to another line) keeps a row whose index went
     // away writing to its own dead object instead of corrupting a different line.
-    const live = () => liveItem(idx, draftRow, captured);
+    const live = () => liveItem(idx, sec, captured);
     const item = live();
     // Changing the table refilters the Product/Description options, so rebuild the row.
-    // Save on every keystroke, draft row included — otherwise a refresh (or a browser
-    // that never gets to "Add line") silently loses whatever was typed into it.
+    // Save on every keystroke, draft rows included — otherwise a refresh (or a browser
+    // that never gets to "Add line") silently loses whatever was typed into them.
     const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table' || key === 'customPrice') rerender(); };
     // Every charge should be checkable without trusting the app: click the price and
     // it shows the arithmetic that produced it.
     const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
-    const priceTd = el('td', { class: 'r price', onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
+    const priceTd = el('td', { class: 'r price stk stk-u', onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
     const clientNode = el('span', {}, ['—']);
-    const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
-    priceCells.push({ committed: !draftRow, get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
-    const cells = cols.map((col) => cell(col, item, onChange));
+    const clientTd = el('td', { class: 'r stk stk-c', style: 'color:var(--muted)' }, [clientNode]);
+    priceCells.push({ committed: !sec, get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
+    const cells = cols.map((col) => cell(col, item, onChange, { q }));
     const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
     if (insInput) insCells.push({ get item() { return live(); }, input: insInput });
     const dimCell = (key) => cells[cols.findIndex((c) => c.key === key)];
     priceCells[priceCells.length - 1].dims = { width: dimCell('width'), height: dimCell('height'), fabricPrice: dimCell('fabricPrice') };
     cells.push(priceTd);
     cells.push(clientTd);
-    if (draftRow) {
-      cells.push(el('td', { style: 'white-space:nowrap' }, [
-        iconButton('check', 'Add this line', 'ok', () => addLine()),
-        iconButton('undo', 'Clear this row', '', async () => { if (isRowEmpty(live()) || await confirmAction('Clear this row? What you typed in it will be lost.', 'Clear row')) { q._draft = blankLine(s); save(); rerender(); } }),
+    if (sec) {
+      cells.push(el('td', { class: 'stk stk-a', style: 'white-space:nowrap' }, [
+        iconButton('check', 'Add this line', 'ok', () => addLine(sec)),
+        iconButton('undo', 'Clear this row', '', async () => { if (isRowEmpty(live()) || await confirmAction('Clear this row? What you typed in it will be lost.', 'Clear row')) { q._drafts[sec.key] = blankLine(s, sec.defaultTable); save(); rerender(); } }),
       ]));
-      return el('tr', { class: 'draftrow' }, cells);
+      const tr = el('tr', { class: 'draftrow' }, cells);
+      // Enter anywhere in the draft row commits it.
+      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented) { e.preventDefault(); addLine(sec); } });
+      return tr;
     }
-    cells.push(el('td', { style: 'white-space:nowrap' }, [
-      iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(idx + 1, 0, { ...live() }); save(); rerender(); }),
+    cells.push(el('td', { class: 'stk stk-a rowact', style: 'white-space:nowrap' }, [
+      iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(idx + 1, 0, { ...live(), id: undefined }); save(); rerender(); }),
       iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(idx, 1); save(); rerender(); } }),
     ]));
     return el('tr', {}, cells);
   };
 
-  const addLine = () => {
-    const d = q._draft || draft;
-    if (isSizeless(s, d)) { if (!hasSizelessContent(d)) return toast('Type an item and price, or pick an accessory'); }
+  const addLine = (sec) => {
+    const d = q._drafts[sec.key] || draftOf(sec);
+    if (['accessory', 'service'].includes(sec.family)) { if (!hasSizelessContent(d)) return toast('Pick or type an item, and a price'); }
     else if (!d.width || !d.height) return toast('Enter width and height');
     q.items.push({ ...d });
-    q._draft = blankLine(s);
+    q._drafts[sec.key] = blankLine(s, sec.defaultTable);
     save();
     rerender();
+    focusDraft(sec.key);
+  };
+  const focusDraft = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] tr.draftrow input:not([type=checkbox])`)?.focus(), 40);
+
+  const openSection = (key) => {
+    if (!openedSections.has(q.id)) openedSections.set(q.id, new Set());
+    openedSections.get(q.id).add(key);
+    rerender();
+    focusDraft(key);
   };
 
-  const head = el('tr', {}, [
-    ...cols.map((c) => el('th', { style: `min-width:${c.w}px`, title: COL_HELP[c.key] || '' }, [c.label])),
-    el('th', { class: 'r', title: 'Internal full price for ONE shade (with installation, cents).' }, ['Unit $']),
-    el('th', { class: 'r', title: 'What the client sees per shade on the invoice — rounded, with installation shown as its own line.' }, ['Client $']),
-    el('th', {}, ['']),
-  ]);
+  const sectionEl = (sec) => {
+    const cols = colsOf(sec);
+    const head = el('tr', {}, [
+      ...cols.map((c) => el('th', { style: `min-width:${c.w}px`, title: COL_HELP[c.key] || '' }, [c.label])),
+      el('th', { class: 'r stk stk-u', title: 'Internal full price for ONE unit (with installation, cents).' }, ['Unit $']),
+      el('th', { class: 'r stk stk-c', title: 'What the client sees per unit on the invoice — rounded, with installation shown as its own line.' }, ['Client $']),
+      el('th', { class: 'stk stk-a' }, ['']),
+    ]);
+    const body = [...linesOf(sec).map(({ it, idx }) => makeRow(it, cols, { idx })), makeRow(draftOf(sec), cols, { sec })];
+    const count = el('span', { class: 'sub' }, ['']);
+    const sub = el('strong', { class: 'sec-sub' }, ['']);
+    secRefs.push({ sec, count, sub });
+    return el('section', { class: 'fam', 'data-sec': sec.key }, [
+      el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
+      el('div', { class: 'sheet-wrap' }, [el('table', { class: 'sheet' }, [el('thead', {}, [head]), el('tbody', {}, body)])]),
+    ]);
+  };
 
-  const bodyRows = q.items.map((it, idx) => makeRow(it, { idx }));
-  const draftRow = makeRow(draft, { draftRow: true });
-  // Enter anywhere in the draft row commits it.
-  draftRow.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addLine(); } });
-
-  const table = el('table', { class: 'sheet' }, [
-    el('thead', {}, [head]),
-    el('tbody', {}, [...bodyRows, draftRow]),
-  ]);
+  // The one place to start anything: a menu of every kind of line the quote can hold.
+  const addMenu = (anchor) => {
+    const item = (label, hint, key) => el('button', { type: 'button', class: 'dd-opt', onclick: () => { closePopover(); openSection(key); } }, [
+      el('span', { class: 'dd-label' }, [label]), hint ? el('em', {}, [hint]) : null,
+    ]);
+    const list = el('div', { class: 'dd-list' }, [
+      ...(firstGrid ? [item('Shade', groupsOf(isGrid).map((g) => g.label).join(', '), 'shades')] : []),
+      ...(allSections.some((x) => x.family === 'drapery') ? [el('div', { class: 'dd-group' }, ['Drapery'])] : []),
+      ...allSections.filter((x) => x.family === 'drapery').map((x) => item(x.defaultTable, '', x.key)),
+      el('div', { class: 'dd-group' }, ['Other']),
+      item('Accessory', 'remote, charger, hub', 'accessory'),
+      item('Service', 'service call, repair…', 'service'),
+    ]);
+    popover(anchor, list);
+  };
 
   const t = quoteTotals(q, s);
   totalsRefs.sub = el('span', {}, [money(t.subtotal)]);
   totalsRefs.total = el('span', {}, [money(t.total)]);
-  totalsRefs.cost = el('span', {}, ['—']);
   totalsRefs.profit = el('span', {}, ['—']);
   totalsRefs.margin = el('span', { class: 'muted', style: 'font-size:12px' }, ['']);
   totalsRefs.tax = el('span', {}, ['—']);
@@ -637,6 +731,9 @@ function sheet(q, rerender) {
   totalsRefs.material = el('span', {}, ['—']);
   totalsRefs.labor = el('span', {}, ['—']);
   totalsRefs.acc = el('span', {}, ['—']);
+  totalsRefs.barSub = el('strong', {}, ['—']);
+  totalsRefs.barTotal = el('strong', {}, ['—']);
+  totalsRefs.barProfit = el('strong', {}, ['—']);
   const totals = el('div', { class: 'totals' }, [
     el('div', { class: 'line' }, [el('span', {}, ['Subtotal']), totalsRefs.sub]),
     el('div', { class: 'line' }, [
@@ -657,19 +754,27 @@ function sheet(q, rerender) {
     ]),
   ]);
 
+  const addBtn = el('button', { class: 'btn primary', type: 'button' }, labeled('plus', 'Add to quote'));
+  addBtn.onclick = () => addMenu(addBtn);
+  const body = sections.length
+    ? sections.map(sectionEl)
+    : [el('div', { class: 'empty-sheet' }, [el('p', {}, ['Nothing here yet. Start with the kind of line you want to add.']), ...['shades', 'accessory', 'service'].filter((k) => k !== 'shades' || firstGrid).map((k) => el('button', { class: 'btn', type: 'button', onclick: () => openSection(k) }, [({ shades: 'Shade', accessory: 'Accessory', service: 'Service' })[k]]))])];
+
   recalc();
 
   return el('div', { class: 'panel' }, [
     el('div', { class: 'section-head' }, [
       el('h3', { style: 'margin:0' }, ['Worksheet']),
-      el('span', { class: 'hint' }, ['Fill the highlighted row, then Add line. Every cell is editable · scroll sideways for more.']),
+      el('span', { class: 'hint' }, ['Each kind of line has its own section with only the fields that belong to it · scroll sideways inside a section.']),
+      addBtn,
     ]),
-    el('div', { class: 'sheet-wrap' }, [table]),
-    el('div', { class: 'addbar' }, [
-      el('button', { class: 'btn primary', onclick: addLine }, labeled('plus', 'Add line')),
-      el('span', { class: 'hint' }, ['or press Enter']),
-    ]),
+    ...body,
     totals,
+    el('div', { class: 'sumbar' }, [
+      el('span', {}, ['Subtotal ', totalsRefs.barSub]),
+      el('span', {}, ['Total ', totalsRefs.barTotal]),
+      el('span', { class: 'sumbar-profit' }, ['Est. profit ', totalsRefs.barProfit]),
+    ]),
   ]);
 }
 
@@ -927,24 +1032,72 @@ function fitLabels() {
 
 // Client version: everything goes into the Description (fields chosen in Settings),
 // client price shown, NO dimensions.
+// Documents group lines by kind, in the order a customer thinks of them. Headings only
+// appear when more than one kind is present, so a shades-only quote reads exactly as before.
+const DOC_GROUPS = [['shade', 'Shades'], ['drapery', 'Drapery'], ['accessory', 'Accessories'], ['service', 'Services']];
+function groupedRows(items, tables, span, rowFor) {
+  const groups = DOC_GROUPS
+    .map(([family, label]) => ({ label, lines: items.filter((l) => familyOf(l, tables) === family) }))
+    .filter((g) => g.lines.length);
+  let n = 0;
+  return groups.flatMap((g) => [
+    groups.length > 1 ? el('tr', { class: 'grp' }, [el('td', { colspan: span }, [g.label.toUpperCase()])]) : null,
+    ...g.lines.map((l) => rowFor(l, n++)),
+  ]);
+}
+
+// Which shades or drapes an accessory goes with, by room.
+const forNames = (q, l) => q.items.filter((x) => (l.forLines || []).includes(x.id) && x.id !== l.id).map((x) => x.location || x.table);
+
+// "Bundle accessories" folds each linked accessory into the shades it goes with, so the
+// document shows one line per window. Whole dollars, split equally across the shades it
+// is linked to (the first gets any odd dollar), so the rows still add up to the total.
+function bundling(q, s, showInstall, { singleOnly = false } = {}) {
+  const hidden = new Set(), extra = new Map(), added = new Map();
+  const targets = (a) => q.items.filter((x) => (a.forLines || []).includes(x.id) && ['shade', 'drapery'].includes(familyOf(x, s.tables)));
+  for (const a of q.items) {
+    if (familyOf(a, s.tables) !== 'accessory') continue;
+    const t = targets(a);
+    // On an order to the supplier, a part shared by several shades must stay one line with
+    // its real quantity — repeating it under each shade reads as one per shade.
+    if (!t.length || (singleOnly && t.length > 1)) continue;
+    const c = computeLine(a, s), qty = Number(a.qty) || 1;
+    const amount = roundWhole((c.unit || 0) - (showInstall ? (c.installation || 0) : 0)) * qty;
+    hidden.add(a.id);
+    t.forEach((x, i) => {
+      const share = Math.floor(amount / t.length) + (i < amount % t.length ? 1 : 0);
+      extra.set(x.id, (extra.get(x.id) || 0) + share);
+      added.set(x.id, [...(added.get(x.id) || []), `${qty > 1 ? qty + '× ' : ''}${a.customText || 'accessory'}`]);
+    });
+  }
+  return { hidden, extra, added };
+}
+
 function clientTable(q, s) {
   const cfg = s.docConfig.client;
-  const rows = q.items.map((l, i) => {
+  const showInstall = s.showInstall !== false;
+  const bundle = cfg.bundleAccessories === true ? bundling(q, s, showInstall) : { hidden: new Set(), extra: new Map(), added: new Map() };
+  const rows = groupedRows(q.items.filter((l) => !bundle.hidden.has(l.id)), s.tables, 5, (l) => {
     const c = computeLine(l, s);
     const qty = Number(l.qty) || 1;
-    const shownUnit = (c.unit || 0) - (s.showInstall !== false ? (c.installation || 0) : 0);
+    const shownUnit = (c.unit || 0) - (showInstall ? (c.installation || 0) : 0);
+    const extra = bundle.extra.get(l.id) || 0;
+    const lineTotal = roundWhole(shownUnit) * qty + extra;
+    const unitText = extra && lineTotal % qty ? money(lineTotal / qty) : money0(lineTotal / qty);
     // An off-chart line used to print $0 / $0 — a client-facing invoice offering a
     // shade for free, with nothing on the page saying it was unpriced.
     // A line with no size at all still cannot be priced; one that is merely off the
     // chart now carries its typed charges, and those are in the totals below, so the
     // page has to print them or the column would not add up to the Total.
     const unpriced = c.unit == null;
+    const names = familyOf(l, s.tables) === 'accessory' ? forNames(q, l) : [];
+    const desc = [describeLine(l, cfg, false, false, s) + (names.length ? ` (for ${names.join(', ')})` : ''), ...(bundle.added.get(l.id) || []).map((t) => '+ ' + t)].filter(Boolean).join(', ');
     return el('tr', { class: unpriced ? 'unpriced' : '' }, [
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
-      el('td', { class: 'desc' }, [describeLine(l, cfg, false, false, s)]),
-      el('td', { class: 'num' }, [unpriced ? 'TBD' : money0(shownUnit)]),
-      el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(roundWhole(shownUnit) * qty)]),
+      el('td', { class: 'desc' }, [desc]),
+      el('td', { class: 'num' }, [unpriced ? 'TBD' : unitText]),
+      el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(lineTotal)]),
     ]);
   });
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
@@ -963,14 +1116,19 @@ function workTable(q, s, items = q.items) {
   // Qty was missing entirely: a line reading "Living room x 6" printed as one row
   // with no quantity, and the shop built one shade.
   const cols = ['#', 'Qty', 'Location', 'Size (W×H)', 'Description', 'Notes'];
-  const rows = items.map((l, i) => el('tr', {}, [
-    el('td', { class: 'num' }, [String(i + 1)]),
-    el('td', { class: 'num strong' }, [String(Number(l.qty) || 1)]),
-    el('td', { class: 'strong' }, [l.location]),
-    el('td', { class: 'strong' }, [sizeText(l)]),
-    el('td', { class: 'desc' }, [describeLine(l, cfg, true, false, s)]),
-    el('td', { class: 'desc' }, [l.notes || '']),
-  ]));
+  const bundle = cfg.bundleAccessories === true ? bundling(q, s, true, { singleOnly: true }) : { hidden: new Set(), added: new Map() };
+  const rows = groupedRows(items.filter((l) => !bundle.hidden.has(l.id)), s.tables, cols.length, (l, i) => {
+    const names = familyOf(l, s.tables) === 'accessory' ? forNames(q, l) : [];
+    const desc = [describeLine(l, cfg, true, false, s) + (names.length ? ` (for ${names.join(', ')})` : ''), ...(bundle.added.get(l.id) || []).map((t) => '+ ' + t)].filter(Boolean).join(', ');
+    return el('tr', {}, [
+      el('td', { class: 'num' }, [String(i + 1)]),
+      el('td', { class: 'num strong' }, [String(Number(l.qty) || 1)]),
+      el('td', { class: 'strong' }, [l.location]),
+      el('td', { class: 'strong' }, [sizeText(l)]),
+      el('td', { class: 'desc' }, [desc]),
+      el('td', { class: 'desc' }, [l.notes || '']),
+    ]);
+  });
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })]), el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 ? 'num' : '' }, [h])))]),
     el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: cols.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),

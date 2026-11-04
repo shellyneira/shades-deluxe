@@ -257,16 +257,15 @@ function computeDraperyLine(line, table, state) {
   return computeLinearDrapery(line, rates, track); // Cornice (both sizes), Swag & Jabot
 }
 
-// A table flagged `noSize` is for lines with no dimensions at all — an accessory sold
-// on its own (remote, service call). Nothing is looked up on a chart; the line is the
-// accessories you picked plus whatever is typed on it.
+// Accessory, Service and Custom lines have no dimensions. Nothing is looked up on a chart;
+// the line is what is typed on it (price, installation, markup, discount).
 export const ACCESSORY_TABLE = 'Accessory';
 export const SERVICE_TABLE = 'Service';
 export const CUSTOM_TABLE = 'Custom item';
 // Lines that are not a shade: no size, priced by what is typed and picked.
 export const OTHER_LINES = [ACCESSORY_TABLE, SERVICE_TABLE, CUSTOM_TABLE];
 export const isOtherLine = (line) => OTHER_LINES.includes(line?.table);
-export const isSizeless = (state, line) => isOtherLine(line) || !!state.tables[line?.table]?.noSize;
+export const isSizeless = (state, line) => isOtherLine(line);
 
 export function computeLine(line, state) {
   const table = state.tables[line.table];
@@ -526,16 +525,18 @@ export function descFields(state) {
 // docKey ('client'/'work'/'label') per call, derived from the same isWork/compact
 // flags every call site already passes — no field ever hardcodes its own label text.
 export function describeLine(line, cfg, isWork, compact, state) {
+  // An accessory, service or custom charge is described by its own name — it has no
+  // fabric, color or mount for the Settings → Documents toggles to pick from.
+  if (isOtherLine(line)) return line.customText || '';
   const docKey = isWork ? 'work' : compact ? 'label' : 'client';
   const labels = state?.docFieldLabel?.[docKey] || {};
-  const named = isOtherLine(line) && line.customText ? [line.customText] : [];
-  return [...named, ...descFields(state)
+  return descFields(state)
     .filter((f) => !cfg || cfg[f.key])
     .map((f) => {
       const text = f.fmt(line, isWork, compact);
       return text && labels[f.key] ? `${f.label}: ${text}` : text;
     })
-    .filter(Boolean)]
+    .filter(Boolean)
     .join(', ');
 }
 

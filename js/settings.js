@@ -93,9 +93,19 @@ function documentsPanel(s) {
       }, [labelBox, `show “${f.label}:”`]));
       return el('div', { style: 'display:flex;align-items:center' }, row);
     });
+    // Accessories linked to shades (the worksheet's "For" column) can ride inside that
+    // shade's line instead of standing on their own.
+    const bundleBox = docKey === 'label' ? null : (() => {
+      const box = el('input', { type: 'checkbox', onchange: (e) => { cfg.bundleAccessories = e.target.checked; save(); } });
+      box.checked = cfg.bundleAccessories === true;
+      return el('label', { class: 'field check', style: 'margin:0 0 12px;font-weight:600' }, [box, docKey === 'client'
+        ? 'Add linked accessories into their shade’s price (one line per window)'
+        : 'List linked accessories inside their shade’s description']);
+    })();
     return el('div', { class: 'field-subcard' }, [
       el('div', { class: 'field-subcard-head' }, [title]),
       el('p', { class: 'hint', style: 'margin:-6px 0 12px' }, [note]),
+      bundleBox,
       el('div', { style: 'display:grid;grid-template-columns:1fr;gap:8px 14px' }, boxes),
     ]);
   };

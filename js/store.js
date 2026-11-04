@@ -389,17 +389,16 @@ try { engine.restore(JSON.parse(localStorage.getItem(META_KEY) || 'null')); } ca
 engine.adopt();
 
 // Line identity is what lets two people's edits to the same quote merge line by line.
-// Lines that predate ids get a deterministic one so every device agrees on it; a copied
-// line (same id twice) gives the copy a fresh one.
+// A line without one (new, or copied) gets a fresh random id, and so does the second of
+// two lines sharing an id (a duplicate).
 const newLineId = () => 'i_' + Math.random().toString(36).slice(2, 10);
 function ensureLineIds() {
   for (const q of state.quotes) {
     const seen = new Set();
-    (q.items || []).forEach((it, i) => {
-      if (typeof it.id !== 'string' || !it.id) it.id = `${q.id}:${i}`;
-      else if (seen.has(it.id)) it.id = newLineId();
+    for (const it of q.items || []) {
+      if (typeof it.id !== 'string' || !it.id || seen.has(it.id)) it.id = newLineId();
       seen.add(it.id);
-    });
+    }
   }
 }
 

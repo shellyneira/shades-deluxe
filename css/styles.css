@@ -843,3 +843,31 @@ table.sheet .dd-text { flex: 1 0 auto; overflow: visible; text-overflow: clip; }
 table.sheet .dd { width: 100%; }
 table.sheet input:not([type="checkbox"]) { field-sizing: content; width: 100%; }
 table.sheet input[type="text"] { max-width: 480px; }
+
+/* ---- worksheet sections: one table per kind of line ---- */
+.fam { margin-bottom: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+.fam > header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.fam > header h4 { margin: 0; font-size: 15px; }
+.fam > header .sub { color: var(--muted); font-size: 12.5px; }
+.fam > header .grow { flex: 1; }
+.fam .tag { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.fam .sec-sub { font-variant-numeric: tabular-nums; }
+.fam .sheet-wrap { border: 0; border-radius: 0; }
+.empty-sheet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 22px 4px; color: var(--muted); }
+.empty-sheet p { margin: 0 8px 0 0; }
+/* price and actions stay in view while the fields scroll sideways */
+table.sheet .stk { position: sticky; background: var(--panel); z-index: 2; }
+table.sheet th.stk { z-index: 3; background: var(--surface-sunken); }
+table.sheet .stk-a { right: 0; min-width: 76px; }
+table.sheet .stk-c { right: 76px; min-width: 76px; box-shadow: none; }
+table.sheet .stk-u { right: 152px; min-width: 84px; border-left: 1px solid var(--line); }
+table.sheet tbody tr:hover td.stk { background: var(--surface-hover); }
+table.sheet tr.draftrow td.stk { background: var(--bg); }
+table.sheet td.rowact .row-act { opacity: 0; transition: opacity .12s; }
+table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .row-act { opacity: 1; }
+@media (hover: none) { table.sheet td.rowact .row-act { opacity: 1; } }
+.for-opt { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.sumbar { position: sticky; bottom: 0; z-index: 4; display: flex; justify-content: flex-end; gap: 22px; padding: 10px 16px; margin: 16px -4px -4px; background: var(--panel); border-top: 1px solid var(--line-strong); border-radius: 0 0 var(--radius) var(--radius); font-size: 13px; color: var(--muted); }
+.sumbar strong { color: var(--ink); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.sumbar-profit strong { color: var(--ok, #2f7d4f); }
+.invoice table.items tr.grp td { padding: 16px 12px 6px; font-size: 10.5px; letter-spacing: 1px; font-weight: 700; color: var(--ink3); border-bottom: 1px solid var(--hair); }
