@@ -104,6 +104,7 @@ export function offChartReason(table, width, widthFrac, height, heightFrac) {
 export function lineIssues(line, state, { committed = true } = {}) {
   if (!(Number(line.width) && Number(line.height))) return [];
   const table = state.tables[line.table];
+  if (table?.noSize) return [];
   if (table?.kind === 'formula') {
     return committed && !Number(line.fabricPrice)
       ? [{ text: 'Fabric $/yd is missing — drapery is priced from it', fields: ['fabricPrice'] }] : [];
@@ -247,8 +248,21 @@ function computeDraperyLine(line, table, state) {
   return computeLinearDrapery(line, rates, track); // Cornice (both sizes), Swag & Jabot
 }
 
+// A table flagged `noSize` is for lines with no dimensions at all — an accessory sold
+// on its own (remote, service call). Nothing is looked up on a chart; the line is the
+// accessories you picked plus whatever is typed on it.
+export const isSizeless = (state, line) => !!state.tables[line?.table]?.noSize;
+
 export function computeLine(line, state) {
   const table = state.tables[line.table];
+  if (table?.noSize) {
+    const extras = accessoriesExtras(line, state) + customListExtras(line, state);
+    const installation = Number(line.installation) || 0;
+    const brackets = Number(line.brackets) || 0;
+    const unit = Math.max(0, extras + installation + brackets + (Number(line.markup) || 0) + (Number(line.motorPrice) || 0) - (Number(line.discount) || 0));
+    // Accessories are billed at cost on the cost side, same as everywhere else.
+    return { list: 0, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation, brackets, extras: round2(extras), cost: round2(extras + installation + brackets), unit: round2(unit) };
+  }
   if (table?.kind === 'formula') {
     const d = computeDraperyLine(line, table, state);
     const markup = Number(line.markup) || 0, motor = Number(line.motorPrice) || 0, lineDisc = Number(line.discount) || 0;
@@ -321,7 +335,10 @@ export function explainLine(line, state) {
   const w = Number(line.width) || 0;
   const h = Number(line.height) || 0;
 
-  if (table?.kind === 'formula') {
+  if (table?.noSize) {
+    // Nothing to look up: the accessory charges below ARE the line.
+    if (!(line.accessories || []).length) steps.push({ kind: 'note', label: 'Pick an accessory', detail: `${line.table} lines have no size \u2014 the price is the accessories you pick` });
+  } else if (table?.kind === 'formula') {
     // Drapery is computed from a formula per style rather than a grid; report what
     // it produced plus everything added on top of it.
     steps.push({ kind: 'base', label: `${line.table} (formula)`, detail: 'Priced from the style\u2019s rates in Price Tables, not a size grid', amount: round2((c.unit || 0) - (c.extras || 0) - (Number(line.markup) || 0) - (Number(line.motorPrice) || 0) + (Number(line.discount) || 0)) });

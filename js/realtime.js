@@ -2,11 +2,11 @@
 // WebSocket (Phoenix protocol), no SDK, so the app stays build-free.
 //
 // Three things ride on the same channel:
-//   • broadcast        — instant row patches between open tabs (~50ms, independent
-//                        of how fast the row lands in Postgres)
+//   • broadcast        — cursor and typing pings. Ephemeral by design: never data.
 //   • presence         — who is online, which view / quote / field they are on
-//   • postgres_changes — the durable net: anything written while you were offline,
-//                        or by a client whose broadcast you missed, still arrives
+//   • postgres_changes — every document change, in commit order and carrying its row
+//                        version. This is the ONLY path data takes between devices, so
+//                        there is nothing to race against.
 //
 // The channel is private, so joining requires a logged-in user (RLS on
 // realtime.messages — see supabase/schema.sql).
@@ -17,7 +17,7 @@ const TOPIC = 'realtime:shades-deluxe';
 const TABLES = ['app_state', 'quotes', 'price_tables', 'option_lists'];
 
 // Two identities, and the difference matters.
-//   CLIENT_ID — this tab. Used to ignore the echo of our own broadcasts.
+//   CLIENT_ID — this tab. Used to ignore the echo of our own pings.
 //   userKey() — this person. Used for the presence key and the colour, so a reload
 //     replaces that person's entry instead of adding a second one, and so Sarkis is
 //     the same colour on every screen. Keying presence on a per-tab random id was
@@ -44,17 +44,15 @@ let attempts = 0;
 let status = 'offline';       // offline | connecting | live
 let myMeta = {};
 let peers = [];               // [{ id, email, name, color, view, quoteId, field, self }]
-const handlers = { patch: [], db: [], presence: [], status: [], live: [] };
+const handlers = { db: [], presence: [], status: [], live: [] };
 
 const nextRef = () => String(++ref);
 const emit = (kind, arg) => handlers[kind].forEach((fn) => { try { fn(arg); } catch (e) { console.warn(e); } });
 
 export function realtimeStatus() { return status; }
-export function clientId() { return CLIENT_ID; }
 export function myColor() { return colorFor(userKey()); }
 export function getPeers() { return peers.filter((p) => !p.self); }
 
-export function onPatch(fn) { handlers.patch.push(fn); }
 export function onDbChange(fn) { handlers.db.push(fn); }
 export function onPresence(fn) { handlers.presence.push(fn); }
 export function onStatus(fn) { handlers.status.push(fn); fn(status); }
@@ -131,8 +129,7 @@ export function connectRealtime() {
     }
     if (event === 'broadcast') {
       const body = payload?.payload ?? payload;
-      if (payload?.event === 'live') { if (body.from !== CLIENT_ID) emit('live', body); }
-      else emit('patch', body);
+      if (payload?.event === 'live' && body.from !== CLIENT_ID) emit('live', body);
     }
     else if (event === 'postgres_changes') emit('db', payload?.data);
     else if (event === 'presence_state') { peers = fromState(payload); emit('presence', getPeers()); }
@@ -196,12 +193,6 @@ export function trackPresence(meta) {
 setInterval(() => { if (joined) trackPresence(myMeta); }, 20_000);
 
 /* ---------------- broadcast ---------------- */
-
-// Returns false when the socket is not up, so the caller can keep the change queued
-// instead of assuming it went out.
-export function broadcastPatch(payload) {
-  return joined && send('broadcast', { type: 'broadcast', event: 'patch', payload: { from: CLIENT_ID, ...payload } });
-}
 
 // Cursor position and typing pings. Deliberately not presence: presence is state
 // worth reconciling, this is a firehose that is worthless a second later.

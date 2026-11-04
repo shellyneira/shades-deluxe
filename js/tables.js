@@ -234,6 +234,10 @@ function gridEditor(name) {
       tableActions(name),
     ]),
     summary(name, table),
+    el('label', { class: 'row', style: 'gap:8px;margin:10px 0;align-items:center;cursor:pointer' }, [
+      (() => { const b = el('input', { type: 'checkbox', onchange: (e) => { table.noSize = e.target.checked; save(); renderTables(); } }); b.checked = !!table.noSize; return b; })(),
+      el('span', {}, ['Accessories only — lines on this table need no width or height']),
+    ]),
     el('div', { class: 'grid-wrap' }, [grid]),
     el('p', { class: 'hint', style: 'margin:10px 0 0' }, ['Widths run left→right, lengths top→bottom. A shade uses the first width ≥ its size and the first length ≥ its size.']),
     controls,

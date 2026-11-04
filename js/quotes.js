@@ -2,7 +2,7 @@
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
 import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine, descFields } from './pricing.js';
+import { computeLine, isSizeless, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -187,7 +187,7 @@ function showBreakdown(item, s) {
 // doesn't silently lose a line when they jump to the invoice.
 function commitDraftIfFilled(q) {
   const d = q._draft;
-  if (d && d.width && d.height) {
+  if (d && (isSizeless(getState(), d) ? (d.accessories || []).length : d.width && d.height)) {
     q.items.push({ ...d });
     delete q._draft;
     save();
@@ -442,7 +442,8 @@ function sheet(q, rerender) {
       if (c.listMissing) p.td.append(el('span', { class: 'offtag', title: `This size is off the ${p.item.table} chart, so the shade itself is not priced — only the charges typed on this line are. Extend the chart in Price Tables.` }, ['no list']));
       // An untitled em-dash is why a row with a markup typed into it reads as a dead
       // app. Say what is missing instead of saying nothing.
-      p.node.title = c.list == null && isDrapery(p.item, s.tables)
+      p.node.title = isSizeless(s, p.item) ? 'Accessories-only line — priced from the accessories picked, no size needed'
+        : c.list == null && isDrapery(p.item, s.tables)
         ? (hasDims ? 'Type the fabric price per yard in the "Fabric $/yd" column — drapery is priced from it. Price Tables only holds the rates (fullness, labor, markup).' : 'Enter width, height and Fabric $/yd to price this drapery')
         : c.list == null
         ? (hasDims ? `Off the ${p.item.table} chart — this is the typed charges only, NOT a full price` : 'Enter width and height — charges are added on top of the list price, so there is nothing to price yet')
@@ -561,8 +562,10 @@ function sheet(q, rerender) {
   };
 
   const addLine = () => {
-    if (!draft.width || !draft.height) return toast('Enter width and height');
-    q.items.push({ ...draft });
+    const d = q._draft || draft;
+    if (isSizeless(s, d)) { if (!d.accessories?.length) return toast('Pick at least one accessory'); }
+    else if (!d.width || !d.height) return toast('Enter width and height');
+    q.items.push({ ...d });
     q._draft = blankLine(s);
     save();
     rerender();
