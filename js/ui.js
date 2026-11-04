@@ -199,7 +199,7 @@ export function combo({ options, value, onChange, placeholder = '', style = '', 
     rows = shown.map((o, i) => {
       const row = el('div', { class: 'dd-opt', role: 'option' }, [
         el('span', { class: 'dd-mark' }, []),
-        el('span', { class: 'dd-label' }, [o.name]),
+        el('span', { class: 'dd-label', style: 'white-space:normal' }, [o.name]),
         Number(o.price) && money ? el('em', {}, [money(o.price)]) : null,
       ]);
       row.onmousedown = (e) => e.preventDefault(); // keep the caret in the box
@@ -209,7 +209,7 @@ export function combo({ options, value, onChange, placeholder = '', style = '', 
     });
     active = -1;
     if (!rows.length) { closePopover(); return; }
-    if (!list) { list = el('div', { class: 'dd-list', role: 'listbox' }, []); popover(inp, list, { onClose: () => { list = null; inp.setAttribute('aria-expanded', 'false'); } }); }
+    if (!list) { list = el('div', { class: 'dd-list', role: 'listbox', style: 'max-width:min(480px, calc(100vw - 24px))' }, []); popover(inp, list, { onClose: () => { list = null; inp.setAttribute('aria-expanded', 'false'); } }); }
     list.replaceChildren(...rows);
   };
   const mark = (i, scroll = true) => {
