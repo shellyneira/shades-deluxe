@@ -31,6 +31,11 @@ function abbreviationsPanel(s) {
 // Settings never raises "does this affect just this document?" The list itself
 // comes from descFields(), which already includes any category the user has added
 // from Lists — nothing here is hardcoded to a fixed field set.
+// Fields that only mean something for one kind of line say so, wherever they are listed.
+// Accessories and services print just their own name, so nothing here applies to them.
+const APPLIES = { control: 'Shades', style: 'Shades', headrail: 'Shades', bottomRail: 'Shades', reverse: 'Shades', fascia: 'Shades', cassette: 'Shades', sideChannel: 'Shades', track: 'Drapery', lining: 'Drapery', fabricWidth: 'Drapery', fabricPrice: 'Drapery' };
+const appliesTag = (key) => (APPLIES[key] ? el('span', { class: 'applies', title: `Only used on ${APPLIES[key].toLowerCase()}` }, [APPLIES[key]]) : null);
+
 function fieldOrderPanel(s) {
   const fields = descFields(s); // already sorted by s.docFieldOrder
   const order = fields.map((f) => f.key);
@@ -54,13 +59,13 @@ function fieldOrderPanel(s) {
         s.docFieldOrder = next;
         save(); renderSettings();
       },
-    }, [el('span', { class: 'drag-handle' }, ['⠿']), f.label]);
+    }, [el('span', { class: 'drag-handle' }, ['⠿']), f.label, appliesTag(f.key)]);
     return r;
   };
 
   return el('div', { class: 'panel' }, [
     el('h2', {}, ['Order these appear in every document']),
-    el('p', { class: 'muted', style: 'margin-top:0' }, ['Drag to reorder. This is the order used everywhere a Description is printed — Client Quote, Work Order and Stickers all follow it.']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Drag to reorder. This is the order used everywhere a Description is printed — Client Quote, Work Order and Stickers all follow it. Accessories and services print just their own name, so nothing here applies to them.']),
     el('div', { class: 'order-list' }, fields.map(row)),
   ]);
 }
@@ -81,7 +86,7 @@ function documentsPanel(s) {
     const boxes = docFields.map((f) => {
       const box = el('input', { type: 'checkbox', onchange: (e) => { cfg[f.key] = e.target.checked; save(); } });
       box.checked = !!cfg[f.key];
-      const row = [el('label', { class: 'field check', style: 'margin:0' }, [box, f.label])];
+      const row = [el('label', { class: 'field check', style: 'margin:0' }, [box, f.label, appliesTag(f.key)])];
       // A second, SEPARATE <label> (not nested in the one above) — a label wrapping two
       // checkboxes forwards an unlabeled click to the first one, so the "show label"
       // checkbox needs its own label to be clickable by its own text.
