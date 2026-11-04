@@ -34,13 +34,6 @@ function optionPrice(state, listKey, name) {
   return found ? Number(found.price) || 0 : 0;
 }
 
-// Accessories (Remote, Valance, etc.) aren't tied to a shade category — the same
-// list applies to Roller, Zebra and Drapery — and a line can carry more than one,
-// unlike the single-value fields above, so it gets its own summing helper.
-function accessoriesExtras(line, state) {
-  return (line.accessories || []).reduce((sum, name) => sum + optionPrice(state, 'accessories', name), 0);
-}
-
 // Custom per-category attributes created from the Lists screen (Drapery's Pattern,
 // and whatever the user adds after it) — same shape as Products/Fabrics, so priced
 // ones are summed the same way as the built-in fields above.
@@ -57,7 +50,7 @@ function customListExtras(line, state) {
 
 function optionExtras(line, state) {
   return PRICED_FIELDS.reduce((sum, [field, key]) => sum + optionPrice(state, key, line[field]), 0)
-    + accessoriesExtras(line, state) + customListExtras(line, state);
+    + customListExtras(line, state);
 }
 
 export function effectiveDim(inches, fraction) {
@@ -271,18 +264,17 @@ export function computeLine(line, state) {
   const table = state.tables[line.table];
   if (isSizeless(state, line)) {
     const typed = Number(line.customPrice) || 0;
-    const extras = accessoriesExtras(line, state) + customListExtras(line, state);
     const installation = Number(line.installation) || 0;
     const brackets = Number(line.brackets) || 0;
-    const unit = Math.max(0, typed + extras + installation + brackets + (Number(line.markup) || 0) + (Number(line.motorPrice) || 0) - (Number(line.discount) || 0));
-    // Accessories are billed at cost on the cost side, same as everywhere else.
-    return { list: 0, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation, brackets, extras: round2(extras), cost: round2(typed + extras + installation + brackets), unit: round2(unit) };
+    const unit = Math.max(0, typed + installation + brackets + (Number(line.markup) || 0) + (Number(line.motorPrice) || 0) - (Number(line.discount) || 0));
+    // Billed at cost on the cost side — no margin is claimed on a typed price.
+    return { list: 0, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation, brackets, extras: 0, cost: round2(typed + installation + brackets), unit: round2(unit) };
   }
   if (table?.kind === 'formula') {
     const d = computeDraperyLine(line, table, state);
     const markup = Number(line.markup) || 0, motor = Number(line.motorPrice) || 0, lineDisc = Number(line.discount) || 0;
     if (!d) return { list: null, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation: 0, brackets: 0, extras: 0, cost: null, unit: null };
-    const extras = accessoriesExtras(line, state) + customListExtras(line, state); // priced accessories/attributes — apply to Drapery too, not just Roller/Zebra
+    const extras = customListExtras(line, state); // priced attributes — apply to Drapery too, not just Roller/Zebra
     const unit = Math.max(0, round2(d.unit + extras + markup + motor - lineDisc));
     return { list: unit, listMissing: false, fascia: 0, cassette: 0, sideChannel: 0, installation: round2(d.installation), brackets: 0, extras: round2(extras), cost: round2(d.cost + extras), unit };
   }
@@ -351,9 +343,9 @@ export function explainLine(line, state) {
   const h = Number(line.height) || 0;
 
   if (isSizeless(state, line)) {
-    // Nothing to look up: what is typed and the accessories picked ARE the line.
+    // Nothing to look up: what is typed on the line IS the line.
     if (Number(line.customPrice)) steps.push({ kind: 'base', label: line.customText || 'Item', detail: 'Price typed on the line', amount: round2(Number(line.customPrice)) });
-    else if (!(line.accessories || []).length) steps.push({ kind: 'note', label: 'No price yet', detail: 'Type a Price $ or pick an accessory \u2014 this line has no size to price from' });
+    else steps.push({ kind: 'note', label: 'No price yet', detail: 'Pick or type an item and a Price $ \u2014 this line has no size to price from' });
   } else if (table?.kind === 'formula') {
     // Drapery is computed from a formula per style rather than a grid; report what
     // it produced plus everything added on top of it.
@@ -398,10 +390,6 @@ export function explainLine(line, state) {
     }
   }
 
-  for (const name of line.accessories || []) {
-    const price = optionPrice(state, 'accessories', name);
-    if (price) steps.push({ kind: 'add', label: `Accessory — ${name}`, detail: '“Accessories” is priced in Lists', amount: round2(price) });
-  }
   if (c.installation) {
     const auto = table?.kind === 'formula' && (line.installation === '' || line.installation == null);
     steps.push({ kind: 'add', label: 'Installation', detail: auto ? installAutoText(line, table).replace(/ Type a number to override\.$/, '') : 'Typed on the line', amount: round2(c.installation) });
@@ -486,7 +474,6 @@ function builtinDescFields(abbrev) {
     { key: 'lining', label: 'Lining', fmt: (l) => l.lining || '' },
     { key: 'discount', label: 'Discount', fmt: (l) => ((Number(l.discount) || 0) > 0 ? '$' + l.discount : '') },
     { key: 'markup', label: 'Extra', fmt: (l) => ((Number(l.markup) || 0) > 0 ? '$' + l.markup : '') },
-    { key: 'accessories', label: 'Accessories', fmt: (l) => (l.accessories || []).join(', ') },
     // Free-text — also has its own dedicated column on the Work Order table; this entry
     // only matters if someone also wants it folded into the Description text itself.
     { key: 'notes', label: 'Notes', fmt: (l) => l.notes || '' },
