@@ -2,7 +2,7 @@
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
 import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, isSizeless, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, explainLine, descFields } from './pricing.js';
+import { computeLine, isSizeless, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -424,7 +424,7 @@ function sheet(q, rerender) {
   const totalsRefs = {};
 
   const recalc = () => {
-    for (const { item, input } of insCells) input.placeholder = String(draperyAutoInstall(item, s.tables[item.table]) || '0');
+    for (const { item, input } of insCells) { input.placeholder = String(draperyAutoInstall(item, s.tables[item.table]) || '0'); input.title = installAutoText(item, s.tables[item.table]); }
     for (const p of priceCells) {
       const c = computeLine(p.item, s);
       const hasDims = p.item.width && p.item.height;

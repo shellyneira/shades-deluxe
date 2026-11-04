@@ -176,6 +176,15 @@ export function draperyAutoInstall(line, table) {
   return round2(((Number(line.width) || 0) / 12) * rates.installPerFoot);
 }
 
+// The working behind draperyAutoInstall, in words, for tooltips and the price breakdown.
+export function installAutoText(line, table) {
+  const def = DRAPERY_STYLES[table?.style];
+  const w = Number(line.width) || 0;
+  if (!def || !w || (table.style !== 'heavyFabric' && table.style !== 'sheer')) return '';
+  const rate = { ...def.rates, ...(table.rates || {}) }.installPerFoot;
+  return `Automatic: ${w}" \u00f7 12 = ${round2(w / 12)} ft \u00d7 $${rate} per foot (rate in Price Tables \u2192 ${line.table}). Type a number to override.`;
+}
+
 // Heavy Fabric / Sheer: fullness × width ÷ fabric width = panels, panels × (height + 12) ÷ 36 = yards.
 // `track` (global, Settings → Rates) covers the Motorized/Manual track add-on — same
 // physical hardware regardless of style, so it isn't duplicated into `rates`. Installation
@@ -386,7 +395,10 @@ export function explainLine(line, state) {
     const price = optionPrice(state, 'accessories', name);
     if (price) steps.push({ kind: 'add', label: `Accessory — ${name}`, detail: '“Accessories” is priced in Lists', amount: round2(price) });
   }
-  if (c.installation) steps.push({ kind: 'add', label: 'Installation', detail: 'Typed on the line', amount: round2(c.installation) });
+  if (c.installation) {
+    const auto = table?.kind === 'formula' && (line.installation === '' || line.installation == null);
+    steps.push({ kind: 'add', label: 'Installation', detail: auto ? installAutoText(line, table).replace(/ Type a number to override\.$/, '') : 'Typed on the line', amount: round2(c.installation) });
+  }
   if (c.brackets) steps.push({ kind: 'add', label: 'Brackets', detail: 'Typed on the line', amount: round2(c.brackets) });
   if (Number(line.motorPrice)) steps.push({ kind: 'add', label: 'Motor', detail: 'Typed on the line', amount: round2(Number(line.motorPrice)) });
   if (Number(line.markup)) steps.push({ kind: 'add', label: 'Markup', detail: 'Extra added on this line', amount: round2(Number(line.markup)) });
