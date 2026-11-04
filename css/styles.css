@@ -896,3 +896,5 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .ed-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 13px; }
 .ed-foot strong { font-size: 16px; font-variant-numeric: tabular-nums; }
 @media (max-width: 900px) { .ed-wrap { grid-template-columns: 1fr; } .ed-list { border-right: 0; border-bottom: 1px solid var(--line); } .ed-panel { position: static; max-height: none; } }
+.quote-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 14px; }
+.quote-bar .quote-tabs { margin: 0; }

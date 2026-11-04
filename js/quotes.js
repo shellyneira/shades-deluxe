@@ -40,8 +40,7 @@ export function dropMissingQuote() {
 }
 
 export function renderQuotes() {
-  if (sub.view === 'edit' && getQuote(sub.quoteId)) return mount(editor(getQuote(sub.quoteId)));
-  if (sub.view === 'invoice' && getQuote(sub.quoteId)) return mount(invoice(getQuote(sub.quoteId)));
+  if ((sub.view === 'edit' || sub.view === 'invoice') && getQuote(sub.quoteId)) return mount(editor(getQuote(sub.quoteId)));
   return mount(list());
 }
 
@@ -100,7 +99,7 @@ function editor(q) {
   const s = getState();
   const set = (fn) => { fn(); save(); };
 
-  const toolbar = el('div', { class: 'section-head' }, [
+  const toolbar = el('div', { class: 'section-head no-print' }, [
     el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list', quoteId: null }; renderQuotes(); } }, labeled('arrowLeft', 'All quotes')),
     el('div', { class: 'row toolbar' }, [
       // One click, and this quote stops counting as business: it leaves every
@@ -110,13 +109,12 @@ function editor(q) {
         box.title = q.isTest ? 'This is a practice quote — it is excluded from the dashboard' : 'Mark as a practice quote, excluded from the dashboard';
         return box;
       })(),
-      el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); open(q.id, 'invoice'); } }, ['View Invoice']),
       el('button', { class: 'btn', onclick: () => { commitDraftIfFilled(q); const d = duplicateQuote(q.id); open(d.id); toast(`Duplicated as quote #${d.number}`); } }, ['Duplicate']),
       el('button', { class: 'btn', style: 'color:var(--danger)', onclick: async () => { if (await confirmAction(`Delete quote #${q.number}${q.client.name ? ' for ' + q.client.name : ''}? This cannot be undone.`)) { deleteQuote(q.id); sub = { view: 'list', quoteId: null }; renderQuotes(); toast('Quote deleted'); } } }, ['Delete']),
     ]),
   ]);
 
-  const client = el('div', { class: 'panel' }, [
+  const client = el('div', { class: 'panel no-print' }, [
     el('h3', {}, ['Client · Quote #' + q.number + (q.isTest ? ' · TEST' : '')]),
     el('div', { class: 'row' }, [
       input('Client name', q.client.name, (v) => set(() => (q.client.name = v)), { class: 'grow' }),
@@ -135,9 +133,15 @@ function editor(q) {
 
   // The worksheet rebuilds itself only when rows are added/removed (keeps input focus otherwise).
   const dynamic = el('div', {});
-  const reRender = () => dynamic.replaceChildren(sheet(q, reRender));
+  const inDoc = sub.view === 'invoice';
+  const reRender = () => dynamic.replaceChildren(inDoc ? docView(q) : sheet(q, reRender));
   reRender();
-  return el('div', {}, [toolbar, client, quoteTabs(q, sheetMode()), dynamic]);
+  // One page, five views: the tabs swap what is shown underneath, nothing navigates away.
+  const bar = el('div', { class: 'quote-bar no-print' }, [
+    quoteTabs(q, inDoc ? invMode : sheetMode()),
+    inDoc ? el('button', { class: 'btn primary small', onclick: () => window.print() }, labeled('printer', 'Print / Save PDF')) : null,
+  ]);
+  return el('div', {}, [toolbar, client, bar, dynamic]);
 }
 
 /* ---------------- price breakdown ----------------
@@ -959,19 +963,14 @@ function shareButton(q, s, isWork) {
   return wrap;
 }
 
-function invoice(q) {
+// The printable documents, shown inline under the quote's view bar.
+function docView(q) {
   const s = getState();
   const co = s.company;
   const t = quoteTotals(q, s);
   const isWork = invMode === 'work';
 
-  const toolbar = el('div', { class: 'section-head no-print' }, [
-    el('button', { class: 'btn ghost', onclick: () => open(q.id, 'edit') }, labeled('arrowLeft', 'Back to quote')),
-    quoteTabs(q, invMode),
-    el('button', { class: 'btn primary small', onclick: () => window.print() }, labeled('printer', 'Print / Save PDF')),
-  ]);
-
-  if (invMode === 'labels') return el('div', {}, [toolbar, labelsView(q, s)]);
+  if (invMode === 'labels') return labelsView(q, s);
 
   const catOf = (l) => s.tables[l.table]?.category;
   const cats = s.categories.filter((c) => q.items.some((l) => catOf(l) === c)); // types this quote actually has
@@ -1080,7 +1079,7 @@ function invoice(q) {
   } else docs = picked.map((c) => build(itemsFor(c), { name: c }));
   if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection.'])];
 
-  return el('div', {}, [toolbar, makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
+  return el('div', {}, [makerBar, el('div', { class: 'panel invoice-panel' }, docs)]);
 }
 
 // DYMO 30252 stickers (1⅛" × 3½"), one per shade, for the LabelWriter 550.
