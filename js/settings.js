@@ -22,7 +22,7 @@ function abbreviationsPanel(s) {
     el('div', { class: 'row' }, [
       field('Control — right hand', 'controlRH', 'Printed on Client Quote / Work Order when Control ends in RH.'),
       field('Control — left hand', 'controlLH', 'Printed when Control ends in LH.'),
-      field('Side channels (sticker)', 'sideChannelShort', 'Short form used only on DYMO stickers — full "Side Channels" elsewhere.'),
+      field('Side channels (label)', 'sideChannelShort', 'Short form used only on DYMO labels — full "Side Channels" elsewhere.'),
     ]),
   ]);
 }
@@ -65,7 +65,7 @@ function fieldOrderPanel(s) {
 
   return el('div', { class: 'panel' }, [
     el('h2', {}, ['Order these appear in every document']),
-    el('p', { class: 'muted', style: 'margin-top:0' }, ['Drag to reorder. This is the order used everywhere a Description is printed — Client Quote, Work Order and Stickers all follow it. Accessories and services print just their own name, so nothing here applies to them.']),
+    el('p', { class: 'muted', style: 'margin-top:0' }, ['Drag to reorder. This is the order used everywhere a Description is printed — Client Quote, Work Order and Labels all follow it. Accessories and services print just their own name, so nothing here applies to them.']),
     el('div', { class: 'order-list' }, fields.map(row)),
   ]);
 }
@@ -120,7 +120,7 @@ function documentsPanel(s) {
     el('div', { class: 'field-subcard-grid' }, [
       col('client', 'Client Quote', 'Shown to the customer. No dimensions; prices shown.'),
       col('work', 'Work Order', 'For your maker. Dimensions shown; no prices.'),
-      col('label', 'Stickers (DYMO)', 'Extra info line on each shade label (name, location, product, size & control are always shown).'),
+      col('label', 'Labels (DYMO)', 'Extra info line on each shade label (name, location, product, size & control are always shown).'),
     ]),
   ]);
 }

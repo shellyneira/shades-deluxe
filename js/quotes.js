@@ -507,7 +507,7 @@ function quoteTabs(q, active) {
     tab('lines', 'Line editor', () => { setSheetMode('lines'); open(q.id, 'edit'); }),
     tab('client', 'Client quote', doc('client')),
     tab('work', 'Work order', doc('work')),
-    tab('labels', 'Stickers', doc('labels')),
+    tab('labels', 'Labels', doc('labels')),
   ]);
 }
 
