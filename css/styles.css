@@ -856,7 +856,6 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .sumbar { position: sticky; bottom: 0; z-index: 4; display: flex; justify-content: flex-end; gap: 22px; padding: 10px 16px; margin: 16px -4px -4px; background: var(--panel); border-top: 1px solid var(--line-strong); border-radius: 0 0 var(--radius) var(--radius); font-size: 13px; color: var(--muted); }
 .sumbar strong { color: var(--ink); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .sumbar-profit strong { color: var(--ok, #2f7d4f); }
-.invoice table.items tr.grp td { padding: 16px 12px 6px; font-size: 10.5px; letter-spacing: 1px; font-weight: 700; color: var(--ink3); border-bottom: 1px solid var(--hair); }
 .combo { position: relative; display: block; }
 .combo input { padding-right: 26px !important; }
 .combo .combo-chev { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--muted); }
@@ -945,8 +944,4 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .invoice.page { position: relative; height: 1056px; overflow: hidden; }
 .invoice.page .pg { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 10.5px; letter-spacing: .08em; color: var(--ink3); }
 .invoice-panel.paginating { visibility: hidden; }
-/* a group in a document: a clear band with its name, how many, and (client quote) its subtotal */
-.invoice table.items tr.grp td { padding: 9px 11px; background: var(--wash); color: var(--ink1); font-size: 10.5px; font-weight: 800; letter-spacing: 1.2px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); border-left: 0; }
-.invoice table.items tr.grp:not(:first-child) td { border-top: 1px solid var(--ink1); }
-.invoice table.items tr.grp td.num { text-align: right; letter-spacing: 0; font-variant-numeric: tabular-nums; font-size: 12px; }
-.invoice table.items tr.grp .grp-n { font-weight: 600; color: var(--ink3); margin-left: 6px; }
+.invoice .doc-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--hair); color: var(--ink3); margin-right: 6px; vertical-align: 1px; }

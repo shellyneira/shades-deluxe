@@ -32,14 +32,7 @@ export function paginate(inv) {
   const capacity = PAGE_H - BOTTOM_SAFE - FIT_SLACK;
   const contStart = padTop + headRowH;
 
-  // A group heading travels with the line under it.
-  const units = [];
-  for (let i = 0; i < rows.length; i++) {
-    const group = [rows[i]];
-    while (rows[i].classList.contains('grp') && rows[i + 1]) { i++; group.push(rows[i]); if (!rows[i].classList.contains('grp')) break; }
-    const h = yBottom(group.at(-1)) - yTop(group[0]);
-    units.push({ rows: group, h });
-  }
+  const units = rows.map((r) => ({ rows: [r], h: yBottom(r) - yTop(r) }));
 
   const afterTable = yBottom(rows.at(-1));
   const sumH = sum ? yBottom(sum) - afterTable : 0;

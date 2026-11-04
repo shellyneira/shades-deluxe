@@ -1193,22 +1193,8 @@ function fitLabels() {
 
 // Client version: everything goes into the Description (fields chosen in Settings),
 // client price shown, NO dimensions.
-// Documents group lines by kind, in the order a customer thinks of them. Headings only
-// appear when more than one kind is present, so a shades-only quote reads exactly as before.
-const DOC_GROUPS = [['shade', 'Shades'], ['drapery', 'Drapery'], ['accessory', 'Accessories'], ['service', 'Services']];
-function groupedRows(items, tables, span, rowFor, subtotalFor) {
-  const groups = DOC_GROUPS
-    .map(([family, label]) => ({ label, lines: items.filter((l) => familyOf(l, tables) === family) }))
-    .filter((g) => g.lines.length);
-  let n = 0;
-  return groups.flatMap((g) => [
-    groups.length > 1 ? el('tr', { class: 'grp' }, [
-      el('td', { colspan: subtotalFor ? span - 1 : span }, [g.label.toUpperCase(), el('span', { class: 'grp-n' }, [`· ${g.lines.length}`])]),
-      subtotalFor ? el('td', { class: 'num' }, [subtotalFor(g.lines)]) : null,
-    ]) : null,
-    ...g.lines.map((l) => rowFor(l, n++)),
-  ]);
-}
+// What a line is, for the small tag the client quote shows in front of its description.
+const FAMILY_TAG = { shade: 'Shade', drapery: 'Drapery', accessory: 'Accessory', service: 'Service' };
 
 // Which shades or drapes an accessory goes with, by room.
 const forNames = (q, l) => q.items.filter((x) => (l.forLines || []).includes(x.id) && x.id !== l.id).map((x) => x.location || x.table);
@@ -1241,7 +1227,7 @@ function clientTable(q, s) {
   const cfg = s.docConfig.client;
   const showInstall = s.showInstall !== false;
   const bundle = cfg.bundleAccessories === true ? bundling(q, s, showInstall) : { hidden: new Set(), extra: new Map(), added: new Map() };
-  const rows = groupedRows(q.items.filter((l) => !bundle.hidden.has(l.id)), s.tables, 5, (l) => {
+  const rows = q.items.filter((l) => !bundle.hidden.has(l.id)).map((l) => {
     const c = computeLine(l, s);
     const qty = Number(l.qty) || 1;
     const shownUnit = (c.unit || 0) - (showInstall ? (c.installation || 0) : 0);
@@ -1259,14 +1245,11 @@ function clientTable(q, s) {
     return el('tr', { class: unpriced ? 'unpriced' : '' }, [
       el('td', { class: 'num' }, [String(qty)]),
       el('td', { class: 'strong' }, [l.location]),
-      el('td', { class: 'desc' }, [desc]),
+      el('td', { class: 'desc' }, [el('span', { class: 'doc-tag' }, [FAMILY_TAG[familyOf(l, s.tables)]]), desc]),
       el('td', { class: 'num' }, [unpriced ? 'TBD' : unitText]),
       el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(lineTotal)]),
     ]);
-  }, (lines) => money0(lines.reduce((a, l) => {
-    const c = computeLine(l, s);
-    return a + roundWhole((c.unit || 0) - (showInstall ? (c.installation || 0) : 0)) * (Number(l.qty) || 1) + (bundle.extra.get(l.id) || 0);
-  }, 0)));
+  });
   const cols = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
   return el('table', { class: 'items' }, [
     el('thead', {}, [el('tr', { class: 'print-gap' }, [el('td', { colspan: cols.length })]), el('tr', {}, cols.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
@@ -1284,7 +1267,7 @@ function workTable(q, s, items = q.items) {
   // with no quantity, and the shop built one shade.
   const cols = ['#', 'Qty', 'Location', 'Size (W×H)', 'Description', 'Notes'];
   const bundle = cfg.bundleAccessories === true ? bundling(q, s, true, { singleOnly: true }) : { hidden: new Set(), added: new Map() };
-  const rows = groupedRows(items.filter((l) => !bundle.hidden.has(l.id)), s.tables, cols.length, (l, i) => {
+  const rows = items.filter((l) => !bundle.hidden.has(l.id)).map((l, i) => {
     const names = familyOf(l, s.tables) === 'accessory' ? forNames(q, l) : [];
     const desc = [describeLine(l, cfg, true, false, s) + (names.length ? ` (for ${names.join(', ')})` : ''), ...(bundle.added.get(l.id) || []).map((t) => '+ ' + t)].filter(Boolean).join(', ');
     return el('tr', {}, [
