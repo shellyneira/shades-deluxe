@@ -1132,7 +1132,8 @@ function docView(q) {
     if (panel.isConnected) [...panel.querySelectorAll(':scope > .invoice')].forEach(paginate);
     panel.classList.remove('paginating');
   };
-  (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(() => requestAnimationFrame(run)));
+  // Fonts settle the line breaks, so wait for them — but never more than a moment: a slow font must not hold the document back.
+  Promise.race([document.fonts?.ready ?? Promise.resolve(), new Promise((r) => setTimeout(r, 800))]).then(() => requestAnimationFrame(() => requestAnimationFrame(run)));
   return el('div', {}, [makerBar, panel]);
 }
 
