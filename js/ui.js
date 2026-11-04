@@ -191,9 +191,11 @@ export function combo({ options, value, onChange, placeholder = '', style = '', 
   const inp = el('input', { type: 'text', value: value ?? '', placeholder, style: style || null, autocomplete: 'off', role: 'combobox', 'aria-expanded': 'false' }, []);
   let list = null, rows = [], shown = [], active = -1;
 
-  const fill = () => {
-    const q = inp.value.trim().toLowerCase();
-    shown = options.filter((o) => o.name && (!q || o.name.toLowerCase().includes(q)) && o.name !== inp.value);
+  // Opening shows everything saved (the box already holding a value must not hide the
+  // alternatives); only typing narrows the list.
+  const fill = (narrow = false) => {
+    const q = narrow ? inp.value.trim().toLowerCase() : '';
+    shown = options.filter((o) => o.name && (!q || o.name.toLowerCase().includes(q)));
     rows = shown.map((o, i) => {
       const row = el('div', { class: 'dd-opt', role: 'option' }, [
         el('span', { class: 'dd-mark' }, []),
@@ -218,9 +220,9 @@ export function combo({ options, value, onChange, placeholder = '', style = '', 
   };
   const pick = (o) => { inp.value = o.name; closePopover(); onChange(o.name, o); };
 
-  inp.addEventListener('focus', fill);
+  inp.addEventListener('focus', () => fill());
   inp.addEventListener('click', () => { if (!list) fill(); });
-  inp.addEventListener('input', () => { onChange(inp.value, null); fill(); });
+  inp.addEventListener('input', () => { onChange(inp.value, null); fill(true); });
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (!list) fill(); mark(active + 1); }
     else if (e.key === 'ArrowUp' && list) { e.preventDefault(); mark(active - 1); }
