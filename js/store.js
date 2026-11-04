@@ -122,7 +122,7 @@ function freshState() {
 // Option list items carry an optional price: stored as { name, price }. Strings from
 // older data (or the seed) migrate to { name, price: 0 }.
 const toPriced = (arr) => (arr || []).map((x) => (typeof x === 'string' ? { name: x, price: 0 } : { name: x.name, price: Number(x.price) || 0 }));
-const FLAT_PRICED_LISTS = ['locations', 'wdNumbers', 'colors', 'controls', 'systems', 'styles', 'headrails', 'accessories', 'mount'];
+const FLAT_PRICED_LISTS = ['locations', 'wdNumbers', 'colors', 'controls', 'systems', 'styles', 'headrails', 'accessories', 'services', 'mount'];
 
 // Table category ("Roller"/"Zebra"/anything you name) used to be guessed from the
 // table's name; it's now an explicit field on the table, and Products/Fabrics are
@@ -154,6 +154,7 @@ function normalize(state) {
   // every other one — the one the user found when auditing for exactly this. Seed the
   // two existing values once so nothing on file changes meaning, then it's editable.
   if (!state.options.mount || !state.options.mount.length) state.options.mount = ['Ceiling', 'Wall'];
+  if (!state.options.services) state.options.services = [];
   for (const key of FLAT_PRICED_LISTS) state.options[key] = toPriced(state.options[key]);
   delete state.manufacturers;
   state.minimumOrder = Number(state.minimumOrder) || 0;

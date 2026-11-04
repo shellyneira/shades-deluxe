@@ -9,16 +9,17 @@ const LABELS = {
   locations: 'Locations', wdNumbers: 'Window / Door #', products: 'Products',
   fabrics: 'Fabrics / Descriptions', colors: 'Colors', controls: 'Controls',
   systems: 'Systems', styles: 'Styles', headrails: 'Headrails / Bottom rails',
-  accessories: 'Accessories', mount: 'Mount',
+  accessories: 'Accessories', services: 'Services', mount: 'Mount',
 };
 const GROUPED = { products: true, fabrics: true }; // stored one array per category
 // Only these add-ons carry a price. Products/fabrics get their price from the Price
 // Tables; colors, locations, w/d and controls are plain labels.
-const PRICEABLE = { systems: true, styles: true, headrails: true, accessories: true };
+const PRICEABLE = { systems: true, styles: true, headrails: true, accessories: true, services: true };
 const PRICE_NOTE = {
   products: 'The price comes from Price Tables — adding one here costs nothing extra.',
   fabrics: 'The price comes from Price Tables — adding one here costs nothing extra.',
   accessories: 'Shared by every product type — pick any number of them on a worksheet line.',
+  services: 'Work you charge for, with a usual price. Pick "Service" in the Table column and choose one — the price fills in and can be changed on the line.',
 };
 const genId = () => 'cl_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36);
 

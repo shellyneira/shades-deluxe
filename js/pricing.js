@@ -260,8 +260,13 @@ function computeDraperyLine(line, table, state) {
 // A table flagged `noSize` is for lines with no dimensions at all — an accessory sold
 // on its own (remote, service call). Nothing is looked up on a chart; the line is the
 // accessories you picked plus whatever is typed on it.
+export const ACCESSORY_TABLE = 'Accessory';
+export const SERVICE_TABLE = 'Service';
 export const CUSTOM_TABLE = 'Custom item';
-export const isSizeless = (state, line) => line?.table === CUSTOM_TABLE || !!state.tables[line?.table]?.noSize;
+// Lines that are not a shade: no size, priced by what is typed and picked.
+export const OTHER_LINES = [ACCESSORY_TABLE, SERVICE_TABLE, CUSTOM_TABLE];
+export const isOtherLine = (line) => OTHER_LINES.includes(line?.table);
+export const isSizeless = (state, line) => isOtherLine(line) || !!state.tables[line?.table]?.noSize;
 
 export function computeLine(line, state) {
   const table = state.tables[line.table];
@@ -523,7 +528,7 @@ export function descFields(state) {
 export function describeLine(line, cfg, isWork, compact, state) {
   const docKey = isWork ? 'work' : compact ? 'label' : 'client';
   const labels = state?.docFieldLabel?.[docKey] || {};
-  const named = line.table === CUSTOM_TABLE && line.customText ? [line.customText] : [];
+  const named = isOtherLine(line) && line.customText ? [line.customText] : [];
   return [...named, ...descFields(state)
     .filter((f) => !cfg || cfg[f.key])
     .map((f) => {

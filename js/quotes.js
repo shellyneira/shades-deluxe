@@ -2,7 +2,7 @@
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
 import { dropdown, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, isSizeless, CUSTOM_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
+import { computeLine, isSizeless, isOtherLine, OTHER_LINES, SERVICE_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -253,7 +253,7 @@ function columns(state, tables, categories, customLists) {
   // kind of table each one is, even though the table names themselves are plain.
   const tableGroups = [
     ...categories.map((cat) => ({ label: cat, names: tableNames.filter((n) => tables[n].category === cat) })),
-    { label: 'Other', names: [CUSTOM_TABLE] },
+    { label: 'Other', names: OTHER_LINES },
   ];
   const forDrapery = (it) => isDrapery(it, tables);
   // Per-category attributes created from the Lists screen (Pattern, and whatever gets
@@ -278,8 +278,10 @@ function columns(state, tables, categories, customLists) {
     { key: 'fabric', label: 'Description', kind: 'select', opts: (it) => opt(o.fabrics[tableCategory(it.table, tables)] || []), w: 160 },
     { key: 'color', label: 'Color', kind: 'select', opts: opt(o.colors), w: 116 },
     // Custom item lines: what to call it and what to charge. Every other column stays live.
-    { key: 'customText', label: 'Item', kind: 'text', w: 150, placeholder: 'Custom item', hideWhen: (it) => it.table !== CUSTOM_TABLE, naWhy: 'Only for Custom item lines' },
-    { key: 'customPrice', label: 'Price $', kind: 'num', w: 74, placeholder: '0', hideWhen: (it) => it.table !== CUSTOM_TABLE, naWhy: 'Only for Custom item lines' },
+    { key: 'customText', label: 'Item', kind: 'text', w: 150, placeholder: 'What is it?', hideWhen: (it) => !isOtherLine(it), naWhy: 'Only for Accessory, Service and Custom item lines',
+      // Saved services/accessories as suggestions; anything else can still be typed. Picking one fills its price.
+      suggest: (it) => (it.table === SERVICE_TABLE ? o.services : it.table === ACCESSORY_TABLE ? o.accessories : []) || [] },
+    { key: 'customPrice', label: 'Price $', kind: 'num', w: 74, placeholder: '0', hideWhen: (it) => !isOtherLine(it), naWhy: 'Only for Accessory, Service and Custom item lines' },
     ...customCols,
     // Roller/Zebra: System (Manual/Motor). Drapery: same column becomes Track
     // (Motorized/Manual) instead — the two concepts play the same role, so Track
@@ -383,12 +385,21 @@ function cell(col, item, onChange) {
     return el('td', {}, [dropdown({ options, value: Number(item[col.key]) || 0, style, onChange: (v) => onChange(col.key, Number(v)) })]);
   }
   if (col.kind === 'text') {
+    const suggestions = col.suggest ? col.suggest(item) : [];
+    const listId = suggestions.length ? 'dl-' + col.key + '-' + Math.random().toString(36).slice(2, 7) : null;
     const inp = el('input', {
       type: 'text', value: item[col.key] ?? '', style, placeholder: col.placeholder || '',
+      ...(listId ? { list: listId } : {}),
       oninput: (e) => { fitText(e.target); onChange(col.key, e.target.value); },
+      // Choosing a saved entry (not typing one) fills in its price, which stays editable.
+      onchange: (e) => {
+        const hit = suggestions.find((o) => o.name === e.target.value);
+        if (hit && Number(hit.price) && !Number(item.customPrice)) onChange('customPrice', hit.price);
+      },
     });
     fitText(inp);
-    return el('td', {}, [inp]);
+    if (!listId) return el('td', {}, [inp]);
+    return el('td', {}, [inp, el('datalist', { id: listId }, suggestions.map((o) => el('option', { value: o.name }, [])))]);
   }
   if (col.kind === 'num') {
     const placeholder = typeof col.placeholder === 'function' ? col.placeholder(item) : (col.placeholder || '');
@@ -539,7 +550,7 @@ function sheet(q, rerender) {
     // Changing the table refilters the Product/Description options, so rebuild the row.
     // Save on every keystroke, draft row included — otherwise a refresh (or a browser
     // that never gets to "Add line") silently loses whatever was typed into it.
-    const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table') rerender(); };
+    const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table' || key === 'customPrice') rerender(); };
     // Every charge should be checkable without trusting the app: click the price and
     // it shows the arithmetic that produced it.
     const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
