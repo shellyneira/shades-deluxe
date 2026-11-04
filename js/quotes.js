@@ -2,7 +2,7 @@
 import { el, input, checkbox, mount, toast, FRACTION_LABEL } from './dom.js';
 import { dropdown, combo, selectField, dateField, multiDropdown, iconButton, confirmAction, labeled } from './ui.js';
 import { getState, save, STAGES, PAYMENTS, isInvoiceStage, payPct, newQuote, duplicateQuote, getQuote, deleteQuote, assignInvoiceNumber } from './store.js';
-import { computeLine, isSizeless, isOtherLine, OTHER_LINES, SERVICE_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
+import { computeLine, isSizeless, isOtherLine, OTHER_LINES, SERVICE_TABLE, CUSTOM_TABLE, ACCESSORY_TABLE, lineIssues, describeLine, quoteTotals, money, money0, roundWhole, round2, DRAPERY_STYLES, draperyAutoInstall, installAutoText, explainLine, descFields } from './pricing.js';
 import { textToPdfBlob } from './pdf.js';
 
 let sub = { view: 'list', quoteId: null };
@@ -684,11 +684,15 @@ const sizeText = (l) => {
   return `${f(l.width, l.widthFrac)} × ${f(l.height, l.heightFrac)}`;
 };
 
+// The work order is what the shop orders from its supplier: shades and the parts that
+// come with them. Labour (services) and one-off charges are never ordered from anyone.
+const orderable = (l) => l.table !== SERVICE_TABLE && l.table !== CUSTOM_TABLE;
+
 // Plain-text version of the document — pasteable into WhatsApp / email.
 function docText(q, s, isWork) {
   const cfg = isWork ? s.docConfig.work : s.docConfig.client;
   const t = quoteTotals(q, s);
-  const rows = q.items.map((l, i) => {
+  const rows = (isWork ? q.items.filter(orderable) : q.items).map((l, i) => {
     const desc = describeLine(l, cfg, isWork, false, s);
     const size = isWork ? ` [${sizeText(l)}]` : '';
     const price = isWork ? '' : ` — ${money(computeLine(l, s).unit || 0)}`;
@@ -873,7 +877,7 @@ function labelsView(q, s) {
   const cfg = { ...s.docConfig.label, control: false };
   // One sticker per shade. This mapped over lines, so a line of six produced a
   // single label and five shades went out unlabelled.
-  const perShade = q.items.flatMap((l) => {
+  const perShade = q.items.filter((l) => !isOtherLine(l)).flatMap((l) => {
     const n = Math.max(1, Number(l.qty) || 1);
     return Array.from({ length: n }, (_, k) => ({ l, k, n }));
   });
@@ -954,6 +958,7 @@ function clientTable(q, s) {
 // Work order: same Description style (fields chosen in Settings) PLUS dimensions,
 // NO prices. Few columns so it always fits a page / PDF.
 function workTable(q, s, items = q.items) {
+  items = items.filter(orderable);
   const cfg = s.docConfig.work;
   // Qty was missing entirely: a line reading "Living room x 6" printed as one row
   // with no quantity, and the shop built one shade.
