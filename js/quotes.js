@@ -914,7 +914,7 @@ function sheet(q, rerender) {
     el('div', { class: 'sum-body' }, [totals, profitBox]),
   ]);
 
-  const addSectionBtn = el('button', { class: 'add-section', type: 'button' }, ['+ Add a section']);
+  const addSectionBtn = el('button', { class: 'add-section', type: 'button' }, ['+ Add shade, drapery, accessory or service']);
   addSectionBtn.onclick = () => addMenu(addSectionBtn);
   const body = sections.length
     ? sections.map(sheetMode() === 'sheet' ? sectionEl : listSectionEl)
