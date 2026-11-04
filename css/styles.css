@@ -539,15 +539,16 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
   /* margin:0 page leaves the browser no room to inject its URL/date/page footer */
   html, body, main { height: auto !important; min-height: 0 !important; }
-  .invoice { max-width: none; page: inv; }
+  .invoice { max-width: none; }
   /* the app already split the document into Letter pages: print them as they are */
   .invoice.page { width: 8.5in; height: 1055px; overflow: hidden; margin: 0; border: 0; box-shadow: none; break-after: page; }
   .invoice.page:last-child { break-after: auto; }
+  .invoice.page .pg { display: none; }
   .invoice .terms { break-inside: avoid; }
   .invoice .sum { break-inside: avoid; }
   .invoice table.items tr { break-inside: avoid; }
-  @page inv { margin: 0; }
-  @page { margin: 12mm; }
+  /* the pages are already laid out on Letter by the app: the printer adds no margin of its own */
+  @page { size: 8.5in 11in; margin: 0; }
 }
 
 /* ---------- live collaboration ---------- */
@@ -941,7 +942,7 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 }
 
 /* paginated Letter pages: the screen shows exactly what prints */
-.invoice.page { position: relative; height: 1056px; overflow: hidden; }
+.invoice.page { position: relative; height: 1056px; overflow: hidden; box-sizing: border-box; }
 .invoice.page .pg { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 10.5px; letter-spacing: .08em; color: var(--ink3); }
 .invoice-panel.paginating { visibility: hidden; }
 .invoice .doc-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--hair); color: var(--ink3); margin-right: 6px; vertical-align: 1px; }
