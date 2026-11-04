@@ -72,19 +72,25 @@ export function closePopover() {
 // clip it; it follows the anchor when the page scrolls or resizes (and closes only once
 // the anchor itself has scrolled out of view). It also closes on outside click and Escape.
 // One at a time.
-export function popover(anchor, node, { onClose, minWidth = true } = {}) {
+export function popover(anchor, node, { onClose, minWidth = true, at = null } = {}) {
   closePopover();
   node.classList.add('pop');
   document.body.append(node);
   anchor.setAttribute?.('aria-expanded', 'true');
+  // `at` ({x, y} of the click) opens the panel where the pointer is instead of at the anchor's
+  // edge, which matters when the anchor is a wide button. It keeps that offset while the page scrolls.
+  const r0 = anchor.getBoundingClientRect();
+  const dx = at ? at.x - r0.left : 0, dy = at ? at.y - r0.top : 0;
   const place = () => {
     const r = anchor.getBoundingClientRect();
     if (r.bottom < 0 || r.top > innerHeight) { closePopover(); return; }
     if (minWidth) node.style.minWidth = r.width + 'px';
     const w = node.offsetWidth, h = node.offsetHeight;
-    const below = innerHeight - r.bottom;
-    node.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
-    node.style.top = (below < h + 12 && r.top > h + 12 ? r.top - h - 6 : r.bottom + 6) + 'px';
+    const x = at ? r.left + dx - 24 : r.left;
+    const top = at ? r.top + dy : r.top, bottom = at ? r.top + dy + 6 : r.bottom;
+    const below = innerHeight - bottom;
+    node.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + 'px';
+    node.style.top = Math.max(8, below < h + 12 && top > h + 12 ? top - h - 6 : bottom + 6) + 'px';
   };
   place();
 

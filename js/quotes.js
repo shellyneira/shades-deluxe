@@ -851,7 +851,7 @@ function sheet(q, rerender) {
   const focusEditor = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] .ed-panel input:not([type=checkbox])`)?.focus(), 40);
 
   // The one place to start anything: a menu of every kind of line the quote can hold.
-  const addMenu = (anchor) => {
+  const addMenu = (anchor, at) => {
     const item = (label, hint, key) => el('div', { class: 'dd-opt', role: 'option', onclick: () => { closePopover(); openSection(key); } }, [
       el('span', { class: 'dd-label' }, [label]), hint ? el('em', {}, [hint]) : null,
     ]);
@@ -862,7 +862,7 @@ function sheet(q, rerender) {
       ...(allSections.some((x) => x.family === 'drapery') ? [el('div', { class: 'dd-group' }, ['Drapery'])] : []),
       ...allSections.filter((x) => x.family === 'drapery').map((x) => item(x.defaultTable, '', x.key)),
     ]);
-    popover(anchor, list, { minWidth: false });
+    popover(anchor, list, { minWidth: false, at });
   };
 
   const t = quoteTotals(q, s);
@@ -915,7 +915,7 @@ function sheet(q, rerender) {
   ]);
 
   const addSectionBtn = el('button', { class: 'add-section', type: 'button' }, ['+ Add shade, drapery, accessory or service']);
-  addSectionBtn.onclick = () => addMenu(addSectionBtn);
+  addSectionBtn.onclick = (e) => addMenu(addSectionBtn, e.detail ? { x: e.clientX, y: e.clientY } : undefined);
   const body = sections.length
     ? sections.map(sheetMode() === 'sheet' ? sectionEl : listSectionEl)
     : [el('div', { class: 'empty-sheet' }, [el('p', {}, ['Nothing here yet. Start with the kind of line you want to add.']), ...['shades', 'accessory', 'service'].filter((k) => k !== 'shades' || firstGrid).map((k) => el('button', { class: 'btn', type: 'button', onclick: () => openSection(k) }, [({ shades: 'Shade', accessory: 'Accessory', service: 'Service' })[k]]))])];
