@@ -855,14 +855,6 @@ table.sheet input[type="text"] { max-width: 480px; }
 .fam .sheet-wrap { border: 0; border-radius: 0; }
 .empty-sheet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 22px 4px; color: var(--muted); }
 .empty-sheet p { margin: 0 8px 0 0; }
-/* price and actions stay in view while the fields scroll sideways */
-table.sheet .stk { position: sticky; background: var(--panel); z-index: 2; }
-table.sheet th.stk { z-index: 3; background: var(--surface-sunken); }
-table.sheet .stk-a { right: 0; min-width: 76px; }
-table.sheet .stk-c { right: 76px; min-width: 76px; box-shadow: none; }
-table.sheet .stk-u { right: 152px; min-width: 84px; border-left: 1px solid var(--line); }
-table.sheet tbody tr:hover td.stk { background: var(--surface-hover); }
-table.sheet tr.draftrow td.stk { background: var(--bg); }
 table.sheet td.rowact .row-act { opacity: 0; transition: opacity .12s; }
 table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .row-act { opacity: 1; }
 @media (hover: none) { table.sheet td.rowact .row-act { opacity: 1; } }
@@ -879,12 +871,6 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .fam { margin-bottom: 26px; border: 1px solid var(--line-strong); box-shadow: var(--shadow-md, 0 2px 10px rgba(20,24,40,.08)); }
 .fam > header { background: var(--surface-sunken); border-bottom: 1px solid var(--line-strong); }
 .fam > header h4 { font-size: 16px; }
-/* the pinned price columns read as their own panel over the scrolling fields */
-table.sheet .stk { background: var(--panel); }
-table.sheet th.stk { background: var(--surface-sunken); }
-table.sheet .stk-u { box-shadow: -10px 0 12px -10px rgba(20, 24, 40, .22); border-left: 1px solid var(--line-strong); }
-table.sheet tr.draftrow td.stk { background: color-mix(in srgb, var(--brand-tint) 55%, var(--panel)); }
-table.sheet tbody tr:hover td.stk { background: var(--surface-hover); }
 /* the quote's views */
 .quote-tabs { margin: 18px 0 14px; }
 /* line editor */

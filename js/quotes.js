@@ -660,9 +660,9 @@ function sheet(q, rerender) {
     // Every charge should be checkable without trusting the app: click the price and
     // it shows the arithmetic that produced it.
     const priceNode = el('strong', { class: 'price-explain', title: 'Click to see how this price is calculated' }, ['—']);
-    const priceTd = el('td', { class: 'r price stk stk-u', onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
+    const priceTd = el('td', { class: 'r price', onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
     const clientNode = el('span', {}, ['—']);
-    const clientTd = el('td', { class: 'r stk stk-c', style: 'color:var(--muted)' }, [clientNode]);
+    const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
     priceCells.push({ committed: !sec, get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
     const cells = cols.map((col) => cell(col, item, onChange, { q, rerender }));
     const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
@@ -672,7 +672,7 @@ function sheet(q, rerender) {
     cells.push(priceTd);
     cells.push(clientTd);
     if (sec) {
-      cells.push(el('td', { class: 'stk stk-a', style: 'white-space:nowrap' }, [
+      cells.push(el('td', { style: 'white-space:nowrap' }, [
         iconButton('check', 'Add this line', 'ok', () => addLine(sec)),
         iconButton('undo', 'Clear this row', '', async () => { if (isRowEmpty(live()) || await confirmAction('Clear this row? What you typed in it will be lost.', 'Clear row')) { q._drafts[sec.key] = blankLine(s, sec.defaultTable); save(); rerender(); } }),
       ]));
@@ -681,7 +681,7 @@ function sheet(q, rerender) {
       tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented) { e.preventDefault(); addLine(sec); } });
       return tr;
     }
-    cells.push(el('td', { class: 'stk stk-a rowact', style: 'white-space:nowrap' }, [
+    cells.push(el('td', { class: 'rowact', style: 'white-space:nowrap' }, [
       iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(idx + 1, 0, { ...live(), id: undefined }); save(); rerender(); }),
       iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(idx, 1); save(); rerender(); } }),
     ]));
@@ -711,9 +711,9 @@ function sheet(q, rerender) {
     const cols = colsOf(sec);
     const head = el('tr', {}, [
       ...cols.map((c) => el('th', { style: `min-width:${c.w}px`, title: COL_HELP[c.key] || '' }, [c.label])),
-      el('th', { class: 'r stk stk-u', title: 'Internal full price for ONE unit (with installation, cents).' }, ['Unit $']),
-      el('th', { class: 'r stk stk-c', title: 'What the client sees per unit on the invoice — rounded, with installation shown as its own line.' }, ['Client $']),
-      el('th', { class: 'stk stk-a' }, ['']),
+      el('th', { class: 'r', title: 'Internal full price for ONE unit (with installation, cents).' }, ['Unit $']),
+      el('th', { class: 'r', title: 'What the client sees per unit on the invoice — rounded, with installation shown as its own line.' }, ['Client $']),
+      el('th', {}, ['']),
     ]);
     const body = [...linesOf(sec).map(({ it, idx }) => makeRow(it, cols, { idx })), makeRow(draftOf(sec), cols, { sec })];
     const count = el('span', { class: 'sub' }, ['']);
