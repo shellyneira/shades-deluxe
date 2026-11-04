@@ -536,6 +536,8 @@ input.field-chip-price:focus { outline: 0; border-color: var(--brand); backgroun
   .invoice table.items tr.print-gap { display: table-row; }
   .no-print { display: none !important; }
   html, body, main { background: var(--paper); margin: 0; max-width: none; padding: 0; }
+  /* beats `body.wide-sheet main` (the on-screen quote page width), which would otherwise keep its side padding and clip the sheet */
+  body.wide-sheet main { margin: 0 !important; max-width: none !important; padding: 0 !important; }
   .panel { box-shadow: none; border: 0; margin: 0; padding: 0; }
   /* margin:0 page leaves the browser no room to inject its URL/date/page footer */
   html, body, main { height: auto !important; min-height: 0 !important; }
