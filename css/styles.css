@@ -873,8 +873,9 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .fam > header h4 { font-size: 16px; }
 /* the quote's views */
 .quote-tabs { margin: 18px 0 14px; }
-/* line editor: a list; the chosen line opens right under its row, full width */
-.ed-list { min-height: 0; }
+/* line editor: the list on the left, the chosen line's fields on the right; the page is the only thing that scrolls */
+.ed-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); align-items: stretch; }
+.ed-list { min-height: 0; border-right: 1px solid var(--line); }
 .edrow { display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .edrow:hover { background: var(--surface-hover); }
 .edrow.active { background: var(--brand-tint); box-shadow: inset 3px 0 0 var(--brand); }
@@ -884,7 +885,8 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .edmain small { color: var(--muted); font-size: 12px; }
 .edprice { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .edadd { color: var(--brand); }
-.ed-panel { background: var(--bg); border-bottom: 1px solid var(--line-strong); box-shadow: inset 3px 0 0 var(--brand); }
+.ed-panel { background: var(--bg); display: flex; flex-direction: column; }
+.ed-panel .ed-body { flex: 1; }
 .ed-head { display: flex; align-items: center; gap: 8px; padding: 14px 20px 0; }
 .ed-head h4 { margin: 0; font-size: 14px; }
 .ed-head .grow { flex: 1; }
@@ -903,3 +905,4 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .quote-bar .quote-tabs { margin: 0; }
 .quote-bar { scroll-margin-top: 76px; }
 @media screen { html { scrollbar-gutter: stable; } }
+@media (max-width: 900px) { .ed-wrap { grid-template-columns: 1fr; } .ed-list { border-right: 0; border-bottom: 1px solid var(--line); } }

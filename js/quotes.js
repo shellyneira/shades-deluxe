@@ -781,7 +781,7 @@ function sheet(q, rerender) {
     // The action sits where the form ends: that is where the eye and the cursor are when it is filled.
     const action = target.draft
       ? el('button', { class: 'btn primary', type: 'button', onclick: () => addLine(sec) }, ['Add line'])
-      : el('button', { class: 'btn', type: 'button', onclick: () => { editorSel.set(key, null); rerender(); } }, ['Done']);
+      : el('button', { class: 'btn', type: 'button', onclick: () => { editorSel.set(key, 'new'); rerender(); } }, ['Done']);
     const box = el('div', { class: 'ed-panel' }, [
       el('div', { class: 'ed-head' }, head),
       el('div', { class: 'ed-body' }, body),
@@ -795,31 +795,31 @@ function sheet(q, rerender) {
     const cols = colsOf(sec);
     const key = q.id + '|' + sec.key;
     const lines = linesOf(sec);
-    // A section with lines starts collapsed; an empty one opens straight into its first line.
+    // The editor on the right shows the chosen line, or a blank one for the next line to add.
     let sel = editorSel.get(key);
-    if (sel === undefined) { sel = lines.length ? null : 'new'; editorSel.set(key, sel); }
-    if (typeof sel === 'number' && !q.items[sel]) sel = null;
-    const toggle = (target) => { editorSel.set(key, sel === target ? null : target); rerender(); if (sel !== target) focusEditor(sec.key); };
-    const rows = lines.flatMap(({ it, idx }) => {
+    if (sel === undefined || (typeof sel === 'number' && !q.items[sel])) sel = 'new';
+    // Picking an existing line opens it without stealing the cursor; only a new line takes focus.
+    const pick = (target) => { editorSel.set(key, target); rerender(); if (target === 'new') focusEditor(sec.key); };
+    const rows = lines.map(({ it, idx }) => {
       const sm = lineSummary(it);
       const priceNode = el('strong', {}, ['—']);
       const priceTd = el('div', { class: 'edprice' }, [priceNode]);
       priceCells.push({ committed: true, get item() { return q.items[idx] || it; }, node: priceNode, td: priceTd, client: el('span', {}, []), dims: {} });
-      const row = el('div', { class: 'edrow' + (sel === idx ? ' active' : ''), tabindex: 0, role: 'button', 'aria-expanded': String(sel === idx), onclick: () => toggle(idx) }, [
+      const row = el('div', { class: 'edrow' + (sel === idx ? ' active' : ''), tabindex: 0, role: 'button', 'aria-pressed': String(sel === idx), onclick: () => pick(idx) }, [
         el('div', { class: 'edmain' }, [el('b', {}, [(Number(it.qty) > 1 ? it.qty + ' × ' : '') + sm.main]), sm.what ? el('span', {}, [sm.what]) : null, sm.size ? el('small', {}, [sm.size]) : null]),
         priceTd,
       ]);
-      row.addEventListener('keydown', (e) => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(idx); } });
-      return sel === idx ? [row, editorEl(sec, cols, { idx })] : [row];
+      row.addEventListener('keydown', (e) => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(idx); } });
+      return row;
     });
-    const addRow = el('div', { class: 'edrow edadd' + (sel === 'new' ? ' active' : ''), tabindex: 0, role: 'button', 'aria-expanded': String(sel === 'new'), onclick: () => toggle('new') }, [el('div', { class: 'edmain' }, [el('b', {}, ['+ New line'])])]);
-    addRow.addEventListener('keydown', (e) => { if (e.target === addRow && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle('new'); } });
+    const addRow = el('div', { class: 'edrow edadd' + (sel === 'new' ? ' active' : ''), tabindex: 0, role: 'button', 'aria-pressed': String(sel === 'new'), onclick: () => pick('new') }, [el('div', { class: 'edmain' }, [el('b', {}, ['+ New line'])])]);
+    addRow.addEventListener('keydown', (e) => { if (e.target === addRow && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick('new'); } });
     const count = el('span', { class: 'sub' }, ['']);
     const sub = el('strong', { class: 'sec-sub' }, ['']);
     secRefs.push({ sec, count, sub });
     return el('section', { class: 'fam', 'data-sec': sec.key }, [
       el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
-      el('div', { class: 'ed-list' }, [...rows, addRow, ...(sel === 'new' ? [editorEl(sec, cols, { draft: true })] : [])]),
+      el('div', { class: 'ed-wrap' }, [el('div', { class: 'ed-list' }, [...rows, addRow]), sel === 'new' ? editorEl(sec, cols, { draft: true }) : editorEl(sec, cols, { idx: sel })]),
     ]);
   };
   const focusEditor = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] .ed-panel input:not([type=checkbox])`)?.focus(), 40);
