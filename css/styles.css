@@ -831,7 +831,7 @@ table.sheet td { white-space: nowrap; }
 table.sheet .dd-text { flex: 1 0 auto; overflow: visible; text-overflow: clip; }
 table.sheet .dd { width: 100%; }
 table.sheet input:not([type="checkbox"]) { field-sizing: content; width: 100%; }
-table.sheet input[type="text"] { max-width: 480px; }
+table.sheet input[type="text"], table.sheet .combo { max-width: 480px; }
 
 /* ---- worksheet sections: one table per kind of line ---- */
 .fam { margin-bottom: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
@@ -940,3 +940,18 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .invoice.page .pg { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 10.5px; letter-spacing: .08em; color: var(--ink3); }
 .invoice-panel.paginating { visibility: hidden; }
 .invoice table.items.fixed { table-layout: fixed; }
+
+/* reordering: a grip on every line and section, and a line showing where it will land */
+.drag-handle.grip { cursor: grab; user-select: none; padding: 0 6px; color: var(--muted); }
+.drag-handle.grip:active { cursor: grabbing; }
+.dragging { opacity: .4; }
+tr.drop-before > td { box-shadow: inset 0 2px 0 var(--brand); }
+tr.drop-after > td { box-shadow: inset 0 -2px 0 var(--brand); }
+.edrow.drop-before { box-shadow: inset 0 2px 0 var(--brand); }
+.edrow.drop-after { box-shadow: inset 0 -2px 0 var(--brand); }
+.fam.drop-before { box-shadow: 0 -3px 0 var(--brand); }
+.fam.drop-after { box-shadow: 0 3px 0 var(--brand); }
+.fam > header .grip { margin-left: -6px; }
+.edrow .grip { align-self: center; margin-left: -6px; }
+table.sheet .grip-cell { width: 26px; min-width: 26px; padding: 0 0 0 4px; text-align: center; }
+.edrow .edmain { flex: 1; }

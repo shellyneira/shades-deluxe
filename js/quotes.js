@@ -523,6 +523,64 @@ const EDITOR_GROUPS = [
 ];
 const editorSel = new Map(); // "quote|section" -> index of the line being edited, or 'new'
 
+// The order sections appear in is the quote's own (dragged by the user); sections never dragged keep the default.
+const defaultSectionOrder = (tables) => ['shades', ...Object.keys(tables).filter((n) => tables[n].kind === 'formula').map((n) => 'drapery:' + n), 'accessory', 'service'];
+const sectionOrderOf = (q, tables) => { const saved = q.sectionOrder || []; return [...saved, ...defaultSectionOrder(tables).filter((k) => !saved.includes(k))]; };
+// Documents list lines section by section in that same order (rows keep the order they have in their section).
+function orderedItems(q, s) {
+  const order = sectionOrderOf(q, s.tables);
+  const rank = (it) => { const i = order.indexOf(sectionKeyOf(it, s.tables)); return i < 0 ? order.length : i; };
+  return q.items.map((it, i) => ({ it, i })).sort((a, b) => rank(a.it) - rank(b.it) || a.i - b.i).map((x) => x.it);
+}
+
+// Drag to reorder: grab the handle, drop on a sibling. One drag at a time, same group only.
+let dragging = null;
+function reorderable(handle, target, group, id, onMove, siblings) {
+  handle.draggable = true;
+  handle.title = (handle.title || 'Drag to reorder') + ' — or focus it and press ↑ ↓';
+  handle.tabIndex = 0;
+  handle.dataset.grip = group + '|' + id;
+  // The keyboard does the same job as the mouse, so reordering never depends on drag and drop working.
+  handle.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const ids = siblings();
+    const to = ids[ids.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1)];
+    if (to === undefined) return;
+    e.preventDefault();
+    onMove(id, to, e.key === 'ArrowUp');
+    setTimeout(() => document.querySelector(`[data-grip="${CSS.escape(group + '|' + id)}"]`)?.focus(), 60);
+  });
+  handle.addEventListener('dragstart', (e) => {
+    dragging = { group, id };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(id));
+    e.dataTransfer.setDragImage(target, 12, 12);
+    requestAnimationFrame(() => target.classList.add('dragging'));
+  });
+  handle.addEventListener('dragend', () => {
+    dragging = null;
+    document.querySelectorAll('.dragging, .drop-before, .drop-after').forEach((n) => n.classList.remove('dragging', 'drop-before', 'drop-after'));
+  });
+  const side = (e) => { const r = target.getBoundingClientRect(); return e.clientY < r.top + r.height / 2 ? 'before' : 'after'; };
+  target.addEventListener('dragover', (e) => {
+    if (!dragging || dragging.group !== group || dragging.id === id) return;
+    e.preventDefault();
+    const sd = side(e);
+    target.classList.toggle('drop-before', sd === 'before');
+    target.classList.toggle('drop-after', sd === 'after');
+  });
+  target.addEventListener('dragleave', (e) => { if (!target.contains(e.relatedTarget)) target.classList.remove('drop-before', 'drop-after'); });
+  target.addEventListener('drop', (e) => {
+    if (!dragging || dragging.group !== group || dragging.id === id) return;
+    e.preventDefault();
+    const before = side(e) === 'before';
+    const from = dragging.id;
+    target.classList.remove('drop-before', 'drop-after');
+    onMove(from, id, before);
+  });
+}
+const dragGrip = (title) => el('span', { class: 'drag-handle grip', title }, ['⠿']);
+
 // One open-section memory per quote for this session: a section the user just asked for
 // exists even before it has a line, so there is somewhere to type the first one.
 const openedSections = new Map();
@@ -563,7 +621,9 @@ function sheet(q, rerender) {
   const titleOf = (sec) => sec.title || [...new Set(sec.groups.map((g) => g.label))].join(' & ') || 'Shades';
   const linesOf = (sec) => q.items.map((it, idx) => ({ it, idx })).filter(({ it }) => sectionKeyOf(it, tables) === sec.key);
   const isOpen = (sec) => linesOf(sec).length || openedSections.get(q.id)?.has(sec.key) || !isRowEmpty(q._drafts[sec.key] || {});
-  const sections = allSections.filter((sec) => (sec.family !== 'shade' || sec.defaultTable) && isOpen(sec));
+  const order = sectionOrderOf(q, tables);
+  const sections = allSections.filter((sec) => (sec.family !== 'shade' || sec.defaultTable) && isOpen(sec))
+    .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
 
   const priceCells = []; // {getItem, node}
   const insCells = []; // {item, input} — Drapery's live "auto install" placeholder
@@ -698,7 +758,10 @@ function sheet(q, rerender) {
       iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(idx + 1, 0, { ...live(), id: undefined }); save(); rerender(); }),
       iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(idx, 1); save(); rerender(); } }),
     ]));
+    const grip = dragGrip('Drag to reorder this line');
+    cells.unshift(el('td', { class: 'grip-cell' }, [grip]));
     const tr = el('tr', {}, cells);
+    reorderable(grip, tr, 'rows:' + sectionKeyOf(item, tables), item.id, moveLine, () => linesOf(sectionOfItem(live())).map(({ it }) => it.id));
     // Enter in the last row of a section starts the next one, like a spreadsheet.
     tr.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' || e.defaultPrevented || e.target.tagName !== 'INPUT' || e.target.type === 'checkbox') return;
@@ -730,6 +793,43 @@ function sheet(q, rerender) {
     focusLastRow(sec.key);
   };
 
+  // Moving a line only reorders it among the lines of its own section.
+  const moveLine = (fromId, toId, before) => {
+    const from = q.items.findIndex((l) => l.id === fromId), to0 = q.items.findIndex((l) => l.id === toId);
+    if (from < 0 || to0 < 0) return;
+    const [it] = q.items.splice(from, 1);
+    const to = q.items.findIndex((l) => l.id === toId);
+    q.items.splice(before ? to : to + 1, 0, it);
+    save();
+    rerender();
+  };
+  const moveSection = (fromKey, toKey, before) => {
+    const keys = sections.map((x) => x.key).filter((k) => k !== fromKey);
+    const to = keys.indexOf(toKey);
+    keys.splice(before ? to : to + 1, 0, fromKey);
+    q.sectionOrder = [...keys, ...order.filter((k) => !keys.includes(k))];
+    save();
+    rerender();
+  };
+  const deleteSection = async (sec) => {
+    const n = linesOf(sec).length;
+    const ok = !n || await confirmAction(`Delete the ${titleOf(sec)} section and its ${n} line${n === 1 ? '' : 's'} from this quote?`, 'Delete section');
+    if (!ok) return;
+    q.items = q.items.filter((it) => sectionKeyOf(it, tables) !== sec.key);
+    delete q._drafts[sec.key];
+    openedSections.get(q.id)?.delete(sec.key);
+    editorSel.delete(q.id + '|' + sec.key);
+    save();
+    rerender();
+  };
+  // Header of a section: grip to reorder it, name, count, and a delete for the whole section.
+  const secHeader = (sec, cols, count, sub) => el('header', {}, [
+    dragGrip('Drag to reorder this section'), el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []),
+    el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub,
+    iconButton('trash', 'Delete this section', 'danger', () => deleteSection(sec)),
+  ]);
+  const wireSection = (sec, node) => { reorderable(node.querySelector('header .grip'), node, 'sections', sec.key, moveSection, () => sections.map((x) => x.key)); return node; };
+
   const openSection = (key) => {
     const sec = allSections.find((x) => x.key === key);
     if (sheetMode() === 'sheet') { addBlank(sec); return; }
@@ -742,6 +842,7 @@ function sheet(q, rerender) {
   const sectionEl = (sec) => {
     const cols = colsOf(sec);
     const head = el('tr', {}, [
+      el('th', { class: 'grip-cell' }, ['']),
       ...cols.map((c) => el('th', { style: `min-width:${c.w}px`, title: COL_HELP[c.key] || '' }, [c.label])),
       el('th', { class: 'r', title: 'Internal full price for ONE unit (with installation, cents).' }, ['Unit $']),
       el('th', { class: 'r', title: 'What the client sees per unit on the invoice — rounded, with installation shown as its own line.' }, ['Client $']),
@@ -751,11 +852,11 @@ function sheet(q, rerender) {
     const count = el('span', { class: 'sub' }, ['']);
     const sub = el('strong', { class: 'sec-sub' }, ['']);
     secRefs.push({ sec, count, sub });
-    return el('section', { class: 'fam', 'data-sec': sec.key }, [
-      el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
+    return wireSection(sec, el('section', { class: 'fam', 'data-sec': sec.key }, [
+      secHeader(sec, cols, count, sub),
       el('div', { class: 'sheet-wrap' }, [el('table', { class: 'sheet' }, [el('thead', {}, [head]), el('tbody', {}, body)])]),
       el('div', { class: 'sec-foot' }, [el('button', { class: 'new-line', type: 'button', onclick: () => addBlank(sec) }, ['+ New line'])]),
-    ]);
+    ]));
   };
 
   // ---- line editor: a short list of lines, and every field of the chosen one stacked beside it
@@ -837,6 +938,10 @@ function sheet(q, rerender) {
         priceTd,
       ]);
       row.addEventListener('keydown', (e) => { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(idx); } });
+      const grip = dragGrip('Drag to reorder this line');
+      grip.addEventListener('click', (e) => e.stopPropagation());
+      row.prepend(grip);
+      reorderable(grip, row, 'rows:' + sec.key, it.id, moveLine, () => linesOf(sec).map(({ it: x }) => x.id));
       return row;
     });
     const addRow = el('div', { class: 'edrow edadd' + (sel === 'new' ? ' active' : ''), tabindex: 0, role: 'button', 'aria-pressed': String(sel === 'new'), onclick: () => pick('new') }, [el('div', { class: 'edmain' }, [el('b', {}, ['+ New line'])])]);
@@ -844,10 +949,10 @@ function sheet(q, rerender) {
     const count = el('span', { class: 'sub' }, ['']);
     const sub = el('strong', { class: 'sec-sub' }, ['']);
     secRefs.push({ sec, count, sub });
-    return el('section', { class: 'fam', 'data-sec': sec.key }, [
-      el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
+    return wireSection(sec, el('section', { class: 'fam', 'data-sec': sec.key }, [
+      secHeader(sec, cols, count, sub),
       el('div', { class: 'ed-wrap' }, [el('div', { class: 'ed-list' }, [...rows, addRow]), sel === 'new' ? editorEl(sec, cols, { draft: true }) : editorEl(sec, cols, { idx: sel })]),
-    ]);
+    ]));
   };
   const focusEditor = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] .ed-panel input:not([type=checkbox])`)?.focus(), 40);
 
@@ -1020,7 +1125,7 @@ function docView(q) {
 
   const catOf = (l) => s.tables[l.table]?.category;
   const cats = s.categories.filter((c) => q.items.some((l) => catOf(l) === c)); // types this quote actually has
-  const itemsFor = (c) => q.items.filter((l) => catOf(l) === c);
+  const itemsFor = (c) => orderedItems(q, s).filter((l) => catOf(l) === c);
   const picked = woSel ? cats.filter((c) => woSel.has(c)) : cats;
   const makerBar = isWork && cats.length > 1 ? el('div', { class: 'maker-bar no-print' }, [
     el('span', { class: 'hint' }, ['Work order for']),
@@ -1120,7 +1225,7 @@ function docView(q) {
 
   let docs;
   if (!isWork || picked.length < 2 || !woSeparate) {
-    const items = !isWork || picked.length === cats.length ? q.items : q.items.filter((l) => picked.includes(catOf(l)));
+    const items = !isWork || picked.length === cats.length ? orderedItems(q, s) : orderedItems(q, s).filter((l) => picked.includes(catOf(l)));
     docs = [build(items, !isWork || picked.length === cats.length ? null : { name: picked.join(' + ') })];
   } else docs = picked.map((c) => build(itemsFor(c), { name: c }));
   if (!docs.length) docs = [el('div', { class: 'empty' }, ['Nothing to show for this selection.'])];
@@ -1144,7 +1249,7 @@ function labelsView(q, s) {
   const cfg = { ...s.docConfig.label, control: false };
   // One sticker per shade. This mapped over lines, so a line of six produced a
   // single label and five shades went out unlabelled.
-  const perShade = q.items.filter((l) => !isOtherLine(l)).flatMap((l) => {
+  const perShade = orderedItems(q, s).filter((l) => !isOtherLine(l)).flatMap((l) => {
     const n = Math.max(1, Number(l.qty) || 1);
     return Array.from({ length: n }, (_, k) => ({ l, k, n }));
   });
@@ -1253,7 +1358,7 @@ function clientTable(q, s) {
     ]);
   };
   // One list, in the order the lines were added: shades, drapery, accessories and services together.
-  const rows = q.items.filter((l) => !bundle.hidden.has(l.id)).map(line);
+  const rows = orderedItems(q, s).filter((l) => !bundle.hidden.has(l.id)).map(line);
   return el('table', { class: 'items fixed' }, [
     el('colgroup', {}, ['7%', '16%', '47%', '15%', '15%'].map((w) => el('col', { style: `width:${w}` }, []))),
     el('thead', {}, [el('tr', {}, CLIENT_COLS.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
