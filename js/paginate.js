@@ -10,6 +10,7 @@
 // `table.items`), then an optional summary and terms. A section that runs onto the next
 // page gets its title ("continued") and column headings again.
 
+const PAGE_W = 816;        // 8.5 in at 96 dpi
 const PAGE_H = 1056;       // 11 in at 96 dpi
 const BOTTOM_SAFE = 44;    // content never runs into the bottom edge of a page
 const FIT_SLACK = 4;       // measured and final layouts may differ by a rounding error
@@ -18,6 +19,10 @@ export function paginate(inv) {
   const scroll = inv.querySelector(':scope > .inv-scroll');
   const tables = scroll ? [...scroll.querySelectorAll('table.items')] : [];
   if (!tables.length || !inv.isConnected) return [inv];
+  // A page is a Letter sheet whatever the window is: measuring at a narrower width would make pages
+  // that are not what prints. (A window narrower than a sheet just scrolls sideways.)
+  inv.style.width = PAGE_W + 'px';
+  inv.style.maxWidth = 'none';
 
   const top = inv.getBoundingClientRect().top;
   const yTop = (n) => n.getBoundingClientRect().top - top;

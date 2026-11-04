@@ -1222,11 +1222,6 @@ function bundling(q, s, showInstall, { singleOnly = false } = {}) {
 
 // The client quote reads in up to three parts — products (shades and drapery together), accessories,
 // and services — each with its own title and column headings, because they are bought differently.
-const CLIENT_SECTIONS = [
-  ['Products', (f) => f === 'shade' || f === 'drapery'],
-  ['Accessories', (f) => f === 'accessory'],
-  ['Services', (f) => f === 'service'],
-];
 const CLIENT_COLS = ['Qty', 'Location', 'Description', 'Unit Price', 'Total'];
 
 function clientTable(q, s) {
@@ -1248,32 +1243,21 @@ function clientTable(q, s) {
     const unpriced = c.unit == null;
     const names = familyOf(l, s.tables) === 'accessory' ? forNames(q, l) : [];
     const desc = [describeLine(l, cfg, false, false, s) + (names.length ? ` (for ${names.join(', ')})` : ''), ...(bundle.added.get(l.id) || []).map((t) => '+ ' + t)].filter(Boolean).join(', ');
-    return {
-      total: unpriced ? 0 : lineTotal,
-      tr: el('tr', { class: unpriced ? 'unpriced' : '' }, [
-        el('td', { class: 'num' }, [String(qty)]),
-        el('td', { class: 'strong' }, [l.location]),
-        el('td', { class: 'desc' }, [desc]),
-        el('td', { class: 'num' }, [unpriced ? 'TBD' : unitText]),
-        el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(lineTotal)]),
-      ]),
-    };
+    return el('tr', { class: unpriced ? 'unpriced' : '' }, [
+      el('td', { class: 'num' }, [String(qty)]),
+      el('td', { class: 'strong' }, [l.location]),
+      el('td', { class: 'desc' }, [desc]),
+      el('td', { class: 'num' }, [unpriced ? 'TBD' : unitText]),
+      el('td', { class: 'num strong' }, [unpriced ? 'TBD' : money0(lineTotal)]),
+    ]);
   };
-  const shown = q.items.filter((l) => !bundle.hidden.has(l.id));
-  const parts = CLIENT_SECTIONS
-    .map(([title, match]) => ({ title, lines: shown.filter((l) => match(familyOf(l, s.tables))).map(line) }))
-    .filter((p) => p.lines.length);
-  const table = (rows) => el('table', { class: 'items fixed' }, [
+  // One list, in the order the lines were added: shades, drapery, accessories and services together.
+  const rows = q.items.filter((l) => !bundle.hidden.has(l.id)).map(line);
+  return el('table', { class: 'items fixed' }, [
     el('colgroup', {}, ['7%', '16%', '47%', '15%', '15%'].map((w) => el('col', { style: `width:${w}` }, []))),
     el('thead', {}, [el('tr', {}, CLIENT_COLS.map((h, i) => el('th', { class: i === 0 || i >= 3 ? 'num' : '' }, [h])))]),
-    el('tbody', {}, rows),
+    el('tbody', {}, rows.length ? rows : [el('tr', {}, [el('td', { colspan: CLIENT_COLS.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]),
   ]);
-  if (!parts.length) return table([el('tr', {}, [el('td', { colspan: CLIENT_COLS.length, class: 'muted', style: 'text-align:center;padding:24px' }, ['No items'])])]);
-  return el('div', { class: 'inv-sections' }, parts.flatMap((p) => [
-    // One part needs no title; several do.
-    parts.length > 1 ? el('div', { class: 'sec-title' }, [el('b', {}, [p.title]), el('span', {}, [money0(p.lines.reduce((a, x) => a + x.total, 0))])]) : null,
-    table(p.lines.map((x) => x.tr)),
-  ]));
 }
 
 // Work order: same Description style (fields chosen in Settings) PLUS dimensions,

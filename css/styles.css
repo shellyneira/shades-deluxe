@@ -153,7 +153,6 @@ table.grid th .row-act { width: 22px; height: 22px; opacity: .45; margin-top: 2p
 .invoice .delivery-banner { margin: 4px 0 20px; padding: 10px 16px; border: 2px solid var(--brand); border-radius: var(--radius-sm); font-size: 20px; font-weight: 800; color: var(--brand); text-align: center; letter-spacing: .3px; }
 .invoice .parties { display: flex; justify-content: space-between; gap: 40px; margin-bottom: 16px; }
 .invoice .parties .ship { text-align: right; }
-@media screen and (max-width: 760px) { .invoice .parties { flex-direction: column; gap: 16px; } .invoice .parties .ship { text-align: left; } }
 .invoice .bill { padding: 2px 0 0; }
 .invoice .bill h4 { margin: 0 0 6px; font-size: 10.5px; text-transform: uppercase; color: var(--ink3); letter-spacing: 1px; font-weight: 700; }
 .invoice .bill-name { font-size: 16px; font-weight: 700; color: var(--ink1); }
@@ -229,13 +228,6 @@ table.grid th .row-act { width: 22px; height: 22px; opacity: .45; margin-top: 2p
   .field.grow { flex-basis: 100%; }
   .totals { width: 100%; }
   .list-split { grid-template-columns: 1fr; }
-  .invoice { padding: 22px 16px; }
-  .invoice .head { flex-direction: column; gap: 16px; }
-  .invoice .doc-title { text-align: left; }
-  .invoice .doc-meta { min-width: 0; }
-  .invoice .logo { width: 60px; height: 60px; }
-  .invoice .doc-title .t { font-size: 22px; letter-spacing: 3px; }
-  .invoice .sum-box { width: 100%; }
   .cards { grid-template-columns: 1fr; }
 }
 
@@ -948,8 +940,3 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .invoice.page .pg { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 10.5px; letter-spacing: .08em; color: var(--ink3); }
 .invoice-panel.paginating { visibility: hidden; }
 .invoice table.items.fixed { table-layout: fixed; }
-.invoice .sec-title { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 6px; padding: 0 11px; color: var(--ink1); }
-.invoice .sec-title:first-child { margin-top: 4px; }
-.invoice .sec-title b { font-size: 14px; letter-spacing: .2px; }
-.invoice .sec-title span { font-variant-numeric: tabular-nums; color: var(--ink3); font-size: 12.5px; }
-.invoice .sec-title .sec-cont { font-weight: 500; color: var(--ink3); font-size: 12px; margin-left: 4px; }
