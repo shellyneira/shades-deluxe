@@ -901,3 +901,5 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 @media (max-width: 800px) { .fam.summary .sum-body { grid-template-columns: 1fr; } }
 .quote-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 14px; }
 .quote-bar .quote-tabs { margin: 0; }
+.quote-bar { scroll-margin-top: 76px; }
+@media screen { html { scrollbar-gutter: stable; } }

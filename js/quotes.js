@@ -480,7 +480,9 @@ const setSheetMode = (m) => { try { localStorage.setItem('sd-sheet-mode', m); } 
 
 // The five views of one quote, always in the same place: between the client card and the lines.
 function quoteTabs(q, active) {
-  const tab = (id, label, go) => el('button', { type: 'button', class: 'subtab' + (active === id ? ' active' : ''), onclick: go }, [label]);
+  // Switching views keeps the bar where it is: the new view starts right under it instead of
+  // inheriting whatever scroll offset the old, taller or shorter, view had.
+  const tab = (id, label, go) => el('button', { type: 'button', class: 'subtab' + (active === id ? ' active' : ''), onclick: () => { go(); document.querySelector('.quote-bar')?.scrollIntoView({ block: 'start' }); } }, [label]);
   const doc = (mode) => () => { commitDraftIfFilled(q); invMode = mode; open(q.id, 'invoice'); };
   return el('div', { class: 'subtabs quote-tabs no-print' }, [
     tab('sheet', 'Worksheet', () => { setSheetMode('sheet'); open(q.id, 'edit'); }),
@@ -896,7 +898,7 @@ function sheet(q, rerender) {
 
   return el('div', { class: 'panel' }, [
     el('div', { class: 'section-head' }, [
-      el('h3', { style: 'margin:0' }, ['Worksheet']),
+      el('h3', { style: 'margin:0' }, [sheetMode() === 'sheet' ? 'Worksheet' : 'Line editor']),
       el('span', { class: 'hint' }, [sheetMode() === 'sheet' ? 'Each kind of line has its own section with only the fields that belong to it · scroll sideways inside a section.' : 'Pick a line to edit all of its fields, or start a new one.']),
       addBtn,
     ]),

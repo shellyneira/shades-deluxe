@@ -38,8 +38,8 @@ const segmentsFor = (view) => (view === 'dashboard' ? [] : [view, ...(ROUTES[vie
 // re-push forever.
 let canonicalizing = false;
 function syncUrl() {
-  // Preparing a quote gets the whole window, like a spreadsheet; documents keep their page width.
-  document.body.classList.toggle('wide-sheet', current === 'quotes' && quoteRoute().length === 1);
+  // The whole quote page — worksheet and its documents alike — shares one width, so switching views never shifts the sides.
+  document.body.classList.toggle('wide-sheet', current === 'quotes' && quoteRoute().length >= 1);
   const next = pathFor(segmentsFor(current));
   if (location.pathname === next || decodeURI(location.pathname) === decodeURI(next)) return;
   history[canonicalizing ? 'replaceState' : 'pushState'](null, '', next);
