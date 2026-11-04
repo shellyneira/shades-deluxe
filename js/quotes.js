@@ -132,7 +132,7 @@ function editor(q) {
   ]);
 
   // The worksheet rebuilds itself only when rows are added/removed (keeps input focus otherwise).
-  const dynamic = el('div', {});
+  const dynamic = el('div', { class: 'quote-content' });
   const inDoc = sub.view === 'invoice';
   const reRender = () => dynamic.replaceChildren(inDoc ? docView(q) : sheet(q, reRender));
   reRender();
@@ -480,9 +480,18 @@ const setSheetMode = (m) => { try { localStorage.setItem('sd-sheet-mode', m); } 
 
 // The five views of one quote, always in the same place: between the client card and the lines.
 function quoteTabs(q, active) {
-  // Switching views keeps the bar where it is: the new view starts right under it instead of
-  // inheriting whatever scroll offset the old, taller or shorter, view had.
-  const tab = (id, label, go) => el('button', { type: 'button', class: 'subtab' + (active === id ? ' active' : ''), onclick: () => { go(); document.querySelector('.quote-bar')?.scrollIntoView({ block: 'start' }); } }, [label]);
+  // Switching views must not move what you are looking at: the bar stays exactly where it is on
+  // screen and only what is under it changes (and eases in).
+  const tab = (id, label, go) => el('button', { type: 'button', class: 'subtab' + (active === id ? ' active' : ''), onclick: () => {
+    const before = document.querySelector('.quote-bar')?.getBoundingClientRect().top;
+    go();
+    const bar = document.querySelector('.quote-bar');
+    // Held still where it was — unless it was scrolled out of sight, then just under the top bar.
+    if (before != null && bar) scrollBy(0, bar.getBoundingClientRect().top - Math.max(before, 76));
+    const view = document.querySelector('.quote-content');
+    view?.classList.add('view-in');
+    view?.addEventListener('animationend', () => view.classList.remove('view-in'), { once: true });
+  } }, [label]);
   const doc = (mode) => () => { commitDraftIfFilled(q); invMode = mode; open(q.id, 'invoice'); };
   return el('div', { class: 'subtabs quote-tabs no-print' }, [
     tab('sheet', 'Worksheet', () => { setSheetMode('sheet'); open(q.id, 'edit'); }),

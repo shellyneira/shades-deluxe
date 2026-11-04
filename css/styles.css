@@ -903,6 +903,10 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 @media (max-width: 800px) { .fam.summary .sum-body { grid-template-columns: 1fr; } }
 .quote-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 14px; }
 .quote-bar .quote-tabs { margin: 0; }
-.quote-bar { scroll-margin-top: 76px; }
 @media screen { html { scrollbar-gutter: stable; } }
 @media (max-width: 900px) { .ed-wrap { grid-template-columns: 1fr; } .ed-list { border-right: 0; border-bottom: 1px solid var(--line); } }
+/* a view is never shorter than the screen, so swapping views can always hold the bar still */
+.quote-content { min-height: calc(100vh - 150px); }
+.quote-content.view-in { animation: viewIn .22s ease-out; }
+@keyframes viewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .quote-content.view-in { animation: none; } }
