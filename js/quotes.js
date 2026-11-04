@@ -272,7 +272,7 @@ function reorderByFieldOrder(cols, state) {
 // `hideWhen(item)` greys a cell out for rows where the field is meaningless.
 function columns(state, tables, categories, customLists) {
   const o = state.options;
-  const SH = ['shade'], DR = ['drapery'], SD = ['shade', 'drapery'], OT = ['accessory', 'service'], SIA = ['shade', 'drapery', 'accessory'], ALL = ['shade', 'drapery', 'accessory', 'service'];
+  const SH = ['shade'], DR = ['drapery'], SD = ['shade', 'drapery'], OT = ['accessory', 'service'], ALL = ['shade', 'drapery', 'accessory', 'service'];
   const opt = (arr) => ['', ...arr];
   const tableNames = Object.keys(tables);
   const forDrapery = (it) => isDrapery(it, tables);
@@ -330,7 +330,7 @@ function columns(state, tables, categories, customLists) {
     // Drapery Heavy/Sheer: same idea, but the "default" is a live formula (scales with
     // width) shown as a placeholder — leave it blank to use it, type a number to override.
     // Drapery Cornice/Swag/Grommet: no formula exists, so it behaves exactly like Brackets.
-    { key: 'installation', fam: SIA, label: 'Ins', kind: 'num', w: 58, placeholder: (it) => String(draperyAutoInstall(it, tables[it.table]) || '0') },
+    { key: 'installation', fam: ALL, label: 'Ins', kind: 'num', w: 58, placeholder: (it) => String(draperyAutoInstall(it, tables[it.table]) || '0') },
     { key: 'brackets', fam: SD, label: 'Bra', kind: 'num', w: 58 },
     { key: 'mount', fam: SD, label: 'Mount', kind: 'select', opts: opt(o.mount), w: 90 },
     { key: 'fabricPrice', fam: DR, label: 'Fabric $/yd', kind: 'num', w: 92, placeholder: '0', hideWhen: (it) => !forDrapery(it), naWhy: 'Fabric price per yard only applies to drapery — Roller and Zebra are priced from their chart' },
