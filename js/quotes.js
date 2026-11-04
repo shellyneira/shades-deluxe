@@ -696,7 +696,7 @@ function sheet(q, rerender) {
 
   // The one place to start anything: a menu of every kind of line the quote can hold.
   const addMenu = (anchor) => {
-    const item = (label, hint, key) => el('button', { type: 'button', class: 'dd-opt', onclick: () => { closePopover(); openSection(key); } }, [
+    const item = (label, hint, key) => el('div', { class: 'dd-opt', role: 'option', onclick: () => { closePopover(); openSection(key); } }, [
       el('span', { class: 'dd-label' }, [label]), hint ? el('em', {}, [hint]) : null,
     ]);
     const list = el('div', { class: 'dd-list' }, [
