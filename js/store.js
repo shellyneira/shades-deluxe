@@ -322,6 +322,17 @@ let lastSentConfig = '';
 // under them; once they pause, the newest write wins and both screens converge.
 const localTouch = {};
 const EDIT_GRACE = 1500;
+// Every version of a quote this device has pushed or broadcast. Our own writes echo
+// back late and out of order (the DB echo of "...lake" lands while "...lake conway"
+// is already on screen); matching only the latest push let the stale echo through
+// and it overwrote what had been typed since.
+const ownVersions = new Map();
+function rememberOwn(id, fp) {
+  let set = ownVersions.get(id);
+  if (!set) ownVersions.set(id, set = new Set());
+  set.add(fp);
+  if (set.size > 50) set.delete(set.values().next().value);
+}
 const pendingRemote = new Map();
 let pendingTimer;
 
@@ -382,6 +393,7 @@ function scheduleSync() {
     const changedQuotes = state.quotes.filter((q) => fingerprint(q) !== lastPushedQuote[q.id]);
     const changedTables = changedSince(lastPushedTable, tableRows(state));
     const changedLists = changedSince(lastPushedList, listRows(state));
+    changedQuotes.forEach((q) => rememberOwn(q.id, fingerprint(q)));
     setSyncState('saving');
     Promise.all([
       pushState({ ...config, quotes: [], tables: {}, minPrice: {}, options: {}, customLists: [] }),
@@ -421,6 +433,7 @@ function scheduleBroadcast() {
   broadcastTimer = setTimeout(() => {
     const patch = pendingBroadcast;
     pendingBroadcast = null;
+    patch.quotes.forEach((q) => rememberOwn(q.id, fingerprint(q)));
     if (!broadcastPatch(patch)) return;
     patch.quotes.forEach((q) => { lastSentQuote[q.id] = fingerprint(q); });
     patch.tables.forEach((r) => { lastSentTable[r.id] = fingerprint(r.data); });
@@ -480,8 +493,12 @@ function applyRows({ quotes = [], tables = [], lists = [], deletedQuotes = [], c
     // so our own push echoes back here. If it's exactly what we last pushed it carries no
     // new information — queuing it for delayed replay would just clobber whatever we've
     // typed since with our own older text.
-    if (fingerprint(q) === lastPushedQuote[q.id]) continue;
-    if (now - (localTouch[q.id] || 0) < EDIT_GRACE) { hold(q.id, q); continue; }
+    const fp = fingerprint(q);
+    if (fp === lastPushedQuote[q.id] || ownVersions.get(q.id)?.has(fp)) continue;
+    // Unsent local edits also mean the inbound copy is older than what's on screen
+    // (a pull that started before the last keystrokes); wait for our push to land.
+    const dirty = mine && fingerprint(mine) !== lastPushedQuote[q.id];
+    if (dirty || now - (localTouch[q.id] || 0) < EDIT_GRACE) { hold(q.id, q); continue; }
     if (mine) Object.assign(mine, q);
     else state.quotes.unshift(q);
     changed = true;
