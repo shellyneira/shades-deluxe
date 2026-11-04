@@ -910,3 +910,18 @@ table.sheet tr:hover td.rowact .row-act, table.sheet tr:focus-within td.rowact .
 .quote-content.view-in { animation: viewIn .22s ease-out; }
 @keyframes viewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .quote-content.view-in { animation: none; } }
+
+/* polish: clearer rows, a real "new line" affordance, and a way to add another kind of line */
+.edrow { padding: 14px 18px; align-items: flex-start; }
+.edmain b { font-size: 14.5px; }
+.edmain span { color: var(--ink-soft); line-height: 1.45; }
+.edprice { font-size: 14.5px; }
+.edrow.active { background: color-mix(in srgb, var(--brand-tint) 70%, var(--panel)); }
+.edadd { align-items: center; padding: 13px 18px; font-weight: 700; transition: background .12s; }
+.edadd:hover { background: var(--brand-tint); }
+.fam .tag { background: var(--panel); }
+.sec-foot { padding: 8px 12px; border-top: 1px solid var(--line); background: var(--panel); }
+.new-line { border: 0; background: transparent; color: var(--brand); font: inherit; font-weight: 700; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.new-line:hover { background: var(--brand-tint); }
+.add-section { display: block; width: 100%; margin: -8px 0 26px; padding: 14px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius); background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; transition: all .12s; }
+.add-section:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }

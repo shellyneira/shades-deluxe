@@ -715,6 +715,13 @@ function sheet(q, rerender) {
   };
   const focusDraft = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] :is(tr.draftrow, .ed-panel) input:not([type=checkbox])`)?.focus(), 40);
 
+  // "+ New line": add what is already typed in the row, or put the cursor in it to start.
+  const newLine = (sec) => {
+    const d = q._drafts[sec.key] || draftOf(sec);
+    const filled = ['accessory', 'service'].includes(sec.family) ? hasSizelessContent(d) : d.width && d.height;
+    if (filled) addLine(sec); else focusDraft(sec.key);
+  };
+
   const openSection = (key) => {
     if (!openedSections.has(q.id)) openedSections.set(q.id, new Set());
     openedSections.get(q.id).add(key);
@@ -737,6 +744,7 @@ function sheet(q, rerender) {
     return el('section', { class: 'fam', 'data-sec': sec.key }, [
       el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
       el('div', { class: 'sheet-wrap' }, [el('table', { class: 'sheet' }, [el('thead', {}, [head]), el('tbody', {}, body)])]),
+      el('div', { class: 'sec-foot' }, [el('button', { class: 'new-line', type: 'button', onclick: () => newLine(sec) }, ['+ New line'])]),
     ]);
   };
 
@@ -899,6 +907,8 @@ function sheet(q, rerender) {
 
   const addBtn = el('button', { class: 'btn primary', type: 'button' }, labeled('plus', 'Add to quote'));
   addBtn.onclick = () => addMenu(addBtn);
+  const addSectionBtn = el('button', { class: 'add-section', type: 'button' }, ['+ Add a section']);
+  addSectionBtn.onclick = () => addMenu(addSectionBtn);
   const body = sections.length
     ? sections.map(sheetMode() === 'sheet' ? sectionEl : listSectionEl)
     : [el('div', { class: 'empty-sheet' }, [el('p', {}, ['Nothing here yet. Start with the kind of line you want to add.']), ...['shades', 'accessory', 'service'].filter((k) => k !== 'shades' || firstGrid).map((k) => el('button', { class: 'btn', type: 'button', onclick: () => openSection(k) }, [({ shades: 'Shade', accessory: 'Accessory', service: 'Service' })[k]]))])];
@@ -912,6 +922,7 @@ function sheet(q, rerender) {
       addBtn,
     ]),
     ...body,
+    sections.length ? addSectionBtn : null,
     summary,
     el('div', { class: 'sumbar' }, [
       el('span', {}, ['Subtotal ', totalsRefs.barSub]),
