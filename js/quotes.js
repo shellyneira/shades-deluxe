@@ -100,7 +100,7 @@ function editor(q) {
   const set = (fn) => { fn(); save(); };
 
   const toolbar = el('div', { class: 'section-head no-print' }, [
-    el('button', { class: 'btn ghost', onclick: () => { sub = { view: 'list', quoteId: null }; renderQuotes(); } }, labeled('arrowLeft', 'All quotes')),
+    el('button', { class: 'btn ghost', onclick: () => { dropBlankLines(q); sub = { view: 'list', quoteId: null }; renderQuotes(); } }, labeled('arrowLeft', 'All quotes')),
     el('div', { class: 'row toolbar' }, [
       // One click, and this quote stops counting as business: it leaves every
       // dashboard number and never takes an invoice number.
@@ -191,6 +191,7 @@ function showBreakdown(item, s) {
 // the invoice never silently drops a line.
 const hasSizelessContent = (l) => Number(l.customPrice) || l.customText;
 function commitDraftIfFilled(q) {
+  dropBlankLines(q);
   const tables = getState().tables;
   for (const [key, d] of Object.entries(q._drafts || {})) {
     const sizeless = ['accessory', 'service'].includes(familyOf(d, tables));
@@ -221,7 +222,14 @@ function isRowEmpty(l) {
   return !l.width && !l.height && !l.location && !l.wdNumber && !l.product && !l.fabric &&
     !l.color && !l.control && !l.system && !l.style && !l.headrail && !l.bottomRail && !l.reverse &&
     !l.fascia && !l.cassette && !l.sideChannel && !l.installation && !l.brackets && !l.fabricPrice &&
-    !l.customText && !l.customPrice;
+    !l.customText && !l.customPrice && !l.motorPrice && !l.markup && !l.discount && !l.notes && !(l.forLines || []).length;
+}
+
+// A "+ New line" nobody filled in is not a line: it is dropped when you leave the worksheet, so it never
+// reaches a document or the totals.
+function dropBlankLines(q) {
+  const keep = q.items.filter((l) => !isRowEmpty(l));
+  if (keep.length !== q.items.length) { q.items = keep; save(); }
 }
 
 // A shade's Product/Fabric options are filtered by its table's category (Roller,
@@ -661,16 +669,15 @@ function sheet(q, rerender) {
   // every access instead; order is preserved by the merge, and the two operations
   // that do reorder (duplicate, remove) rerender. Drafts are replaced by the same
   // merge, so a draft row resolves its section's draft the same way.
-  const liveItem = (idx, sec, captured) => (sec ? q._drafts[sec.key] : q.items[idx]) || captured;
+  const liveItem = (idx, captured) => q.items[idx] || captured;
 
-  const makeRow = (captured, cols, { sec, idx } = {}) => {
+  const makeRow = (captured, cols, { idx }) => {
     // Falling back to `captured` (never to another line) keeps a row whose index went
     // away writing to its own dead object instead of corrupting a different line.
-    const live = () => liveItem(idx, sec, captured);
+    const live = () => liveItem(idx, captured);
     const item = live();
     // Changing the table refilters the Product/Description options, so rebuild the row.
-    // Save on every keystroke, draft rows included — otherwise a refresh (or a browser
-    // that never gets to "Add line") silently loses whatever was typed into them.
+    // Save on every keystroke — otherwise a refresh silently loses whatever was typed.
     const onChange = (key, val) => { live()[key] = val; save(); recalc(); if (key === 'table') rerender(); };
     // Every charge should be checkable without trusting the app: click the price and
     // it shows the arithmetic that produced it.
@@ -678,7 +685,7 @@ function sheet(q, rerender) {
     const priceTd = el('td', { class: 'r price', onclick: () => showBreakdown(live(), getState()) }, [priceNode]);
     const clientNode = el('span', {}, ['—']);
     const clientTd = el('td', { class: 'r', style: 'color:var(--muted)' }, [clientNode]);
-    priceCells.push({ committed: !sec, get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
+    priceCells.push({ committed: true, get item() { return live(); }, node: priceNode, td: priceTd, client: clientNode });
     const cells = cols.map((col) => cell(col, item, onChange, { q, rerender }));
     const insInput = cells[cols.findIndex((c) => c.key === 'installation')]?.querySelector('input[data-live-ins-placeholder]');
     if (insInput) insCells.push({ get item() { return live(); }, input: insInput });
@@ -686,22 +693,20 @@ function sheet(q, rerender) {
     priceCells[priceCells.length - 1].dims = { width: dimCell('width'), height: dimCell('height'), fabricPrice: dimCell('fabricPrice') };
     cells.push(priceTd);
     cells.push(clientTd);
-    if (sec) {
-      cells.push(el('td', { style: 'white-space:nowrap' }, [
-        iconButton('check', 'Add this line', 'ok', () => addLine(sec)),
-        iconButton('undo', 'Clear this row', '', async () => { if (isRowEmpty(live()) || await confirmAction('Clear this row? What you typed in it will be lost.', 'Clear row')) { q._drafts[sec.key] = blankLine(s, sec.defaultTable); save(); rerender(); } }),
-      ]));
-      const tr = el('tr', { class: 'draftrow' }, cells);
-      // Enter anywhere in the draft row commits it.
-      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.defaultPrevented) { e.preventDefault(); addLine(sec); } });
-      return tr;
-    }
     cells.push(el('td', { class: 'rowact', style: 'white-space:nowrap' }, [
       iconButton('copy', 'Duplicate this line', '', () => { q.items.splice(idx + 1, 0, { ...live(), id: undefined }); save(); rerender(); }),
       iconButton('trash', 'Delete this line', 'danger', async () => { if (await confirmAction('Delete this line from the quote?', 'Delete line')) { q.items.splice(idx, 1); save(); rerender(); } }),
     ]));
-    return el('tr', {}, cells);
+    const tr = el('tr', {}, cells);
+    // Enter in the last row of a section starts the next one, like a spreadsheet.
+    tr.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.defaultPrevented || e.target.tagName !== 'INPUT' || e.target.type === 'checkbox') return;
+      const last = linesOf(sectionOfItem(live())).at(-1);
+      if (last && last.idx === idx) { e.preventDefault(); addBlank(sectionOfItem(live())); }
+    });
+    return tr;
   };
+  const sectionOfItem = (it) => allSections.find((x) => x.key === sectionKeyOf(it, tables));
 
   const addLine = (sec) => {
     const d = q._drafts[sec.key] || draftOf(sec);
@@ -713,16 +718,20 @@ function sheet(q, rerender) {
     rerender();
     focusDraft(sec.key);
   };
-  const focusDraft = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] :is(tr.draftrow, .ed-panel) input:not([type=checkbox])`)?.focus(), 40);
+  const focusDraft = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] .ed-panel input:not([type=checkbox])`)?.focus(), 40);
+  const focusLastRow = (key) => setTimeout(() => document.querySelector(`[data-sec="${CSS.escape(key)}"] tbody tr:last-child input:not([type=checkbox])`)?.focus(), 40);
 
-  // "+ New line": add what is already typed in the row, or put the cursor in it to start.
-  const newLine = (sec) => {
-    const d = q._drafts[sec.key] || draftOf(sec);
-    const filled = ['accessory', 'service'].includes(sec.family) ? hasSizelessContent(d) : d.width && d.height;
-    if (filled) addLine(sec); else focusDraft(sec.key);
+  // "+ New line": a fresh row right away, whether or not the last one is finished.
+  const addBlank = (sec) => {
+    q.items.push(blankLine(s, sec.defaultTable));
+    save();
+    rerender();
+    focusLastRow(sec.key);
   };
 
   const openSection = (key) => {
+    const sec = allSections.find((x) => x.key === key);
+    if (sheetMode() === 'sheet') { addBlank(sec); return; }
     if (!openedSections.has(q.id)) openedSections.set(q.id, new Set());
     openedSections.get(q.id).add(key);
     rerender();
@@ -737,14 +746,14 @@ function sheet(q, rerender) {
       el('th', { class: 'r', title: 'What the client sees per unit on the invoice — rounded, with installation shown as its own line.' }, ['Client $']),
       el('th', {}, ['']),
     ]);
-    const body = [...linesOf(sec).map(({ it, idx }) => makeRow(it, cols, { idx })), makeRow(draftOf(sec), cols, { sec })];
+    const body = linesOf(sec).map(({ it, idx }) => makeRow(it, cols, { idx }));
     const count = el('span', { class: 'sub' }, ['']);
     const sub = el('strong', { class: 'sec-sub' }, ['']);
     secRefs.push({ sec, count, sub });
     return el('section', { class: 'fam', 'data-sec': sec.key }, [
       el('header', {}, [el('h4', {}, [titleOf(sec)]), count, el('span', { class: 'grow' }, []), el('span', { class: 'tag' }, [`${cols.length} fields · ${sec.tag}`]), sub]),
       el('div', { class: 'sheet-wrap' }, [el('table', { class: 'sheet' }, [el('thead', {}, [head]), el('tbody', {}, body)])]),
-      el('div', { class: 'sec-foot' }, [el('button', { class: 'new-line', type: 'button', onclick: () => newLine(sec) }, ['+ New line'])]),
+      el('div', { class: 'sec-foot' }, [el('button', { class: 'new-line', type: 'button', onclick: () => addBlank(sec) }, ['+ New line'])]),
     ]);
   };
 
@@ -846,14 +855,14 @@ function sheet(q, rerender) {
     const item = (label, hint, key) => el('div', { class: 'dd-opt', role: 'option', onclick: () => { closePopover(); openSection(key); } }, [
       el('span', { class: 'dd-label' }, [label]), hint ? el('em', {}, [hint]) : null,
     ]);
-    const list = el('div', { class: 'dd-list', style: 'max-height:min(460px, calc(100vh - 140px))' }, [
+    const list = el('div', { class: 'dd-list', style: 'width:300px; max-height:min(460px, calc(100vh - 140px))' }, [
       ...(firstGrid ? [item('Shade', groupsOf(isGrid).map((g) => g.label).join(', '), 'shades')] : []),
       item('Accessory', 'remote, charger, hub', 'accessory'),
       item('Service', 'service call, repair…', 'service'),
       ...(allSections.some((x) => x.family === 'drapery') ? [el('div', { class: 'dd-group' }, ['Drapery'])] : []),
       ...allSections.filter((x) => x.family === 'drapery').map((x) => item(x.defaultTable, '', x.key)),
     ]);
-    popover(anchor, list);
+    popover(anchor, list, { minWidth: false });
   };
 
   const t = quoteTotals(q, s);
@@ -905,8 +914,6 @@ function sheet(q, rerender) {
     el('div', { class: 'sum-body' }, [totals, profitBox]),
   ]);
 
-  const addBtn = el('button', { class: 'btn primary', type: 'button' }, labeled('plus', 'Add to quote'));
-  addBtn.onclick = () => addMenu(addBtn);
   const addSectionBtn = el('button', { class: 'add-section', type: 'button' }, ['+ Add a section']);
   addSectionBtn.onclick = () => addMenu(addSectionBtn);
   const body = sections.length
@@ -919,10 +926,9 @@ function sheet(q, rerender) {
     el('div', { class: 'section-head' }, [
       el('h3', { style: 'margin:0' }, [sheetMode() === 'sheet' ? 'Worksheet' : 'Line editor']),
       el('span', { class: 'hint' }, [sheetMode() === 'sheet' ? 'Each kind of line has its own section with only the fields that belong to it · scroll sideways inside a section.' : 'Pick a line to edit all of its fields, or start a new one.']),
-      addBtn,
     ]),
     ...body,
-    sections.length ? addSectionBtn : null,
+    addSectionBtn,
     summary,
     el('div', { class: 'sumbar' }, [
       el('span', {}, ['Subtotal ', totalsRefs.barSub]),
@@ -1003,6 +1009,7 @@ function shareButton(q, s, isWork) {
 
 // The printable documents, shown inline under the quote's view bar.
 function docView(q) {
+  dropBlankLines(q);
   const s = getState();
   const co = s.company;
   const t = quoteTotals(q, s);
