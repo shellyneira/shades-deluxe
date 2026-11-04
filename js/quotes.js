@@ -475,7 +475,7 @@ function cell(col, item, onChange, ctx = {}) {
 
 // How the quote page shows its lines: "sheet" (spreadsheet, fast for many similar lines)
 // or "lines" (a short list with every field of the chosen line stacked beside it).
-const sheetMode = () => { try { return localStorage.getItem('sd-sheet-mode') === 'sheet' ? 'sheet' : 'lines'; } catch { return 'lines'; } };
+const sheetMode = () => { try { return localStorage.getItem('sd-sheet-mode') === 'lines' ? 'lines' : 'sheet'; } catch { return 'sheet'; } };
 const setSheetMode = (m) => { try { localStorage.setItem('sd-sheet-mode', m); } catch { /* the choice just is not remembered */ } };
 
 // The five views of one quote, always in the same place: between the client card and the lines.
